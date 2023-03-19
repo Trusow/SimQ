@@ -10,6 +10,7 @@ namespace simq::util {
                 IS_EXISTS,
                 ACCESS_DENY,
                 UNKNOWN,
+                FS_ERROR,
                 DUPLICATE_GROUP,
                 NOT_FOUND_GROUP,
                 NOT_FOUND_SESSION,
