@@ -8,12 +8,14 @@
 namespace simq::util {
     class Buffer {
         private:
-            const unsigned int LENGTH_PACKET = 4096;
+            const unsigned int LENGTH_PACKET_ON_DISK = 4096;
+            const unsigned int LENGTH_PACKET_IN_MEMORY = 1024;
+
             struct Item {
                 unsigned int lengthEnd;
                 unsigned int length;
                 char **buffer;
-                unsigned long int **itemsDisk;
+                unsigned long int *itemsDisk;
             };
 
 
@@ -24,6 +26,10 @@ namespace simq::util {
 
             unsigned int getUniqID();
             void freeUniqID( unsigned int id );
+
+            std::mutex mFile;
+            std::map<unsigned long int, Item> freeFileOffsets;
+            unsigned long int fileOffset = 0;
 
         public:
             Buffer( const char *path );
