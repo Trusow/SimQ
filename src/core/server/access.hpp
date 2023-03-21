@@ -72,10 +72,9 @@ namespace simq::core::server {
         void _removeProducer( const char *group, const char *channel, const char *name );
         void _validateConsumer( const char *group, const char *channel, const char *name );
         void _validateProducer( const char *group, const char *channel, const char *name );
+        void wait( std::atomic_uint &atom );
      
         public:
-        void wait( std::atomic_uint &atom );
-
         void addGroup( const char *name, const unsigned char password[crypto::HASH_LENGTH] );
         void authGroup( const char *name, const unsigned char password[crypto::HASH_LENGTH], unsigned int fd );
         void removeGroup( const char *name );
