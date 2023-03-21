@@ -7,6 +7,7 @@ namespace simq::util {
             enum Err {
                 NOT_FOUND,
                 WRONG_PASSWORD,
+                WRONG_PARAM,
                 IS_EXISTS,
                 ACCESS_DENY,
                 UNKNOWN,
