@@ -33,7 +33,7 @@ namespace simq::util {
                 unsigned int length;
                 unsigned int packetSize;
                 char **buffer;
-                unsigned long int *itemsDisk;
+                unsigned long int *fileOffsets;
             };
 
             FILE *file = nullptr;
@@ -122,7 +122,7 @@ namespace simq::util {
                         }
                         delete[] items[i][b]->buffer;
                     } else {
-                        delete[] items[i][b]->itemsDisk;
+                        delete[] items[i][b]->fileOffsets;
                     }
                     delete items[i][b];
                 }
@@ -151,7 +151,7 @@ namespace simq::util {
         auto item = new Item{};
         item->packetSize = LENGTH_PACKET_ON_DISK;
         item->length++;
-        item->itemsDisk = new unsigned long int[1]{};
+        item->fileOffsets = new unsigned long int[1]{};
 
         items[offsetPacket][offset] = item;
 
@@ -161,7 +161,7 @@ namespace simq::util {
             expandFile();
         }
 
-        item->itemsDisk[0] = freeFileOffsets.front();
+        item->fileOffsets[0] = freeFileOffsets.front();
         freeFileOffsets.pop();
 
         return id;
@@ -231,10 +231,10 @@ namespace simq::util {
             std::lock_guard<std::mutex> lockFile( mFile );
 
             for( int i = 0; i < item->length; i++ ) {
-                freeFileOffsets.push( item->itemsDisk[i] );
+                freeFileOffsets.push( item->fileOffsets[i] );
             }
 
-            delete[] item->itemsDisk;
+            delete[] item->fileOffsets;
         }
 
         delete item;
@@ -319,7 +319,7 @@ namespace simq::util {
         if( wrData.startSize ) {
             FS::readFile(
                 file,
-                item->itemsDisk[wrData.startPartOffset] * packetSize + wrData.startOffset,
+                item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset,
                 wrData.startSize,
                 (void *)data
             );
@@ -329,7 +329,7 @@ namespace simq::util {
             wrData.startPartOffset++;
             FS::readFile(
                 file,
-                item->itemsDisk[wrData.startPartOffset] * packetSize,
+                item->fileOffsets[wrData.startPartOffset] * packetSize,
                 i == wrData.sizes - 1 ? wrData.startSize : packetSize,
                 (void *)&data[wrData.startSize + i * packetSize]
             );
@@ -350,7 +350,7 @@ namespace simq::util {
         if( wrData.startSize ) {
             FS::writeFile(
                 file,
-                item->itemsDisk[wrData.startPartOffset] * packetSize + wrData.startOffset,
+                item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset,
                 wrData.startSize,
                 (void *)data
             );
@@ -358,10 +358,10 @@ namespace simq::util {
 
         if( wrData.sizes ) {
             auto tmpItemsDisk = new unsigned long int[item->length + wrData.sizes]{};
-            memcpy( tmpItemsDisk, item->itemsDisk, item->length * sizeof( unsigned long int ) );
+            memcpy( tmpItemsDisk, item->fileOffsets, item->length * sizeof( unsigned long int ) );
 
-            delete[] item->itemsDisk;
-            item->itemsDisk = tmpItemsDisk;
+            delete[] item->fileOffsets;
+            item->fileOffsets = tmpItemsDisk;
             item->lengthEnd = wrData.endSize;
         } else {
             item->lengthEnd += wrData.startSize;
@@ -373,12 +373,12 @@ namespace simq::util {
             }
             wrData.startPartOffset++;
             item->length++;
-            item->itemsDisk[wrData.startPartOffset] = freeFileOffsets.front();
+            item->fileOffsets[wrData.startPartOffset] = freeFileOffsets.front();
             freeFileOffsets.pop();
 
             FS::writeFile(
                 file,
-                item->itemsDisk[wrData.startPartOffset] * packetSize,
+                item->fileOffsets[wrData.startPartOffset] * packetSize,
                 i == wrData.sizes - 1 ? wrData.endSize : packetSize,
                 (void *)&data[wrData.startSize + i * packetSize]
             );
