@@ -132,7 +132,7 @@ namespace simq::util {
             return 0;
         }
      
-        return fread( buffer, 1, length, file );
+        return fread( buffer, sizeof( char ), length, file );
     }
  
     bool FS::writeFile( FILE *file, unsigned int position, unsigned int length, void *buffer ) {
@@ -140,7 +140,7 @@ namespace simq::util {
             return false;
         }
      
-        unsigned int count = fwrite( buffer, 1, length, file );
+        unsigned int count = fwrite( buffer, sizeof( char ), length, file );
      
         return count == length;
     }
