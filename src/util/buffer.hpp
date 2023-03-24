@@ -9,6 +9,9 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <errno.h>
 #include "fs.hpp"
 #include "error.h"
 #include "lock_atomic.hpp"
@@ -77,6 +80,8 @@ namespace simq::util {
             void _writeFile( Item *item, const char *data, unsigned int length );
             char *_readBuffer( Item *item, char *data, unsigned int length, unsigned int offset );
             char *_readFile( Item *item, char *data, unsigned int length, unsigned int offset );
+            unsigned int _recvToBuffer( Item *item, unsigned int fd, unsigned int length );
+            unsigned int _recvToFile( Item *item, unsigned int fd, unsigned int length );
 
         public:
             Buffer( const char *path );
@@ -89,6 +94,7 @@ namespace simq::util {
             void write( unsigned int id, const char *data, unsigned int length );
             unsigned int getLength( unsigned int id );
             void read( unsigned int id, char *data, unsigned int length, unsigned int offset = 0 );
+            unsigned int recv( unsigned int id, unsigned int fd, unsigned int length );
     };
 
     Buffer::Buffer( const char *path ) {
@@ -338,6 +344,92 @@ namespace simq::util {
         return data;
     }
 
+    unsigned int Buffer::_recvToFile( Item *item, unsigned int fd, unsigned int length ) {
+        std::lock_guard<std::mutex> lock( mFile );
+
+        const unsigned int packetSize = LENGTH_PACKET_ON_DISK;
+        WRData wrData;
+        unsigned int fullLength = item->length == 1 ? item->lengthEnd : item->length * packetSize + item->lengthEnd;
+        _calculateWriteData( fullLength, packetSize, length, wrData );
+        char data[LENGTH_PACKET_ON_DISK];
+
+        if( wrData.startSize ) {
+
+            auto size = ::recv(
+                fd,
+                data,
+                length,
+                MSG_NOSIGNAL
+            );
+
+            if( size == -1 ) {
+                if( errno != EAGAIN ) {
+                    throw -1;
+                }
+
+                return 0;
+            }
+
+            FS::writeFile(
+                file,
+                item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset,
+                size,
+                (void *)data
+            );
+
+            item->lengthEnd += size;
+
+            return size;
+        }
+
+        if( wrData.sizes ) {
+            item->length++;
+            item->lengthEnd = 0;
+
+            auto tmpItemsDisk = new unsigned long int[item->length]{};
+            memcpy( tmpItemsDisk, item->fileOffsets, ( item->length - 1 ) * sizeof( unsigned long int ) );
+
+            delete[] item->fileOffsets;
+            item->fileOffsets = tmpItemsDisk;
+
+            if( freeFileOffsets.empty() ) {
+                expandFile();
+            }
+
+            wrData.startPartOffset++;
+            item->fileOffsets[wrData.startPartOffset] = freeFileOffsets.front();
+            freeFileOffsets.pop();
+
+            auto size = ::recv(
+                fd,
+                data,
+                1 == wrData.sizes ? wrData.endSize : packetSize,
+                MSG_NOSIGNAL
+            );
+
+            if( size == -1 ) {
+                if( errno != EAGAIN ) {
+                    throw -1;
+                }
+
+                return 0;
+            }
+
+            FS::writeFile(
+                file,
+                item->fileOffsets[wrData.startPartOffset] * packetSize,
+                size,
+                (void *)data
+            );
+
+            item->lengthEnd = size;
+
+            return size;
+        }
+
+        return 0;
+    }
+
     void Buffer::_writeFile( Item *item, const char *data, unsigned int length ) {
         std::lock_guard<std::mutex> lock( mFile );
 
@@ -409,6 +501,65 @@ namespace simq::util {
         }
 
         return data;
+    }
+
+    unsigned int Buffer::_recvToBuffer( Item *item, unsigned int fd, unsigned int length ) {
+        const unsigned int packetSize = item->packetSize;
+        WRData wrData;
+        unsigned int fullLength = item->length == 1 ? item->lengthEnd : item->length * packetSize + item->lengthEnd;
+        _calculateWriteData( fullLength, packetSize, length, wrData );
+
+        if( wrData.startSize ) {
+            auto size = ::recv(
+                fd,
+                &item->buffer[wrData.startPartOffset][wrData.startOffset],
+                wrData.startSize,
+                MSG_NOSIGNAL
+            );
+            if( size == -1 ) {
+                if( errno != EAGAIN ) {
+                    throw -1;
+                }
+
+                return 0;
+            }
+
+            item->lengthEnd += size;
+
+            return size;
+        }
+
+        if( wrData.sizes ) {
+            item->length++;
+            item->lengthEnd = 0;
+
+            auto tmpBuffer = new char*[item->length]{};
+            memcpy( tmpBuffer, item->buffer, ( item->length - 1 ) * sizeof( char * ) );
+
+            delete[] item->buffer;
+            item->buffer = tmpBuffer;
+
+            auto size = ::recv(
+                fd,
+                &item->buffer[wrData.startPartOffset+1][0],
+                1 == wrData.sizes ? wrData.endSize : packetSize,
+                MSG_NOSIGNAL
+            );
+            if( size == -1 ) {
+                if( errno != EAGAIN ) {
+                    throw -1;
+                }
+
+                return 0;
+            }
+
+            item->lengthEnd = size;
+
+            return size;
+        }
+
+        return 0;
+
     }
 
     void Buffer::_writeBuffer( Item *item, const char *data, unsigned int length ) {
@@ -495,6 +646,29 @@ namespace simq::util {
             _readBuffer( item, data, length, offset );
         } else {
             _readFile( item, data, length, offset );
+        }
+    }
+
+    unsigned int Buffer::recv( unsigned int id, unsigned int fd, unsigned int length ) {
+        wait( countItemsWrited );
+        std::shared_lock<std::shared_timed_mutex> lock( mItems );
+
+        if( id > uniqID ) {
+            return 0;
+        }
+
+        auto offsetPacket = id / SIZE_ITEM_PACKET;
+        auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
+        auto item = items[offsetPacket][offset];
+
+        if( item == nullptr ) {
+            return 0;
+        }
+
+        if( item->buffer ) {
+            return _recvToBuffer( item, fd, length );
+        } else {
+            return _recvToFile( item, fd, length );
         }
     }
 
