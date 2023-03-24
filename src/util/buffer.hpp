@@ -356,7 +356,7 @@ namespace simq::util {
 
             if( size == -1 ) {
                 if( errno != EAGAIN ) {
-                    throw -1;
+                    throw util::Error::SOCKET;
                 }
 
                 return 0;
@@ -377,7 +377,7 @@ namespace simq::util {
 
             if( size == -1 ) {
                 if( errno != EAGAIN ) {
-                    throw -1;
+                    throw util::Error::SOCKET;
                 }
 
                 return 0;
@@ -439,7 +439,7 @@ namespace simq::util {
 
             if( size == -1 ) {
                 if( errno != EAGAIN ) {
-                    throw -1;
+                    throw util::Error::SOCKET;
                 }
 
                 return 0;
@@ -484,7 +484,7 @@ namespace simq::util {
 
             if( size == -1 ) {
                 if( errno != EAGAIN ) {
-                    throw -1;
+                    throw util::Error::SOCKET;
                 }
 
                 return 0;
@@ -573,7 +573,7 @@ namespace simq::util {
 
             if( size == -1 ) {
                 if( errno != EAGAIN ) {
-                    throw -1;
+                    throw util::Error::SOCKET;
                 }
                 
                 return 0;
@@ -594,7 +594,7 @@ namespace simq::util {
 
             if( size == -1 ) {
                 if( errno != EAGAIN ) {
-                    throw -1;
+                    throw util::Error::SOCKET;
                 }
                 
                 return 0;
@@ -647,7 +647,7 @@ namespace simq::util {
             );
             if( size == -1 ) {
                 if( errno != EAGAIN ) {
-                    throw -1;
+                    throw util::Error::SOCKET;
                 }
 
                 return 0;
@@ -676,7 +676,7 @@ namespace simq::util {
             );
             if( size == -1 ) {
                 if( errno != EAGAIN ) {
-                    throw -1;
+                    throw util::Error::SOCKET;
                 }
 
                 return 0;

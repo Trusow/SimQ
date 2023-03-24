@@ -22,6 +22,7 @@ namespace simq::util {
                 DUPLICATE_CHANNEL,
                 DUPLICATE_CONSUMER,
                 DUPLICATE_PRODUCER,
+                SOCKET,
             };
     };
 }
