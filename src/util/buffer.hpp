@@ -9,9 +9,11 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
+#include <sys/sendfile.h>
 #include "fs.hpp"
 #include "error.h"
 #include "lock_atomic.hpp"
@@ -40,6 +42,7 @@ namespace simq::util {
             };
 
             FILE *file = nullptr;
+            unsigned int fileFD = 0;
 
 
             std::shared_timed_mutex mItems;
@@ -82,6 +85,18 @@ namespace simq::util {
             char *_readFile( Item *item, char *data, unsigned int length, unsigned int offset );
             unsigned int _recvToBuffer( Item *item, unsigned int fd, unsigned int length );
             unsigned int _recvToFile( Item *item, unsigned int fd, unsigned int length );
+            unsigned int _sendFromBuffer(
+                Item *item,
+                unsigned int fd,
+                unsigned int length,
+                unsigned int offset
+            );
+            unsigned int _sendFromFile(
+                Item *item,
+                unsigned int fd,
+                unsigned int length,
+                unsigned int offset
+            );
 
         public:
             Buffer( const char *path );
@@ -95,6 +110,7 @@ namespace simq::util {
             unsigned int getLength( unsigned int id );
             void read( unsigned int id, char *data, unsigned int length, unsigned int offset = 0 );
             unsigned int recv( unsigned int id, unsigned int fd, unsigned int length );
+            unsigned int send( unsigned int id, unsigned int fd, unsigned int length, unsigned int offset = 0 );
     };
 
     Buffer::Buffer( const char *path ) {
@@ -109,6 +125,8 @@ namespace simq::util {
         if( !file ) {
             throw util::Error::FS_ERROR;
         }
+
+        fileFD = fileno( file );
 
         initFileSize();
         initItems();
@@ -314,6 +332,63 @@ namespace simq::util {
         }
     }
 
+    unsigned int Buffer::_sendFromFile(
+        Item *item,
+        unsigned int fd,
+        unsigned int length,
+        unsigned int offset
+    ) {
+        std::lock_guard<std::mutex> lock( mFile );
+
+        const unsigned int packetSize = item->packetSize;
+        WRData wrData;
+        unsigned int fullLength = item->length == 1 ? item->lengthEnd : item->length * packetSize + item->lengthEnd;
+        _calculateReadData( fullLength, packetSize, offset, length, wrData );
+
+        if( wrData.startSize ) {
+            auto _offset = item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset;
+            auto size = ::sendfile(
+                fd,
+                fileFD,
+                (long *)&_offset,
+                wrData.startSize
+            );
+
+            if( size == -1 ) {
+                if( errno != EAGAIN ) {
+                    throw -1;
+                }
+
+                return 0;
+            }
+
+            return size;
+        }
+
+        if( wrData.sizes ) {
+            wrData.startPartOffset++;
+            auto _offset = item->fileOffsets[wrData.startPartOffset] * packetSize;
+            auto size = ::sendfile(
+                fd,
+                fileFD,
+                (long *)&_offset,
+                1 == wrData.sizes ? wrData.startSize : packetSize
+            );
+
+            if( size == -1 ) {
+                if( errno != EAGAIN ) {
+                    throw -1;
+                }
+
+                return 0;
+            }
+
+            return size;
+        }
+
+        return 0;
+    }
+
     char *Buffer::_readFile( Item *item, char *data, unsigned int length, unsigned int offset ) {
         std::lock_guard<std::mutex> lock( mFile );
 
@@ -475,6 +550,60 @@ namespace simq::util {
                 (void *)&data[wrData.startSize + i * packetSize]
             );
         }
+    }
+
+    unsigned int Buffer::_sendFromBuffer(
+        Item *item,
+        unsigned int fd,
+        unsigned int length,
+        unsigned int offset
+    ) {
+        const unsigned int packetSize = item->packetSize;
+        WRData wrData;
+        unsigned int fullLength = item->length == 1 ? item->lengthEnd : item->length * packetSize + item->lengthEnd;
+        _calculateReadData( fullLength, packetSize, offset, length, wrData );
+
+        if( wrData.startSize ) {
+            auto size = ::send(
+                fd,
+                &item->buffer[wrData.startPartOffset][wrData.startOffset],
+                wrData.startSize,
+                MSG_NOSIGNAL
+            );
+
+            if( size == -1 ) {
+                if( errno != EAGAIN ) {
+                    throw -1;
+                }
+                
+                return 0;
+            }
+
+            return size;
+        }
+
+        if( wrData.sizes ) {
+            wrData.startPartOffset++;
+
+            auto size = ::send(
+                fd,
+                &item->buffer[wrData.startPartOffset][0],
+                1 == wrData.sizes ? wrData.endSize : packetSize,
+                MSG_NOSIGNAL
+            );
+
+            if( size == -1 ) {
+                if( errno != EAGAIN ) {
+                    throw -1;
+                }
+                
+                return 0;
+            }
+
+            return size;
+        }
+
+        return 0;
     }
 
     char *Buffer::_readBuffer( Item *item, char *data, unsigned int length, unsigned int offset ) {
@@ -671,6 +800,36 @@ namespace simq::util {
             return _recvToFile( item, fd, length );
         }
     }
+
+    unsigned int Buffer::send(
+        unsigned int id,
+        unsigned int fd,
+        unsigned int length,
+        unsigned int offset
+    ) {
+        wait( countItemsWrited );
+        std::shared_lock<std::shared_timed_mutex> lock( mItems );
+
+        if( id > uniqID ) {
+            return 0;
+        }
+
+        auto offsetPacket = id / SIZE_ITEM_PACKET;
+        auto _offset = id - offsetPacket * SIZE_ITEM_PACKET;
+        auto item = items[offsetPacket][_offset];
+
+        if( item == nullptr ) {
+            return 0;
+        }
+
+        if( item->buffer ) {
+            return _sendFromBuffer( item, fd, length, offset );
+        } else {
+            return _sendFromFile( item, fd, length, offset );
+        }
+    }
+
+
 
     unsigned int Buffer::getUniqID() {
 
