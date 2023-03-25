@@ -79,6 +79,7 @@ namespace simq::util {
                 WRData &data
             );
 
+            Item *_getItem( unsigned int id );
             void _writeBuffer( Item *item, const char *data, unsigned int length );
             void _writeFile( Item *item, const char *data, unsigned int length );
             char *_readBuffer( Item *item, char *data, unsigned int length, unsigned int offset );
@@ -165,7 +166,7 @@ namespace simq::util {
 
     unsigned int Buffer::allocateOnDisk() {
         util::LockAtomic lockAtomicGroup( countItemsWrited );
-        std::lock_guard<std::shared_timed_mutex> lock( mItems );
+        std::lock_guard<std::shared_timed_mutex> lockItems( mItems );
 
         auto id = getUniqID();
 
@@ -197,7 +198,7 @@ namespace simq::util {
         }
 
         util::LockAtomic lockAtomicGroup( countItemsWrited );
-        std::lock_guard<std::shared_timed_mutex> lock( mItems );
+        std::lock_guard<std::shared_timed_mutex> lockItems( mItems );
 
         auto id = getUniqID();
 
@@ -215,33 +216,36 @@ namespace simq::util {
         return id;
     }
 
-    unsigned int Buffer::getLength( unsigned int id ) {
+    Buffer::Item *Buffer::_getItem( unsigned int id ) {
         if( id > uniqID ) {
-            return 0;
+            return nullptr;
         }
-
-        wait( countItemsWrited );
-        std::shared_lock<std::shared_timed_mutex> lock( mItems );
 
         auto offsetPacket = id / SIZE_ITEM_PACKET;
         auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
-        auto item = items[offsetPacket][offset];
+
+        return items[offsetPacket][offset];
+    }
+
+    unsigned int Buffer::getLength( unsigned int id ) {
+        wait( countItemsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockItems( mItems );
+
+        auto item = _getItem( id );
+
+        if( !item ) {
+            return 0;
+        }
 
         return item->packetSize * ( item->length - 1 ) + item->lengthEnd;
     }
 
     void Buffer::free( unsigned int id ) {
         util::LockAtomic lockAtomicGroup( countItemsWrited );
-        std::lock_guard<std::shared_timed_mutex> lock( mItems );
+        std::lock_guard<std::shared_timed_mutex> lockItems( mItems );
 
-        if( id > uniqID ) {
-            return;
-        }
-
-        auto offsetPacket = id / SIZE_ITEM_PACKET;
-        auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
-        auto item = items[offsetPacket][offset];
-
+        auto item = _getItem( id );
+        
         if( item == nullptr ) {
             return;
         }
@@ -262,6 +266,10 @@ namespace simq::util {
         }
 
         delete item;
+
+        auto offsetPacket = id / SIZE_ITEM_PACKET;
+        auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
+
         items[offsetPacket][offset] = nullptr;
         freeUniqID( id );
     }
@@ -338,7 +346,7 @@ namespace simq::util {
         unsigned int length,
         unsigned int offset
     ) {
-        std::lock_guard<std::mutex> lock( mFile );
+        std::lock_guard<std::mutex> lockFile( mFile );
 
         const unsigned int packetSize = item->packetSize;
         WRData wrData;
@@ -390,7 +398,7 @@ namespace simq::util {
     }
 
     char *Buffer::_readFile( Item *item, char *data, unsigned int length, unsigned int offset ) {
-        std::lock_guard<std::mutex> lock( mFile );
+        std::lock_guard<std::mutex> lockFile( mFile );
 
         const unsigned int packetSize = item->packetSize;
         WRData wrData;
@@ -420,7 +428,7 @@ namespace simq::util {
     }
 
     unsigned int Buffer::_recvToFile( Item *item, unsigned int fd, unsigned int length ) {
-        std::lock_guard<std::mutex> lock( mFile );
+        std::lock_guard<std::mutex> lockFile( mFile );
 
         const unsigned int packetSize = LENGTH_PACKET_ON_DISK;
         WRData wrData;
@@ -506,7 +514,7 @@ namespace simq::util {
     }
 
     void Buffer::_writeFile( Item *item, const char *data, unsigned int length ) {
-        std::lock_guard<std::mutex> lock( mFile );
+        std::lock_guard<std::mutex> lockFile( mFile );
 
 
         const unsigned int packetSize = LENGTH_PACKET_ON_DISK;
@@ -733,15 +741,9 @@ namespace simq::util {
 
     void Buffer::write( unsigned int id, const char *data, unsigned int length ) {
         wait( countItemsWrited );
-        std::shared_lock<std::shared_timed_mutex> lock( mItems );
+        std::shared_lock<std::shared_timed_mutex> lockItems( mItems );
 
-        if( id > uniqID ) {
-            return;
-        }
-
-        auto offsetPacket = id / SIZE_ITEM_PACKET;
-        auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
-        auto item = items[offsetPacket][offset];
+        auto item = _getItem( id );
 
         if( item == nullptr ) {
             return;
@@ -756,20 +758,13 @@ namespace simq::util {
 
     void Buffer::read( unsigned int id, char *data, unsigned int length, unsigned int offset ) {
         wait( countItemsWrited );
-        std::shared_lock<std::shared_timed_mutex> lock( mItems );
+        std::shared_lock<std::shared_timed_mutex> lockItems( mItems );
 
-        if( id > uniqID ) {
-            return;
-        }
-
-        auto offsetPacket = id / SIZE_ITEM_PACKET;
-        auto _offset = id - offsetPacket * SIZE_ITEM_PACKET;
-        auto item = items[offsetPacket][_offset];
+        auto item = _getItem( id );
 
         if( item == nullptr ) {
             return;
         }
-
 
         if( item->buffer ) {
             _readBuffer( item, data, length, offset );
@@ -780,15 +775,9 @@ namespace simq::util {
 
     unsigned int Buffer::recv( unsigned int id, unsigned int fd, unsigned int length ) {
         wait( countItemsWrited );
-        std::shared_lock<std::shared_timed_mutex> lock( mItems );
+        std::shared_lock<std::shared_timed_mutex> lockItems( mItems );
 
-        if( id > uniqID ) {
-            return 0;
-        }
-
-        auto offsetPacket = id / SIZE_ITEM_PACKET;
-        auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
-        auto item = items[offsetPacket][offset];
+        auto item = _getItem( id );
 
         if( item == nullptr ) {
             return 0;
@@ -808,15 +797,9 @@ namespace simq::util {
         unsigned int offset
     ) {
         wait( countItemsWrited );
-        std::shared_lock<std::shared_timed_mutex> lock( mItems );
+        std::shared_lock<std::shared_timed_mutex> lockItems( mItems );
 
-        if( id > uniqID ) {
-            return 0;
-        }
-
-        auto offsetPacket = id / SIZE_ITEM_PACKET;
-        auto _offset = id - offsetPacket * SIZE_ITEM_PACKET;
-        auto item = items[offsetPacket][_offset];
+        auto item = _getItem( id );
 
         if( item == nullptr ) {
             return 0;
