@@ -8,6 +8,8 @@ namespace simq::util {
                 NOT_FOUND,
                 WRONG_PASSWORD,
                 WRONG_PARAM,
+                WRONG_MESSAGE_SIZE,
+                EXCEED_LIMIT,
                 IS_EXISTS,
                 ACCESS_DENY,
                 UNKNOWN,
