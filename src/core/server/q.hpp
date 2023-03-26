@@ -1,9 +1,11 @@
 #ifndef SIMQ_CORE_SERVER_Q
 #define SIMQ_CORE_SERVER_Q
 
+#include <mutex>
 #include <shared_mutex>
 #include <map>
 #include <string>
+#include <string.h>
 #include <deque>
 #include <atomic>
 #include <iterator>
@@ -31,21 +33,26 @@ namespace simq::core::server {
                 unsigned int length;
                 unsigned int wrLength;
                 unsigned int offset;
+                bool isMemory;
             };
 
-            const unsigned int SIZE_ITEM_PACKET = 10'000;
+            const unsigned int MESSAGES_IN_PACKET = 10'000;
 
             struct Channel {
                 util::Buffer *buffer;
-                std::mutex *m;
+                std::mutex *mMessages;
+                std::mutex *mQ;
                 ChannelSettings settings;
                 unsigned int countInMemory;
                 unsigned int countOnDisk;
-                MessageData **messages;
+                MessageData ***messages;
                 unsigned int lengthMessages;
                 std::deque<unsigned int> q;
+                /*
+                std::mutex *mPublish;
                 std::map<unsigned int, std::queue<unsigned int>>subscribers;
                 std::map<unsigned int, unsigned int> publicMessagesCounter;
+                */
             };
 
             std::atomic_uint countGroupWrited {0};
@@ -56,6 +63,8 @@ namespace simq::core::server {
             std::map<std::string, std::map<std::string, Channel>> groups;
 
             void _wait( std::atomic_uint &atom );
+            void _expandMessagesPacket( const char *group, const char *channel );
+            void _addMessage( const char *group, const char *channel, unsigned int id, unsigned int length, bool isMemory );
         public:
             void addGroup( const char *group );
             void addChannel( const char *group, const char *channel, const char *path, ChannelSettings &settings );
@@ -71,24 +80,24 @@ namespace simq::core::server {
                 const char *channel,
                 unsigned int fd,
                 unsigned int id,
-                WRData &data
+                WRData &wrData
             );
             void send(
                 const char *group,
                 const char *channel,
                 unsigned int fd,
                 unsigned int id,
-                WRData &data
+                WRData &wrData
             );
 
-            void revertMessageToQ( const char *group, const char *channel, unsigned int id );
             void pushMessageToQ( const char *group, const char *channel, unsigned int id );
             unsigned int popMessageFromQ( const char *group, const char *channel );
+            void revertMessageToQ( const char *group, const char *channel, unsigned int id );
 
-            void subscribeToChannel( const char *group, const char *channel, unsigned int fd );
-            void unsubscribeFromChannel( const char *group, const char *channel, unsigned int fd );
+            //void subscribeToChannel( const char *group, const char *channel, unsigned int fd );
+            //void unsubscribeFromChannel( const char *group, const char *channel, unsigned int fd );
 
-            void publishMessage( const char *group, const char *channel, unsigned int id );
+            //void publishMessage( const char *group, const char *channel, unsigned int id );
     };
 
     void Q::_wait( std::atomic_uint &atom ) {
@@ -120,6 +129,9 @@ namespace simq::core::server {
         if( !groups.count( group ) ) {
             throw util::Error::NOT_FOUND_GROUP;
         }
+
+        // TODO: create remove channels
+
     }
 
     void Q::addChannel( const char *group, const char *channel, const char *path, ChannelSettings &settings ) {
@@ -131,13 +143,18 @@ namespace simq::core::server {
             throw util::Error::DUPLICATE_CHANNEL;
         }
 
+        // TODO validate settings
+
         util::LockAtomic lockAtomicChannel( countChannelWrited );
         std::lock_guard<std::shared_timed_mutex> lockChannel( mChannel );
 
         Channel _channel{0};
         _channel.buffer = new util::Buffer( path );
-        _channel.m = new std::mutex;
+        _channel.mMessages = new std::mutex;
+        _channel.mQ = new std::mutex;
         _channel.settings = settings;
+        _channel.messages = new MessageData**[1]{};
+        _channel.messages[0] = new MessageData*[MESSAGES_IN_PACKET]{};
         groups[group][channel] = _channel;
     }
 
@@ -149,6 +166,8 @@ namespace simq::core::server {
         } else if( !groups[group].count( channel ) ) {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
+
+        // TODO validate settings
 
         util::LockAtomic lockAtomicChannel( countChannelWrited );
         std::lock_guard<std::shared_timed_mutex> lockChannel( mChannel );
@@ -170,8 +189,52 @@ namespace simq::core::server {
 
         auto iter = groups[group].find( channel );
         delete iter->second.buffer;
-        delete iter->second.m;
+        delete iter->second.mMessages;
+        delete iter->second.mQ;
+        auto lengthMessages = iter->second.lengthMessages / MESSAGES_IN_PACKET;
+        if( iter->second.lengthMessages - lengthMessages * MESSAGES_IN_PACKET ) {
+            lengthMessages++;
+        }
+        for( int i = 0; i < lengthMessages; i++ ) {
+            for( int c = 0; c < MESSAGES_IN_PACKET; c++ ) {
+                if( iter->second.messages[i][c] ) {
+                    delete iter->second.messages[i][c];
+                }
+            }
+            delete[] iter->second.messages[i];
+        }
+
+        delete iter->second.messages;
         groups[group].erase( iter );
+    }
+
+    void Q::_expandMessagesPacket( const char *group, const char *channel ) {
+        auto &data = groups[group].find( channel )->second;
+
+        if( data.lengthMessages % MESSAGES_IN_PACKET != 0 ) {
+            return;
+        }
+
+        auto length = data.lengthMessages / MESSAGES_IN_PACKET;
+
+        auto tmpBuffer = new MessageData**[length+1]{};
+
+        if( length != 0 ) {
+            memcpy( tmpBuffer, data.messages, length * sizeof( MessageData ** ) );
+            delete[] data.messages;
+        }
+        data.messages[length] = new MessageData*[MESSAGES_IN_PACKET]{};
+    }
+
+    void Q::_addMessage( const char *group, const char *channel, unsigned int id, unsigned int length, bool isMemory ) {
+        auto offsetPacket = id / MESSAGES_IN_PACKET;
+        auto offset = groups[group][channel].lengthMessages - offsetPacket * MESSAGES_IN_PACKET;;
+
+        auto data = new MessageData{};
+        data->length = length;
+        data->isMemory = isMemory;
+
+        groups[group][channel].messages[offsetPacket][offset] = data;
     }
 
     unsigned int Q::createMessage( const char *group, const char *channel, unsigned int length ) {
@@ -194,24 +257,178 @@ namespace simq::core::server {
             throw util::Error::EXCEED_LIMIT;
         }
 
-        bool inMemory = false;
-        bool onDisk = false;
-        {
-            std::lock_guard<std::mutex> lockItem( *groups[group][channel].m );
-            if( data.countInMemory == settings.maxMessagesInMemory ) {
-                groups[group][channel].countOnDisk++;
-                onDisk = true;
-            } else {
-                groups[group][channel].countInMemory++;
-                inMemory = true;
-            }
+        std::lock_guard<std::mutex> lockItem( *groups[group][channel].mMessages );
+
+        unsigned int messageId;
+        bool isMemory = false;
+
+        if( data.countInMemory == settings.maxMessagesInMemory ) {
+            groups[group][channel].countOnDisk++;
+            messageId = groups[group][channel].buffer->allocateOnDisk();
+        } else {
+            isMemory = true;
+            groups[group][channel].countInMemory++;
+            messageId = groups[group][channel].buffer->allocate(
+                length < 4096 ? length : 4096
+            );
         }
 
-        if( inMemory ) {
-            return groups[group][channel].buffer->allocate( length < 4096 ? length : 4096 );
+        if( messageId > groups[group][channel].lengthMessages ) {
+            groups[group][channel].lengthMessages = messageId;
+            _expandMessagesPacket( group, channel );
         }
 
-        return groups[group][channel].buffer->allocateOnDisk();
+        _addMessage( group, channel, messageId, length, isMemory );
+
+        return messageId;
+    }
+
+    void Q::removeMessage( const char *group, const char *channel, unsigned int id ) {
+        _wait( countGroupWrited );
+        _wait( countChannelWrited );
+
+        if( !groups.count( group ) ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        } else if( !groups[group].count( channel ) ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto iter = groups[group].find( channel );
+        auto &settings = iter->second.settings;
+        auto &data = iter->second;
+
+        std::lock_guard<std::mutex> lockItem( *groups[group][channel].mMessages );
+
+        if( id > data.lengthMessages ) {
+            throw util::Error::WRONG_PARAM;
+        }
+
+        auto offsetPacket = id / MESSAGES_IN_PACKET;
+        auto offset = data.lengthMessages - offsetPacket * MESSAGES_IN_PACKET;;
+
+        if( data.messages[offsetPacket][offset]->isMemory ) {
+            data.countInMemory--;
+        } else {
+            data.countOnDisk--;
+        }
+        delete data.messages[offsetPacket][offset];
+        data.messages[offsetPacket][offset] = nullptr;
+    }
+
+    void Q::recv(
+        const char *group,
+        const char *channel,
+        unsigned int fd,
+        unsigned int id,
+        WRData &wrData
+    ) {
+        _wait( countGroupWrited );
+        _wait( countChannelWrited );
+
+        if( !groups.count( group ) ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        } else if( !groups[group].count( channel ) ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto iter = groups[group].find( channel );
+        auto &data = iter->second;
+
+        if( id > data.lengthMessages ) {
+            throw util::Error::WRONG_PARAM;
+        }
+
+        // TODO recv
+        //data.buffer->recv( id, fd, 0 );
+    }
+
+    void Q::send(
+        const char *group,
+        const char *channel,
+        unsigned int fd,
+        unsigned int id,
+        WRData &wrData
+    ) {
+        _wait( countGroupWrited );
+        _wait( countChannelWrited );
+
+        if( !groups.count( group ) ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        } else if( !groups[group].count( channel ) ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto iter = groups[group].find( channel );
+        auto &data = iter->second;
+
+        if( id > data.lengthMessages ) {
+            throw util::Error::WRONG_PARAM;
+        }
+
+        // TODO send
+        //data.buffer->recv( id, fd, 0 );
+    }
+
+    void Q::pushMessageToQ( const char *group, const char *channel, unsigned int id ) {
+        _wait( countGroupWrited );
+        _wait( countChannelWrited );
+
+        if( !groups.count( group ) ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        } else if( !groups[group].count( channel ) ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto iter = groups[group].find( channel );
+        auto &data = iter->second;
+
+        if( id > data.lengthMessages ) {
+            throw util::Error::WRONG_PARAM;
+        }
+
+        std::lock_guard<std::mutex> lockQ( *data.mQ );
+        data.q.push_back( id );
+    }
+
+    unsigned int Q::popMessageFromQ( const char *group, const char *channel ) {
+        _wait( countGroupWrited );
+        _wait( countChannelWrited );
+
+        if( !groups.count( group ) ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        } else if( !groups[group].count( channel ) ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto iter = groups[group].find( channel );
+        auto &data = iter->second;
+
+        std::lock_guard<std::mutex> lockQ( *data.mQ );
+        auto messageId = data.q.front();
+        data.q.pop_front();
+
+        return messageId;
+    }
+
+    void Q::revertMessageToQ( const char *group, const char *channel, unsigned int id ) {
+        _wait( countGroupWrited );
+        _wait( countChannelWrited );
+
+        if( !groups.count( group ) ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        } else if( !groups[group].count( channel ) ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto iter = groups[group].find( channel );
+        auto &data = iter->second;
+
+        if( id > data.lengthMessages ) {
+            throw util::Error::WRONG_PARAM;
+        }
+
+        std::lock_guard<std::mutex> lockQ( *data.mQ );
+        data.q.push_front( id );
     }
 }
 
