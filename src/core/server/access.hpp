@@ -103,7 +103,7 @@ namespace simq::core::server {
         void logout( unsigned int fd );
      
         bool canSendMessage( unsigned int fd );
-        bool canReceiveMessage( unsigned int fd );
+        bool canRecvMessage( unsigned int fd );
     };
 
     void Access::wait( std::atomic_uint &atom ) {
@@ -741,7 +741,7 @@ namespace simq::core::server {
         return iterSess->second.type == SessionType::PRODUCER;
     }
      
-    bool Access::canReceiveMessage( unsigned int fd ) {
+    bool Access::canRecvMessage( unsigned int fd ) {
         wait( countSessWrited );
         std::shared_lock<std::shared_timed_mutex> lockSess( mSess );
      
