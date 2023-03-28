@@ -11,18 +11,12 @@
 #include <iterator>
 #include "../../util/lock_atomic.hpp"
 #include "../../util/error.h"
+#include "../../util/types.h"
 #include "../../util/buffer.hpp"
 
 namespace simq::core::server {
     class Q {
         public:
-            struct ChannelSettings {
-                unsigned int minMessageSize;
-                unsigned int maxMessageSize;
-                unsigned int maxMessagesInMemory;
-                unsigned int maxMessagesOnDisk;
-            };
-
             struct WRData {
                 bool isPart;
                 bool isFull;
@@ -42,7 +36,7 @@ namespace simq::core::server {
                 util::Buffer *buffer;
                 std::mutex *mMessages;
                 std::mutex *mQ;
-                ChannelSettings settings;
+                util::Types::ChannelSettings settings;
                 unsigned int countInMemory;
                 unsigned int countOnDisk;
                 MessageData ***messages;
@@ -67,8 +61,17 @@ namespace simq::core::server {
             void _addMessage( const char *group, const char *channel, unsigned int id, unsigned int length, bool isMemory );
         public:
             void addGroup( const char *group );
-            void addChannel( const char *group, const char *channel, const char *path, ChannelSettings &settings );
-            void updateChannelSettings( const char *group, const char *channel, ChannelSettings &settings );
+            void addChannel(
+                const char *group,
+                const char *channel,
+                const char *path,
+                util::Types::ChannelSettings &settings
+            );
+            void updateChannelSettings(
+                const char *group,
+                const char *channel,
+                util::Types::ChannelSettings &settings
+            );
             void removeGroup( const char *group );
             void removeChannel( const char *group, const char *channel );
 
@@ -134,7 +137,12 @@ namespace simq::core::server {
 
     }
 
-    void Q::addChannel( const char *group, const char *channel, const char *path, ChannelSettings &settings ) {
+    void Q::addChannel(
+        const char *group,
+        const char *channel,
+        const char *path,
+        util::Types::ChannelSettings &settings
+    ) {
         _wait( countGroupWrited );
 
         if( !groups.count( group ) ) {
@@ -158,7 +166,11 @@ namespace simq::core::server {
         groups[group][channel] = _channel;
     }
 
-    void Q::updateChannelSettings( const char *group, const char *channel, ChannelSettings &settings ) {
+    void Q::updateChannelSettings(
+        const char *group,
+        const char *channel,
+        util::Types::ChannelSettings &settings
+    ) {
         _wait( countGroupWrited );
 
         if( !groups.count( group ) ) {
