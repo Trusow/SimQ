@@ -6,7 +6,7 @@
 #include <map>
 #include <string>
 #include <string.h>
-#include <deque>
+#include <list>
 #include <atomic>
 #include <iterator>
 #include "../../util/lock_atomic.hpp"
@@ -30,6 +30,15 @@ namespace simq::core::server {
                 bool isMemory;
             };
 
+            struct Session {
+                char *group;
+                char *channel;
+            };
+
+            std::map<unsigned int, Session> sessions;
+            std::shared_timed_mutex mSess;
+            std::atomic_uint countSessWrited {0};
+
             const unsigned int MESSAGES_IN_PACKET = 10'000;
 
             struct Channel {
@@ -41,7 +50,7 @@ namespace simq::core::server {
                 unsigned int countOnDisk;
                 MessageData ***messages;
                 unsigned int lengthMessages;
-                std::deque<unsigned int> q;
+                std::list<unsigned int> q;
                 /*
                 std::mutex *mPublish;
                 std::map<unsigned int, std::queue<unsigned int>>subscribers;
@@ -74,6 +83,9 @@ namespace simq::core::server {
             );
             void removeGroup( const char *group );
             void removeChannel( const char *group, const char *channel );
+
+            void auth( const char *group, const char *channel, unsigned int fd );
+            void logout( unsigned int fd );
 
             unsigned int createMessage( const char *group, const char *channel, unsigned int length );
             void removeMessage( const char *group, const char *channel, unsigned int id );
@@ -247,6 +259,53 @@ namespace simq::core::server {
         data->isMemory = isMemory;
 
         groups[group][channel].messages[offsetPacket][offset] = data;
+    }
+
+    void Q::auth( const char *group, const char *channel, unsigned int fd ) {
+        util::LockAtomic lockAtomicSess( countSessWrited );
+        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+        
+        if( sessions.count( fd ) ) {
+            throw util::Error::DUPLICATE_SESSION;
+        }
+        
+        _wait( countGroupWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroup( mGroup );
+
+        if( !groups.count( group ) ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        _wait( countChannelWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannel( mChannel );
+
+        if( !groups[group].count( channel ) ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        Session sess;
+        auto lGroup = strlen( group );
+        auto lChannel = strlen( group );
+        sess.group = new char[lGroup+1]{};
+        sess.channel = new char[lChannel+1]{};
+
+        sessions[fd] = sess;
+    }
+
+    void Q::logout( unsigned int fd ) {
+        util::LockAtomic lockAtomicSess( countSessWrited );
+        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+        
+        auto iter = sessions.find( fd );
+
+        if( iter == sessions.end() ) {
+            return;
+        }
+
+        delete[] iter->second.group;
+        delete[] iter->second.channel;
+
+        sessions.erase( iter );
     }
 
     unsigned int Q::createMessage( const char *group, const char *channel, unsigned int length ) {
