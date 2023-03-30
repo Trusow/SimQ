@@ -172,7 +172,7 @@ namespace simq::core::server {
 
         {
             util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-            std::lock_guard<std::shared_timed_mutex> lockConcumer( mConsumer );
+            std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
 
             auto iterConsumer = consumers.find( name );
             if( iterConsumer != consumers.end() ) {
@@ -312,7 +312,7 @@ namespace simq::core::server {
 
         {
             util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-            std::lock_guard<std::shared_timed_mutex> lockConcumer( mConsumer );
+            std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
 
             auto iterConsumer = consumers.find( group );
             if( iterConsumer != consumers.end() ) {
@@ -392,7 +392,7 @@ namespace simq::core::server {
         }
 
         util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConcumer( mConsumer );
+        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
 
         auto consumer = Consumer();
         memcpy( consumer.password, password, crypto::HASH_LENGTH );
@@ -465,7 +465,7 @@ namespace simq::core::server {
         std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
 
         util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConcumer( mConsumer );
+        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
 
         if( !consumers.count(group) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
             throw util::Error::NOT_FOUND_CONSUMER;
@@ -681,7 +681,7 @@ namespace simq::core::server {
 
     void Access::_clearConsumerSession( const char *group, const char *channel, const char *name, unsigned int fd ) {
         util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConcumer( mConsumer );
+        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
 
         if( !consumers.count( group ) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
             return;
@@ -699,7 +699,7 @@ namespace simq::core::server {
 
     void Access::_clearProducerSession( const char *group, const char *channel, const char *name, unsigned int fd ) {
         util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConcumer( mConsumer );
+        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
 
         if( !producers.count( group ) || !producers[group].count( channel ) || !producers[group][channel].count( name ) ) {
             return;
@@ -807,7 +807,7 @@ namespace simq::core::server {
         }
 
         wait( countConsumerWrited );
-        std::shared_lock<std::shared_timed_mutex> lockConcumer( mConsumer );
+        std::shared_lock<std::shared_timed_mutex> lockConsumer( mConsumer );
 
         if( !consumers.count( group ) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
             return true;
@@ -830,7 +830,7 @@ namespace simq::core::server {
         }
 
         wait( countConsumerWrited );
-        std::shared_lock<std::shared_timed_mutex> lockConcumer( mConsumer );
+        std::shared_lock<std::shared_timed_mutex> lockConsumer( mConsumer );
 
         if( !consumers.count( group ) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
             return false;
