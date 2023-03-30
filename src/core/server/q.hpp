@@ -68,6 +68,7 @@ namespace simq::core::server {
             void _wait( std::atomic_uint &atom );
             void _expandMessagesPacket( const char *group, const char *channel );
             void _addMessage( const char *group, const char *channel, unsigned int id, unsigned int length, bool isMemory );
+            void _getGroupChannelByFd( unsigned int fd, std::string &group, std::string &channel );
         public:
             void addGroup( const char *group );
             void addChannel(
@@ -87,27 +88,23 @@ namespace simq::core::server {
             void auth( const char *group, const char *channel, unsigned int fd );
             void logout( unsigned int fd );
 
-            unsigned int createMessage( const char *group, const char *channel, unsigned int length );
-            void removeMessage( const char *group, const char *channel, unsigned int id );
+            unsigned int createMessage( unsigned int fd, unsigned int length );
+            void removeMessage( unsigned int fd, unsigned int id );
 
             void recv(
-                const char *group,
-                const char *channel,
                 unsigned int fd,
                 unsigned int id,
                 WRData &wrData
             );
             void send(
-                const char *group,
-                const char *channel,
                 unsigned int fd,
                 unsigned int id,
                 WRData &wrData
             );
 
-            void pushMessageToQ( const char *group, const char *channel, unsigned int id );
-            unsigned int popMessageFromQ( const char *group, const char *channel );
-            void revertMessageToQ( const char *group, const char *channel, unsigned int id );
+            void pushMessageToQ( unsigned int fd, unsigned int id );
+            unsigned int popMessageFromQ( unsigned int fd );
+            void revertMessageToQ( unsigned int fd, unsigned int id );
 
             //void subscribeToChannel( const char *group, const char *channel, unsigned int fd );
             //void unsubscribeFromChannel( const char *group, const char *channel, unsigned int fd );
@@ -261,6 +258,21 @@ namespace simq::core::server {
         groups[group][channel].messages[offsetPacket][offset] = data;
     }
 
+    void Q::_getGroupChannelByFd( unsigned int fd, std::string &group, std::string &channel ) {
+        _wait( countSessWrited );
+        std::shared_lock<std::shared_timed_mutex> lockSess( mSess );
+
+        auto iter = sessions.find( fd );
+
+        if( iter == sessions.end() ) {
+            throw util::Error::NOT_FOUND_SESSION;
+        }
+
+        group = iter->second.group;
+        channel = iter->second.channel;
+
+    }
+
     void Q::auth( const char *group, const char *channel, unsigned int fd ) {
         util::LockAtomic lockAtomicSess( countSessWrited );
         std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
@@ -308,7 +320,13 @@ namespace simq::core::server {
         sessions.erase( iter );
     }
 
-    unsigned int Q::createMessage( const char *group, const char *channel, unsigned int length ) {
+    unsigned int Q::createMessage( unsigned int fd, unsigned int length ) {
+        std::string _group;
+        std::string _channel;
+        _getGroupChannelByFd( fd, _group, _channel );
+        const char *group = _group.c_str();
+        const char *channel = _channel.c_str();
+        
         _wait( countGroupWrited );
         _wait( countChannelWrited );
 
@@ -354,7 +372,13 @@ namespace simq::core::server {
         return messageId;
     }
 
-    void Q::removeMessage( const char *group, const char *channel, unsigned int id ) {
+    void Q::removeMessage( unsigned int fd, unsigned int id ) {
+        std::string _group;
+        std::string _channel;
+        _getGroupChannelByFd( fd, _group, _channel );
+        const char *group = _group.c_str();
+        const char *channel = _channel.c_str();
+
         _wait( countGroupWrited );
         _wait( countChannelWrited );
 
@@ -387,12 +411,16 @@ namespace simq::core::server {
     }
 
     void Q::recv(
-        const char *group,
-        const char *channel,
         unsigned int fd,
         unsigned int id,
         WRData &wrData
     ) {
+        std::string _group;
+        std::string _channel;
+        _getGroupChannelByFd( fd, _group, _channel );
+        const char *group = _group.c_str();
+        const char *channel = _channel.c_str();
+
         _wait( countGroupWrited );
         _wait( countChannelWrited );
 
@@ -414,12 +442,16 @@ namespace simq::core::server {
     }
 
     void Q::send(
-        const char *group,
-        const char *channel,
         unsigned int fd,
         unsigned int id,
         WRData &wrData
     ) {
+        std::string _group;
+        std::string _channel;
+        _getGroupChannelByFd( fd, _group, _channel );
+        const char *group = _group.c_str();
+        const char *channel = _channel.c_str();
+
         _wait( countGroupWrited );
         _wait( countChannelWrited );
 
@@ -440,7 +472,13 @@ namespace simq::core::server {
         //data.buffer->recv( id, fd, 0 );
     }
 
-    void Q::pushMessageToQ( const char *group, const char *channel, unsigned int id ) {
+    void Q::pushMessageToQ( unsigned int fd, unsigned int id ) {
+        std::string _group;
+        std::string _channel;
+        _getGroupChannelByFd( fd, _group, _channel );
+        const char *group = _group.c_str();
+        const char *channel = _channel.c_str();
+
         _wait( countGroupWrited );
         _wait( countChannelWrited );
 
@@ -461,7 +499,13 @@ namespace simq::core::server {
         data.q.push_back( id );
     }
 
-    unsigned int Q::popMessageFromQ( const char *group, const char *channel ) {
+    unsigned int Q::popMessageFromQ( unsigned int fd ) {
+        std::string _group;
+        std::string _channel;
+        _getGroupChannelByFd( fd, _group, _channel );
+        const char *group = _group.c_str();
+        const char *channel = _channel.c_str();
+
         _wait( countGroupWrited );
         _wait( countChannelWrited );
 
@@ -481,7 +525,13 @@ namespace simq::core::server {
         return messageId;
     }
 
-    void Q::revertMessageToQ( const char *group, const char *channel, unsigned int id ) {
+    void Q::revertMessageToQ( unsigned int fd, unsigned int id ) {
+        std::string _group;
+        std::string _channel;
+        _getGroupChannelByFd( fd, _group, _channel );
+        const char *group = _group.c_str();
+        const char *channel = _channel.c_str();
+
         _wait( countGroupWrited );
         _wait( countChannelWrited );
 
