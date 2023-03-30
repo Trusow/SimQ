@@ -12,9 +12,7 @@
 #include <chrono>
 #include <map>
 #include <list>
-#include <deque>
 #include <string.h>
-#include <iostream>
 #include <cstring>
 #include <string>
 
@@ -48,7 +46,7 @@ namespace simq::core::server {
 
         struct Entity {
             unsigned char password[crypto::HASH_LENGTH];
-            std::deque<unsigned int> sessions;
+            std::list<unsigned int> sessions;
         };
 
         struct Group: Entity {};
