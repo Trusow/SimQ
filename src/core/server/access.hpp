@@ -100,7 +100,10 @@ namespace simq::core::server {
         void removeProducer( unsigned int fd, const char *channel, const char *name );
 
         void updatePassword( unsigned int fd, const unsigned char oldPassword[crypto::HASH_LENGTH], const unsigned char newPassword[crypto::HASH_LENGTH] );
+        void updateGroupPassword( const char *group, const unsigned char newPassword[crypto::HASH_LENGTH] );
+        void updateConsumerPassword( const char *group, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] );
         void updateConsumerPassword( unsigned int fd, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] );
+        void updateProducerPassword( const char *group, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] );
         void updateProducerPassword( unsigned int fd, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] );
      
         void logout( unsigned int fd );
@@ -953,6 +956,25 @@ namespace simq::core::server {
         return true;
     }
 
+    void Access::updateGroupPassword( const char *group, const unsigned char newPassword[crypto::HASH_LENGTH] ) {
+        util::LockAtomic lockAtomicSess( countSessWrited );
+        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+
+        util::LockAtomic lockAtomicGroup( countGroupWrited );
+        std::lock_guard<std::shared_timed_mutex> lockGroup( mGroup );
+            
+        if( !groups.count( group ) ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        memcpy( groups[group].password, newPassword, crypto::HASH_LENGTH );
+
+        for( auto it = groups[group].sessions.begin(); it != groups[group].sessions.end(); it++ ) {
+            sessions[*it].type = SessionType::NONE;
+        }
+
+        groups[group].sessions.clear();
+    }
 
     void Access::updatePassword( unsigned int fd, const unsigned char oldPassword[crypto::HASH_LENGTH], const unsigned char newPassword[crypto::HASH_LENGTH] ) {
         util::LockAtomic lockAtomicSess( countSessWrited );
@@ -1039,6 +1061,25 @@ namespace simq::core::server {
         }
     }
 
+    void Access::updateConsumerPassword( const char *group, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] ) {
+        util::LockAtomic lockAtomicSess( countSessWrited );
+        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+
+        util::LockAtomic lockAtomicConsumer( countConsumerWrited );
+        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
+
+        _validateConsumer( group, channel, name );
+        memcpy( consumers[group][channel][name].password, newPassword, crypto::HASH_LENGTH );
+
+        for( auto it = consumers[group][channel][name].sessions.begin(); it != consumers[group][channel][name].sessions.end(); it++ ) {
+            if( sessions.count( *it ) ) {
+                sessions[*it].type = SessionType::NONE;
+            }
+        }
+
+        consumers[group][channel][name].sessions.clear();
+    }
+
     void Access::updateConsumerPassword( unsigned int fd, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] ) {
         util::LockAtomic lockAtomicSess( countSessWrited );
         std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
@@ -1065,6 +1106,25 @@ namespace simq::core::server {
         }
 
         consumers[group][channel][name].sessions.clear();
+    }
+
+    void Access::updateProducerPassword( const char *group, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] ) {
+        util::LockAtomic lockAtomicSess( countSessWrited );
+        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+
+        util::LockAtomic lockAtomicProducer( countProducerWrited );
+        std::lock_guard<std::shared_timed_mutex> lockProducer( mProducer );
+
+        _validateProducer( group, channel, name );
+        memcpy( producers[group][channel][name].password, newPassword, crypto::HASH_LENGTH );
+
+        for( auto it = producers[group][channel][name].sessions.begin(); it != producers[group][channel][name].sessions.end(); it++ ) {
+            if( sessions.count( *it ) ) {
+                sessions[*it].type = SessionType::NONE;
+            }
+        }
+
+        producers[group][channel][name].sessions.clear();
     }
 
     void Access::updateProducerPassword( unsigned int fd, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] ) {
