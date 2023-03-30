@@ -72,6 +72,9 @@ namespace simq::core::server {
         void _removeProducer( const char *group, const char *channel, const char *name );
         void _validateConsumer( const char *group, const char *channel, const char *name );
         void _validateProducer( const char *group, const char *channel, const char *name );
+        bool _validateSessGroup( unsigned int fd, std::string &groupName );
+        bool _validateIssetGroup( unsigned int fd, const char *group );
+        bool _validateIssetChannel( unsigned int fd, const char *group, const char *channel );
         void wait( std::atomic_uint &atom );
      
         public:
@@ -104,6 +107,17 @@ namespace simq::core::server {
      
         bool canSendMessage( unsigned int fd );
         bool canRecvMessage( unsigned int fd );
+
+        bool canCreateChannel( unsigned int fd, const char *channel );
+        bool canRemoveChannel( unsigned int fd, const char *channel );
+
+        bool canCreateConsumer( unsigned int fd, const char *channel, const char *name );
+        bool canUpdateConsumerPassword( unsigned int fd, const char *channel, const char *name );
+        bool canRemoveConsumer( unsigned int fd, const char *channel, const char *name );
+
+        bool canCreateProducer( unsigned int fd, const char *channel, const char *name );
+        bool canUpdateProducerPassword( unsigned int fd, const char *channel, const char *name );
+        bool canRemoveProducer( unsigned int fd, const char *channel, const char *name );
     };
 
     void Access::wait( std::atomic_uint &atom ) {
@@ -755,6 +769,130 @@ namespace simq::core::server {
         return iterSess->second.type == SessionType::CONSUMER;
     }
 
+    bool Access::canCreateChannel( unsigned int fd, const char *channel ) {
+        std::string groupName;
+
+        if( !_validateSessGroup( fd, groupName ) ) {
+            return false;
+        }
+
+        if( !_validateIssetGroup( fd, groupName.c_str() ) ) {
+            return false;
+        }
+
+        return !_validateIssetChannel( fd, groupName.c_str(), channel );
+    }
+
+    bool Access::canRemoveChannel( unsigned int fd, const char *channel ) {
+        std::string groupName;
+
+        if( !_validateSessGroup( fd, groupName ) ) {
+            return false;
+        }
+
+        return _validateIssetChannel( fd, groupName.c_str(), channel );
+    }
+
+    bool Access::canCreateConsumer( unsigned int fd, const char *channel, const char *name ) {
+        std::string groupName;
+
+        if( !_validateSessGroup( fd, groupName ) ) {
+            return false;
+        }
+
+        const char *group = groupName.c_str();
+
+        if( !_validateIssetChannel( fd, group, channel ) ) {
+            return false;
+        }
+
+        wait( countConsumerWrited );
+        std::shared_lock<std::shared_timed_mutex> lockConcumer( mConsumer );
+
+        if( !consumers.count( group ) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    bool Access::canUpdateConsumerPassword( unsigned int fd, const char *channel, const char *name ) {
+        std::string groupName;
+
+        if( !_validateSessGroup( fd, groupName ) ) {
+            return false;
+        }
+
+        const char *group = groupName.c_str();
+
+        if( !_validateIssetChannel( fd, group, channel ) ) {
+            return false;
+        }
+
+        wait( countConsumerWrited );
+        std::shared_lock<std::shared_timed_mutex> lockConcumer( mConsumer );
+
+        if( !consumers.count( group ) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Access::canRemoveConsumer( unsigned int fd, const char *channel, const char *name ) {
+        return canUpdateConsumerPassword( fd, channel, name );
+    }
+
+    bool Access::canCreateProducer( unsigned int fd, const char *channel, const char *name ) {
+        std::string groupName;
+
+        if( !_validateSessGroup( fd, groupName ) ) {
+            return false;
+        }
+
+        const char *group = groupName.c_str();
+
+        if( !_validateIssetChannel( fd, group, channel ) ) {
+            return false;
+        }
+
+        wait( countProducerWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducer( mProducer );
+
+        if( !producers.count( group ) || !producers[group].count( channel ) || !producers[group][channel].count( name ) ) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool Access::canUpdateProducerPassword( unsigned int fd, const char *channel, const char *name ) {
+        std::string groupName;
+
+        if( !_validateSessGroup( fd, groupName ) ) {
+            return false;
+        }
+
+        const char *group = groupName.c_str();
+
+        if( !_validateIssetChannel( fd, group, channel ) ) {
+            return false;
+        }
+
+        wait( countProducerWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducer( mProducer );
+
+        if( !producers.count( group ) || !producers[group].count( channel ) || !producers[group][channel].count( name ) ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Access::canRemoveProducer( unsigned int fd, const char *channel, const char *name ) {
+        return canUpdateProducerPassword( fd, channel, name );
+    }
+
     void Access::_validateConsumer( const char *group, const char *channel, const char *name ) {
         if( !consumers.count( group ) ) {
             throw util::Error::NOT_FOUND_GROUP;
@@ -774,6 +912,47 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_CONSUMER;
         }
     }
+
+    bool Access::_validateSessGroup( unsigned int fd, std::string &groupName ) {
+        wait( countSessWrited );
+        std::shared_lock<std::shared_timed_mutex> lockSess( mSess );
+
+        if( !sessions.count( fd ) ) {
+            return false;
+        }
+
+        auto sess = sessions[fd];
+        if( sess.type != SessionType::GROUP ) {
+            return false;
+        }
+        groupName = sess.data;
+
+        return true;
+    }
+
+    bool Access::_validateIssetGroup( unsigned int fd, const char *group ) {
+        wait( countGroupWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroup( mGroup );
+
+        return groups.count( group ) == 1;
+    }
+
+    bool Access::_validateIssetChannel( unsigned int fd, const char *group, const char *channel ) {
+        wait( countChannelWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannel( mChannel );
+
+        auto iterGroup = channels.find( group );
+        if( iterGroup == channels.end() ) {
+            return false;
+        }
+
+        if( !iterGroup->second.count( channel ) ) {
+            return false;
+        }
+        
+        return true;
+    }
+
 
     void Access::updatePassword( unsigned int fd, const unsigned char oldPassword[crypto::HASH_LENGTH], const unsigned char newPassword[crypto::HASH_LENGTH] ) {
         util::LockAtomic lockAtomicSess( countSessWrited );
