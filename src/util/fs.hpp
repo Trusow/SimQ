@@ -37,21 +37,10 @@ namespace simq::util {
         static bool createDir( unsigned int length, ... );
         static bool removeDir( const char *path );
         static bool removeDir( unsigned int length, ... );
-        static bool createFile( const char *path );
-        static bool createFile( unsigned int length, ... );
         static bool removeFile( const char *path );
         static bool removeFile( unsigned int length, ... );
         static bool listDirs( const char *path );
         static bool listDirs( unsigned int length, ... );
-        static unsigned long int getFileSize( FILE *file );
-        static unsigned long int getFileSize( const char *path );
-        static unsigned long int getFileSize( unsigned int length, ... );
-        static FILE *openFile( const char *path );
-        static FILE *openFile( unsigned int length, ... );
-        static bool closeFile( FILE *file );
-        static unsigned int readFile( FILE *file, unsigned int position, unsigned int length, void *buffer );
-        static bool writeFile( FILE *file, unsigned int position, unsigned int length, void *buffer );
-        static bool expandFile( FILE *file, unsigned int length );
         static char *buildPath( unsigned int length, ... );
         static char **dirs( const char *path, unsigned int &length, ValidationName v = NONE );
         static char **files( const char *path, unsigned int &length, ValidationName v = NONE );
@@ -91,72 +80,8 @@ namespace simq::util {
         return rmdir( path ) == 0;
     }
 
-    bool FS::createFile( const char *path ) {
-        FILE *file = fopen( path, "w" );
-
-        if( file != nullptr ) {
-            fclose( file );
-        }
-
-        return file != nullptr;
-    }
-
     bool FS::removeFile( const char *path ) {
         return unlink( path ) == 0;
-    }
-
-    unsigned long int FS::getFileSize( FILE *file ) {
-        fseek( file, 0L, SEEK_END );
-        return ftell( file );
-    }
-
-    unsigned long int FS::getFileSize( const char *path ) {
-        auto *file = fopen( path, "r" );
-        fseek( file, 0L, SEEK_END );
-        auto size = ftell( file );
-        fclose( file );
-
-        return size;
-    }
-
-    FILE *FS::openFile( const char *path ) {
-        return fopen( path, "r+" );
-    }
-
-    bool FS::closeFile( FILE *file ) {
-        return fclose( file ) == 0;
-    }
-
-    unsigned int FS::readFile( FILE *file, unsigned int position, unsigned int length, void *buffer ) {
-        if( fseek( file, position, SEEK_SET ) != 0 ) {
-            return 0;
-        }
-     
-        return fread( buffer, sizeof( char ), length, file );
-    }
- 
-    bool FS::writeFile( FILE *file, unsigned int position, unsigned int length, void *buffer ) {
-        if( fseek( file, position, SEEK_SET ) != 0 ) {
-            return false;
-        }
-     
-        unsigned int count = fwrite( buffer, sizeof( char ), length, file );
-     
-        return count == length;
-    }
- 
-    bool FS::expandFile( FILE *file, unsigned int length ) {
-        if( fseek( file, 0, SEEK_END ) != 0 ) {
-            return false;
-        }
-
-        length += ftell( file );
-     
-        if( ftruncate( fileno( file ), length ) !=0 ) {
-            return false;
-        }
-
-        return true;
     }
 
     bool FS::createDir( unsigned int length, ... ) {
@@ -173,15 +98,6 @@ namespace simq::util {
         ::free( path );
 
         return isRemove;
-    }
-
-    bool FS::createFile( unsigned int length, ... ) {
-        char *path = buildPath( length );
-        bool isCreate = createFile( path );
-        ::free( path );
-
-
-        return isCreate;
     }
 
     bool FS::removeFile( unsigned int length, ... ) {
@@ -209,23 +125,6 @@ namespace simq::util {
 
 
         return isExists;
-    }
-
-    unsigned long int FS::getFileSize( unsigned int length, ... ) {
-        char *path = buildPath( length );
-        auto l = getFileSize( path );
-        ::free( path );
-
-
-        return l;
-    }
-
-    FILE *FS::openFile( unsigned int length, ... ) {
-        char *path = buildPath( length );
-        FILE *file = openFile( path );
-        ::free( path );
-
-        return file;
     }
 
     char *FS::buildPath( unsigned int length, ... ) {
