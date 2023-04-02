@@ -82,9 +82,10 @@ namespace simq::core::server {
             void updateConsumerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
             void removeConsumer( const char *group, const char *channel, const char *login );
 
-            void getProduces( const char *group, const char *channel, std::list<std::string> &producers );
-            void getProducerPassword( const char *group, const char *channel, const char *login, char password[crypto::HASH_LENGTH] );
-            void updateProducerPassword( const char *group, const char *channel, const char *login, char password[crypto::HASH_LENGTH] );
+            void getProducers( const char *group, const char *channel, std::vector<std::string> &producers );
+            void addProducer( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
+            void getProducerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
+            void updateProducerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
             void removeProducer( const char *group, const char *channel, const char *login );
 
             void getMasterPassword( unsigned char password[crypto::HASH_LENGTH] );
@@ -881,6 +882,179 @@ namespace simq::core::server {
         path += channel;
         path += "/";
         path += pathConsumers;
+        path += "/";
+        path += login;
+        path += "/";
+        path += filePassword;
+
+        util::File filePassword( path.c_str() );
+        filePassword.write( password, crypto::HASH_LENGTH );
+    }
+
+    void Store::getProducers( const char *group, const char *channel, std::vector<std::string> &producers ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        auto itChannel = itGroup->second.find( channel );
+        if( itChannel == itGroup->second.end() ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        for( auto it = itChannel->second.producers.begin(); it != itChannel->second.consumers.end(); it++ ) {
+            producers.push_back( it->first );
+        }
+    }
+
+    void Store::addProducer( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        auto itChannel = itGroup->second.find( channel );
+        if( itChannel == itGroup->second.end() ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto itConsumer = groups[group][channel].producers.find( login );
+        if( itConsumer != groups[group][channel].producers.end() ) {
+            throw util::Error::DUPLICATE_PRODUCER;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+        path += "/";
+        path += channel;
+        path += "/";
+        path += pathProducers;
+        path += "/";
+        path += login;
+
+        if( !util::FS::createDir( path.c_str() ) ) {
+            throw util::Error::FS_ERROR;
+        }
+
+        path += "/";
+        path += filePassword;
+
+        util::File file( path.c_str(), true );
+        file.write( password, crypto::HASH_LENGTH );
+
+        groups[group][channel].producers[login] = true;
+    }
+
+    void Store::removeProducer( const char *group, const char *channel, const char *login ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            return;
+        }
+
+        auto itChannel = itGroup->second.find( channel );
+        if( itChannel == itGroup->second.end() ) {
+            return;
+        }
+
+        auto itConsumer = groups[group][channel].producers.find( login );
+        if( itConsumer == groups[group][channel].producers.end() ) {
+            return;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+        path += "/";
+        path += channel;
+        path += "/";
+        path += pathProducers;
+        path += "/";
+        path += login;
+
+        util::FS::removeDir( path.c_str() );
+
+        groups[group][channel].producers.erase( itConsumer );
+    }
+
+    void Store::getProducerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        auto itChannel = itGroup->second.find( channel );
+        if( itChannel == itGroup->second.end() ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto itConsumer = groups[group][channel].producers.find( login );
+        if( itConsumer == groups[group][channel].producers.end() ) {
+            throw util::Error::NOT_FOUND_PRODUCER;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+        path += "/";
+        path += channel;
+        path += "/";
+        path += pathProducers;
+        path += "/";
+        path += login;
+        path += "/";
+        path += filePassword;
+
+        util::File filePassword( path.c_str() );
+        filePassword.read( password, crypto::HASH_LENGTH );
+    }
+
+    void Store::updateProducerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        auto itChannel = itGroup->second.find( channel );
+        if( itChannel == itGroup->second.end() ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto itConsumer = groups[group][channel].producers.find( login );
+        if( itConsumer == groups[group][channel].producers.end() ) {
+            throw util::Error::NOT_FOUND_PRODUCER;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+        path += "/";
+        path += channel;
+        path += "/";
+        path += pathProducers;
         path += "/";
         path += login;
         path += "/";
