@@ -27,7 +27,7 @@ namespace simq::util {
         static bool dirExists( const char *path );
         static bool fileExists( const char *path );
         static bool createDir( const char *path );
-        static bool removeDir( const char *path );
+        static void removeDir( const char *path );
         static bool removeFile( const char *path );
         static void dirs( const char *path, std::vector<std::string> &v );
         static void files( const char *path, std::vector<std::string> &v );
@@ -61,7 +61,7 @@ namespace simq::util {
         return mkdir( path, 0700 ) == 0;
     }
 
-    bool FS::removeDir( const char *path ) {
+    void FS::removeDir( const char *path ) {
         std::filesystem::remove_all( path );
     }
 
