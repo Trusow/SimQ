@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <filesystem>
 #include "error.h"
 
 namespace simq::util {
@@ -21,15 +22,15 @@ namespace simq::util {
             _FILE,
             _DIR,
         };
-        void _list( const char *path, std::vector<std::string> &v, Type t );
+        static void _list( const char *path, std::vector<std::string> &v, Type t );
         public:
         static bool dirExists( const char *path );
         static bool fileExists( const char *path );
         static bool createDir( const char *path );
         static bool removeDir( const char *path );
         static bool removeFile( const char *path );
-        void dirs( const char *path, std::vector<std::string> &v );
-        void files( const char *path, std::vector<std::string> &v );
+        static void dirs( const char *path, std::vector<std::string> &v );
+        static void files( const char *path, std::vector<std::string> &v );
     };
 
     bool FS::dirExists( const char *path ) {
@@ -61,7 +62,7 @@ namespace simq::util {
     }
 
     bool FS::removeDir( const char *path ) {
-        return rmdir( path ) == 0;
+        std::filesystem::remove_all( path );
     }
 
     bool FS::removeFile( const char *path ) {
