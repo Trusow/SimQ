@@ -11,6 +11,7 @@
 #include "../../crypto/hash.hpp"
 #include "../../util/types.h"
 #include "../../util/fs.hpp"
+#include "../../util/file.hpp"
 #include "../../util/error.h"
 
 
@@ -68,7 +69,7 @@ namespace simq::core::server {
             void removeProducer( const char *group, const char *channel, const char *login );
 
             void getMasterPassword( unsigned char password[crypto::HASH_LENGTH] );
-            void updateMasterPassword( unsigned char password[crypto::HASH_LENGTH] );
+            void updateMasterPassword( const unsigned char password[crypto::HASH_LENGTH] );
 
             unsigned int getCountThreads();
             void updateCountThreads( unsigned int count );
@@ -183,9 +184,8 @@ namespace simq::core::server {
         std::string path;
         _getFileSettings( path );
 
-        auto file = util::FS::openFile( path.c_str() );
-        util::FS::readFile( file, 0, sizeof( Settings ), &settings );
-        util::FS::closeFile( file );
+        auto file = util::File( path.c_str() );
+        file.read( &settings, sizeof( Settings ) );
 
         return ntohl( settings.countThreads );
     }
@@ -204,12 +204,10 @@ namespace simq::core::server {
         std::string path;
         _getFileSettings( path );
 
-        auto file = util::FS::openFile( path.c_str() );
-
-        util::FS::readFile( file, 0, sizeof( Settings ), &settings );
+        auto file = util::File( path.c_str() );
+        file.read( &settings, sizeof( Settings ) );
         settings.countThreads = htonl( countThreads );
-        util::FS::writeFile( file, 0, sizeof( Settings ), &settings );
-        util::FS::closeFile( file );
+        file.write( &settings, sizeof( Settings ), 0 );
     }
 
     unsigned int Store::getPort() {
@@ -219,9 +217,8 @@ namespace simq::core::server {
         std::string path;
         _getFileSettings( path );
 
-        auto file = util::FS::openFile( path.c_str() );
-        util::FS::readFile( file, 0, sizeof( Settings ), &settings );
-        util::FS::closeFile( file );
+        auto file = util::File( path.c_str() );
+        file.read( &settings, sizeof( Settings ) );
 
         return ntohl( settings.port );
     }
@@ -237,11 +234,10 @@ namespace simq::core::server {
         std::string path;
         _getFileSettings( path );
 
-        auto file = util::FS::openFile( path.c_str() );
-        util::FS::readFile( file, 0, sizeof( Settings ), &settings );
+        auto file = util::File( path.c_str() );
+        file.read( &settings, sizeof( Settings ) );
         settings.port = htonl( port );
-        util::FS::writeFile( file, 0, sizeof( Settings ), &settings );
-        util::FS::closeFile( file );
+        file.write( &settings, sizeof( Settings ), 0 );
     }
 
     void Store::getMasterPassword( unsigned char password[crypto::HASH_LENGTH] ) {
@@ -251,24 +247,23 @@ namespace simq::core::server {
         std::string path;
         _getFileSettings( path );
 
-        auto file = util::FS::openFile( path.c_str() );
-        util::FS::readFile( file, 0, sizeof( Settings ), &settings );
+        auto file = util::File( path.c_str() );
+        file.read( &settings, sizeof( Settings ) );
         memcpy( password, settings.password, crypto::HASH_LENGTH );
-        util::FS::closeFile( file );
     }
 
-    void Store::updateMasterPassword( unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::updateMasterPassword( const unsigned char password[crypto::HASH_LENGTH] ) {
         std::lock_guard<std::mutex> lock( m );
         Settings settings;
 
         std::string path;
         _getFileSettings( path );
 
-        auto file = util::FS::openFile( path.c_str() );
-        util::FS::readFile( file, 0, sizeof( Settings ), &settings );
+        auto file = util::File( path.c_str() );
+        file.read( &settings, sizeof( Settings ) );
         memcpy( settings.password, password, crypto::HASH_LENGTH );
-        util::FS::writeFile( file, 0, sizeof( Settings ), &settings );
-        util::FS::closeFile( file );
+        file.write( &settings, sizeof( Settings ), 0 );
+
     }
 }
 
