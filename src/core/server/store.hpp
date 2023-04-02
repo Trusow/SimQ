@@ -5,11 +5,14 @@
 #include <string>
 #include <string.h>
 #include <mutex>
+#include <vector>
 #include <thread>
 #include <arpa/inet.h>
 #include <iostream>
+#include <map>
 #include "../../crypto/hash.hpp"
 #include "../../util/types.h"
+#include "../../util/validation.hpp"
 #include "../../util/fs.hpp"
 #include "../../util/file.hpp"
 #include "../../util/error.h"
@@ -36,20 +39,35 @@ namespace simq::core::server {
 
             std::mutex m;
 
+            struct Channel {
+                std::map<std::string, bool> consumers;
+                std::map<std::string, bool> producers;
+            };
+
+            std::map<std::string, std::map<std::string, Channel>> groups;
+
+            enum TypeUser {
+                CONSUMER,
+                PRODUCER,
+            };
+
             char *_path = nullptr;
 
             void _initSettings( const char *path );
-            void _initChannels( const char *path );
-            void _initUsers( const char *path );
+            void _initChannels( const char *group, const char *path );
+            void _initChannelSettings( const char *path, const char *channel );
+            void _initUsers( const char *group, const char *channel, TypeUser type, const char *path );
             void _initGroups( const char *path );
+            bool _issetCorrectPasswordFile( const char *path );
+            void _getPassword( const char *path, unsigned char password[crypto::HASH_LENGTH] );
 
             void _getFileSettings( std::string &path );
         public:
             Store( const char *path );
 
-            void getGroups( std::list<std::string> &groups );
-            void getGroupPassword( const char *group, char password[crypto::HASH_LENGTH] );
-            void addGroup( const char *group, char password[crypto::HASH_LENGTH] );
+            void getGroups( std::vector<std::string> &groups );
+            void getGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] );
+            void addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] );
             void removeGroup( const char *group );
 
             void getChannels( const char *group, std::list<std::string> &channels );
@@ -156,7 +174,196 @@ namespace simq::core::server {
 
     }
 
+    bool Store::_issetCorrectPasswordFile( const char *path ) {
+        if( !util::FS::fileExists( path ) ) {
+            return false;
+        }
+
+        util::File file( path );
+        if( file.size() < crypto::HASH_LENGTH ) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    void Store::_initUsers( const char *group, const char *channel, TypeUser type, const char *path ) {
+        std::vector<std::string> dirs;
+
+        std::string _path = path;
+
+        util::FS::dirs( _path.c_str(), dirs );
+
+        for( auto it = dirs.begin(); it != dirs.end(); it++ ) {
+            std::string _path = path;
+            _path += "/";
+            _path += *it;
+            _path += "/";
+            _path += filePassword;
+
+            if( !_issetCorrectPasswordFile( _path.c_str() ) ) {
+                continue;
+            }
+
+
+            if( type == TypeUser::CONSUMER ) {
+                if( !util::Validation::isConsumerName( (*it).c_str() ) ) {
+                    continue;
+                }
+                groups[group][channel].consumers[*it] = true;
+            } else if( type == TypeUser::PRODUCER ) {
+                if( !util::Validation::isProducerName( (*it).c_str() ) ) {
+                    continue;
+                }
+                groups[group][channel].producers[*it] = true;
+            }
+        }
+
+    }
+
+    void Store::_initChannelSettings( const char *path, const char *channel ) {
+        std::string _pathChannelSettings = path;
+        _pathChannelSettings += "/";
+        _pathChannelSettings += channel;
+        _pathChannelSettings += "/";
+        _pathChannelSettings += pathSettings;
+
+        if( !util::FS::fileExists( _pathChannelSettings.c_str() ) ) {
+            util::File file( _pathChannelSettings.c_str(), true );
+        }
+
+        util::File file( _pathChannelSettings.c_str() );
+        util::Types::ChannelSettings settings;
+
+        auto size = sizeof( util::Types::ChannelSettings );
+        if( file.size() < size ) {
+            file.expand( size - file.size() );
+        }
+
+
+        file.read( &settings, sizeof( util::Types::ChannelSettings ) );
+        settings.minMessageSize = ntohl( settings.minMessageSize );
+        settings.maxMessageSize = ntohl( settings.maxMessageSize );
+        settings.maxMessagesInMemory = ntohl( settings.maxMessagesInMemory );
+        settings.maxMessagesOnDisk = ntohl( settings.maxMessagesOnDisk );
+
+
+        if( settings.minMessageSize == 0 ) {
+            settings.minMessageSize = 1;
+        }
+
+        if( settings.minMessageSize > settings.maxMessageSize ) {
+            auto tmpSize = settings.maxMessageSize;
+            settings.maxMessageSize = settings.minMessageSize;
+            settings.minMessageSize = tmpSize;
+        }
+
+        if( settings.maxMessagesInMemory == 0 && settings.maxMessagesOnDisk == 0 ) {
+            settings.maxMessagesInMemory = 100;
+        }
+
+        unsigned long int maxMessages = settings.maxMessagesOnDisk + settings.maxMessagesInMemory;
+        if( maxMessages > 0xFF'FF'FF'FF'FF'FF'FF'FF ) {
+            settings.maxMessagesInMemory = 100;
+            settings.maxMessagesOnDisk = 0;
+        }
+
+        settings.minMessageSize = htonl( settings.minMessageSize );
+        settings.maxMessageSize = htonl( settings.maxMessageSize );
+        settings.maxMessagesInMemory = htonl( settings.maxMessagesInMemory );
+        settings.maxMessagesOnDisk = htonl( settings.maxMessagesOnDisk );
+
+        file.write( &settings, size, 0 );
+    }
+
+    void Store::_initChannels( const char *group, const char *path ) {
+        std::vector<std::string> dirs;
+        std::string _path = path;
+
+        util::FS::dirs( _path.c_str(), dirs );
+
+        for( auto it = dirs.begin(); it != dirs.end(); it++ ) {
+
+            if( !util::Validation::isChannelName( (*it).c_str() ) ) {
+                continue;
+            }
+
+            _initChannelSettings( path, (*it).c_str() );
+
+            Channel channel;
+            groups[group][*it] = channel;
+
+
+            auto _pathConsumers = _path;
+            _pathConsumers += "/";
+            _pathConsumers += *it;
+            _pathConsumers += "/";
+            _pathConsumers += pathConsumers;
+
+
+            if( !util::FS::dirExists( _pathConsumers.c_str() ) ) {
+                if( !util::FS::createDir( _pathConsumers.c_str() ) ) {
+                    throw util::Error::FS_ERROR;
+                }
+            }
+
+            _initUsers( group, (*it).c_str(), TypeUser::CONSUMER, _pathConsumers.c_str() );
+
+
+            auto _pathProducers = _path;
+            _pathProducers += "/";
+            _pathProducers += *it;
+            _pathProducers += "/";
+            _pathProducers += pathProducers;
+
+            if( !util::FS::dirExists( _pathProducers.c_str() ) ) {
+                if( !util::FS::createDir( _pathProducers.c_str() ) ) {
+                    throw util::Error::FS_ERROR;
+                }
+            }
+
+            _initUsers( group, (*it).c_str(), TypeUser::PRODUCER, _pathProducers.c_str() );
+        }
+    }
+
     void Store::_initGroups( const char *path ) {
+        std::string strPathGroups = path;
+        strPathGroups += "/";
+        strPathGroups += pathGroups;
+        const char *_pathGroups = strPathGroups.c_str();
+
+        if( !util::FS::dirExists( _pathGroups ) ) {
+            if( !util::FS::createDir( _pathGroups ) ) {
+                throw util::Error::FS_ERROR;
+            }
+        }
+
+        std::vector<std::string> dirs;
+        util::FS::dirs( _pathGroups, dirs );
+
+        for( auto it = dirs.begin(); it != dirs.end(); it++ ) {
+            if( !util::Validation::isGroupName( (*it).c_str() ) ) {
+                continue;
+            }
+
+            std::string _pathPassword = _pathGroups;
+            _pathPassword += "/";
+            _pathPassword += *it;
+            _pathPassword += "/";
+            _pathPassword += filePassword;
+
+            if( !_issetCorrectPasswordFile( _pathPassword.c_str() ) ) {
+                continue;
+            }
+
+            std::string _path = _pathGroups;
+            _path += "/";
+            _path += *it;
+            _initChannels( (*it).c_str(), _path.c_str() );
+
+            std::map<std::string, Channel> channels;
+            groups[*it] = channels;
+        }
     }
 
     void Store::_getFileSettings( std::string &path ) {
@@ -254,6 +461,90 @@ namespace simq::core::server {
         memcpy( settings.password, password, crypto::HASH_LENGTH );
         file.write( &settings, sizeof( Settings ), 0 );
 
+    }
+
+    void Store::getGroups( std::vector<std::string> &groups ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        for( auto it = groups.begin(); it < groups.end(); it++ ) {
+            groups.push_back( *it );
+        }
+    }
+
+    void Store::_getPassword( const char *path, unsigned char password[crypto::HASH_LENGTH] ) {
+        util::File file( path );
+        file.read( password, crypto::HASH_LENGTH );
+    }
+
+    void Store::getGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto it = groups.find( group );
+
+        if( it == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += group;
+        path += "/";
+        path += filePassword;
+
+        _getPassword( path.c_str(), password );
+    }
+
+    void Store::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        if( !util::Validation::isGroupName( group ) ) {
+            throw util::Error::WRONG_PARAM;
+        }
+
+        auto it = groups.find( group );
+
+        if( it != groups.end() ) {
+            throw util::Error::DUPLICATE_GROUP;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+
+        if( !util::FS::createDir( path.c_str() ) ) {
+            throw util::Error::FS_ERROR;
+        }
+
+        path += "/";
+        path += filePassword;
+
+        util::File file( path.c_str(), true );
+        file.write( password, crypto::HASH_LENGTH );
+
+        std::map<std::string, Channel> channel;
+        groups[group] = channel;
+    }
+
+    void Store::removeGroup( const char *group ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto it = groups.find( group );
+
+        if( it == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+
+        util::FS::removeDir( path.c_str() );
+
+        groups.erase( it );
     }
 }
 
