@@ -101,7 +101,12 @@ namespace simq::util {
     }
 
     unsigned int File::read( void *data, unsigned int length ) {
-        return fread( data, sizeof( char ), length, file );
+        auto l = fread( data, 1, length, file );
+        if( l != length ) {
+            throw util::Error::FS_ERROR;
+        }
+
+        return l;
     }
 
     unsigned int File::read( void *data, unsigned int length, unsigned long int offset ) {
