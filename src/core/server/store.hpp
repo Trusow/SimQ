@@ -108,24 +108,17 @@ namespace simq::core::server {
             if( !util::FS::createDir( _pathToDir ) ) {
                 throw util::Error::FS_ERROR;
             }
-            if( !util::FS::createFile( _pathToFile ) ) {
-                throw util::Error::FS_ERROR;
-            }
+            auto _f = util::File( _pathToFile );
             isNewSettings = true;
         } else if( !util::FS::fileExists( _pathToFile ) ) {
-            if( !util::FS::createFile( _pathToFile ) ) {
-                throw util::Error::FS_ERROR;
-            }
-            isNewSettings = true;
-        } else if( util::FS::getFileSize( _pathToFile ) < sizeof( Settings ) ) {
+            auto _f = util::File( _pathToFile );
             isNewSettings = true;
         }
 
+        auto file = util::File( _pathToFile );
 
-        auto file = util::FS::openFile( _pathToFile );
-
-        if( file == NULL ) {
-            throw util::Error::FS_ERROR;
+        if( file.size() < sizeof( Settings ) ) {
+            isNewSettings = true;
         }
 
         if( isNewSettings ) {
@@ -133,10 +126,9 @@ namespace simq::core::server {
             settings.port = htonl( DEFAULT_PORT );
             crypto::Hash::hash( "simq", settings.password );
 
-            util::FS::writeFile( file, 0, sizeof( Settings ), &settings );
-            util::FS::closeFile( file );
+            file.write( &settings, sizeof( Settings ), 0 );
         } else {
-            util::FS::readFile( file, 0, sizeof( Settings ), &settings );
+            file.read( &settings, sizeof( Settings ), 0 );
 
             settings.countThreads = ntohl( settings.countThreads );
             settings.port = ntohl( settings.port );
@@ -157,10 +149,8 @@ namespace simq::core::server {
             }
 
             if( isWrong ) {
-                util::FS::writeFile( file, 0, sizeof( Settings ), &settings );
+                file.write( &settings, sizeof( Settings ), 0 );
             }
-
-            util::FS::closeFile( file );
         }
 
 
