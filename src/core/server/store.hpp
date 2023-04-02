@@ -108,10 +108,10 @@ namespace simq::core::server {
             if( !util::FS::createDir( _pathToDir ) ) {
                 throw util::Error::FS_ERROR;
             }
-            auto _f = util::File( _pathToFile );
+            auto _f = util::File( _pathToFile, true );
             isNewSettings = true;
         } else if( !util::FS::fileExists( _pathToFile ) ) {
-            auto _f = util::File( _pathToFile );
+            auto _f = util::File( _pathToFile, true );
             isNewSettings = true;
         }
 
