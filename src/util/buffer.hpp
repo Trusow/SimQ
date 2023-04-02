@@ -407,7 +407,7 @@ namespace simq::util {
             wrData.startPartOffset++;
             file->read(
                 (void *)&data[wrData.startSize + i * packetSize],
-                i == wrData.sizes - 1 ? wrData.startSize : packetSize,
+                i == wrData.sizes - 1 ? wrData.endSize : packetSize,
                 item->fileOffsets[wrData.startPartOffset] * packetSize
             );
         }
