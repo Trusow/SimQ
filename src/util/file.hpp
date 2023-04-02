@@ -24,6 +24,7 @@ namespace simq::util {
             unsigned int read( void *data, unsigned int length, unsigned long int offset );
             unsigned long int size();
             void expand( unsigned int size );
+            unsigned int fd();
             ~File();
     };
 
@@ -132,6 +133,10 @@ namespace simq::util {
         if( ftruncate( fileno( file ), size ) !=0 ) {
             throw util::Error::FS_ERROR;
         }
+    }
+
+    unsigned int File::fd() {
+        return fileno( file );
     }
 }
 
