@@ -14,13 +14,14 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <sys/sendfile.h>
-#include "fs.hpp"
+#include "file.hpp"
 #include "error.h"
 #include "lock_atomic.hpp"
 
 namespace simq::util {
     class Buffer {
         private:
+            File *file = nullptr;
             const unsigned int LENGTH_PACKET_ON_DISK = 4096;
             const unsigned int MIN_FILE_SIZE = 50 * LENGTH_PACKET_ON_DISK;
             const unsigned int SIZE_ITEM_PACKET = 10'000;
@@ -41,7 +42,6 @@ namespace simq::util {
                 unsigned long int *fileOffsets;
             };
 
-            FILE *file = nullptr;
             unsigned int fileFD = 0;
 
 
@@ -115,19 +115,9 @@ namespace simq::util {
     };
 
     Buffer::Buffer( const char *path ) {
-        if( !FS::fileExists( path ) ) {
-            if( !FS::createFile( path ) ) {
-                throw util::Error::FS_ERROR;
-            }
-        }
+        file = new File( path );
 
-        file = FS::openFile( path );
-
-        if( !file ) {
-            throw util::Error::FS_ERROR;
-        }
-
-        fileFD = fileno( file );
+        fileFD = file->fd();
 
         initFileSize();
         initItems();
@@ -135,7 +125,7 @@ namespace simq::util {
 
     Buffer::~Buffer() {
         if( file ) {
-            FS::closeFile( file );
+            delete file;
         }
 
         for( int i = 0; i < countItemsPackets; i++ ) {
@@ -406,21 +396,19 @@ namespace simq::util {
         _calculateReadData( fullLength, packetSize, offset, length, wrData );
 
         if( wrData.startSize ) {
-            FS::readFile(
-                file,
-                item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset,
+            file->read(
+                (void *)data,
                 wrData.startSize,
-                (void *)data
+                item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset
             );
         }
 
         for( unsigned int i = 0; i < wrData.sizes; i++ ) {
             wrData.startPartOffset++;
-            FS::readFile(
-                file,
-                item->fileOffsets[wrData.startPartOffset] * packetSize,
+            file->read(
+                (void *)&data[wrData.startSize + i * packetSize],
                 i == wrData.sizes - 1 ? wrData.startSize : packetSize,
-                (void *)&data[wrData.startSize + i * packetSize]
+                item->fileOffsets[wrData.startPartOffset] * packetSize
             );
         }
 
@@ -453,11 +441,10 @@ namespace simq::util {
                 return 0;
             }
 
-            FS::writeFile(
-                file,
-                item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset,
+            file->write(
+                (void *)data,
                 size,
-                (void *)data
+                item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset
             );
 
             item->lengthEnd += size;
@@ -498,11 +485,10 @@ namespace simq::util {
                 return 0;
             }
 
-            FS::writeFile(
-                file,
-                item->fileOffsets[wrData.startPartOffset] * packetSize,
+            file->write(
+                (void *)data,
                 size,
-                (void *)data
+                item->fileOffsets[wrData.startPartOffset] * packetSize
             );
 
             item->lengthEnd = size;
@@ -523,11 +509,10 @@ namespace simq::util {
         _calculateWriteData( fullLength, packetSize, length, wrData );
 
         if( wrData.startSize ) {
-            FS::writeFile(
-                file,
-                item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset,
+            file->write(
+                (void *)data,
                 wrData.startSize,
-                (void *)data
+                item->fileOffsets[wrData.startPartOffset] * packetSize + wrData.startOffset
             );
         }
 
@@ -551,11 +536,10 @@ namespace simq::util {
             item->fileOffsets[wrData.startPartOffset] = freeFileOffsets.front();
             freeFileOffsets.pop();
 
-            FS::writeFile(
-                file,
-                item->fileOffsets[wrData.startPartOffset] * packetSize,
+            file->write(
+                (void *)&data[wrData.startSize + i * packetSize],
                 i == wrData.sizes - 1 ? wrData.endSize : packetSize,
-                (void *)&data[wrData.startSize + i * packetSize]
+                item->fileOffsets[wrData.startPartOffset] * packetSize
             );
         }
     }
@@ -850,18 +834,18 @@ namespace simq::util {
 
     void Buffer::expandFile() {
         fileOffset += MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK;
-        FS::expandFile( file, MIN_FILE_SIZE );
+        file->expand( MIN_FILE_SIZE );
         for( unsigned int i = fileOffset; i < fileOffset + MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK; i++ ) {
             freeFileOffsets.push( i );
         }
     }
 
     void Buffer::initFileSize() {
-        auto size = FS::getFileSize( file );
+        auto size = file->size();
         fileOffset = MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK;
 
         if( size == 0 ) {
-            FS::expandFile( file, MIN_FILE_SIZE );
+            file->expand( MIN_FILE_SIZE );
 
             for( unsigned int i = 0; i < MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK; i++ ) {
                 freeFileOffsets.push( i );
@@ -870,13 +854,13 @@ namespace simq::util {
             auto expandSize =  LENGTH_PACKET_ON_DISK - ( size - ( size / LENGTH_PACKET_ON_DISK ) * LENGTH_PACKET_ON_DISK );
             if( size + expandSize < MIN_FILE_SIZE ) {
                 expandSize = MIN_FILE_SIZE - size;
-                FS::expandFile( file, expandSize );
+                file->expand( expandSize );
 
                 for( unsigned int i = 0; i < MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK; i++ ) {
                     freeFileOffsets.push( i );
                 }
             } else {
-                FS::expandFile( file, expandSize );
+                file->expand( expandSize );
 
                 for( unsigned int i = 0; i < ( size + expandSize ) / LENGTH_PACKET_ON_DISK; i++ ) {
                     freeFileOffsets.push( i );
@@ -885,7 +869,7 @@ namespace simq::util {
             }
         } else if( size < MIN_FILE_SIZE ) {
             auto expandSize = MIN_FILE_SIZE - size;
-            FS::expandFile( file, expandSize );
+            file->expand( expandSize );
 
             for( unsigned int i = 0; i < MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK; i++ ) {
                 freeFileOffsets.push( i );
