@@ -85,8 +85,8 @@ namespace simq::core::server {
             void removeGroup( const char *group );
             void removeChannel( const char *group, const char *channel );
 
-            void auth( const char *group, const char *channel, unsigned int fd );
-            void logout( unsigned int fd );
+            void join( const char *group, const char *channel, unsigned int fd );
+            void leave( unsigned int fd );
 
             unsigned int createMessage( unsigned int fd, unsigned int length );
             void removeMessage( unsigned int fd, unsigned int id );
@@ -273,7 +273,7 @@ namespace simq::core::server {
 
     }
 
-    void Q::auth( const char *group, const char *channel, unsigned int fd ) {
+    void Q::join( const char *group, const char *channel, unsigned int fd ) {
         util::LockAtomic lockAtomicSess( countSessWrited );
         std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
         
@@ -304,7 +304,7 @@ namespace simq::core::server {
         sessions[fd] = sess;
     }
 
-    void Q::logout( unsigned int fd ) {
+    void Q::leave( unsigned int fd ) {
         util::LockAtomic lockAtomicSess( countSessWrited );
         std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
         
