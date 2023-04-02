@@ -70,7 +70,7 @@ namespace simq::core::server {
             void addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] );
             void removeGroup( const char *group );
 
-            void getChannels( const char *group, std::list<std::string> &channels );
+            void getChannels( const char *group, std::vector<std::string> &channels );
             void getChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings );
             void addChannel( const char *group, const char *channel, util::Types::ChannelSettings &settings );
             void updateChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings );
@@ -466,7 +466,7 @@ namespace simq::core::server {
     void Store::getGroups( std::vector<std::string> &groups ) {
         std::lock_guard<std::mutex> lock( m );
 
-        for( auto it = groups.begin(); it < groups.end(); it++ ) {
+        for( auto it = groups.begin(); it != groups.end(); it++ ) {
             groups.push_back( *it );
         }
     }
@@ -545,6 +545,175 @@ namespace simq::core::server {
         util::FS::removeDir( path.c_str() );
 
         groups.erase( it );
+    }
+
+    void Store::getChannels( const char *group, std::vector<std::string> &channels ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        for( auto it = groups[group].begin(); it != groups[group].end(); it++ ) {
+            channels.push_back( it->first );
+
+        }
+    }
+
+    void Store::addChannel( const char *group, const char *channel, util::Types::ChannelSettings &settings ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        auto itChannel = itGroup->second.find( channel );
+        if( itChannel != itGroup->second.end() ) {
+            throw util::Error::DUPLICATE_CHANNEL;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+        path += "/";
+        path += channel;
+
+        if( !util::FS::createDir( path.c_str() ) ) {
+            throw util::Error::FS_ERROR;
+        }
+
+        auto pathSettings = path;
+        pathSettings += "/";
+        pathSettings += fileSettings;
+
+        util::File fileSettings( pathSettings.c_str(), true );
+        util::Types::ChannelSettings channelSettings;
+
+        channelSettings.minMessageSize = htonl( settings.minMessageSize );
+        channelSettings.maxMessageSize = htonl( settings.maxMessageSize );
+        channelSettings.maxMessagesInMemory = htonl( settings.maxMessagesInMemory );
+        channelSettings.maxMessagesOnDisk = htonl( settings.maxMessagesOnDisk );
+
+        fileSettings.write( &channelSettings, sizeof( util::Types::ChannelSettings ) );
+
+
+        auto _pathConsumers = path;
+        _pathConsumers += "/";
+        _pathConsumers += pathConsumers;
+        if( !util::FS::createDir( _pathConsumers.c_str() ) ) {
+            throw util::Error::FS_ERROR;
+        }
+
+        auto _pathProducers = path;
+        _pathProducers += "/";
+        _pathProducers += pathProducers;
+        if( !util::FS::createDir( _pathProducers.c_str() ) ) {
+            throw util::Error::FS_ERROR;
+        }
+
+        Channel ch;
+        groups[group][channel] = ch;
+
+    }
+
+    void Store::removeChannel( const char *group, const char *channel ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            return;
+        }
+
+        auto itChannel = itGroup->second.find( channel );
+        if( itChannel == itGroup->second.end() ) {
+            return;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+        path += "/";
+        path += channel;
+
+        util::FS::removeDir( path.c_str() );
+
+        groups[group].erase( itChannel );
+    }
+
+    void Store::getChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        auto itChannel = itGroup->second.find( channel );
+        if( itChannel == itGroup->second.end() ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+        path += "/";
+        path += channel;
+        path += "/";
+        path += fileSettings;
+
+        util::File fileSettings( path.c_str() );
+        fileSettings.read( &settings, sizeof( util::Types::ChannelSettings ) );
+
+        settings.minMessageSize = ntohl( settings.minMessageSize );
+        settings.maxMessageSize = ntohl( settings.maxMessageSize );
+        settings.maxMessagesInMemory = ntohl( settings.maxMessagesInMemory );
+        settings.maxMessagesOnDisk = ntohl( settings.maxMessagesOnDisk );
+    }
+
+    void Store::updateChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto itGroup = groups.find( group );
+
+        if( itGroup == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        auto itChannel = itGroup->second.find( channel );
+        if( itChannel == itGroup->second.end() ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+        path += "/";
+        path += channel;
+        path += "/";
+        path += fileSettings;
+
+        util::File fileSettings( path.c_str() );
+
+        settings.minMessageSize = htonl( settings.minMessageSize );
+        settings.maxMessageSize = htonl( settings.maxMessageSize );
+        settings.maxMessagesInMemory = htonl( settings.maxMessagesInMemory );
+        settings.maxMessagesOnDisk = htonl( settings.maxMessagesOnDisk );
+
+        fileSettings.write( &settings, sizeof( util::Types::ChannelSettings ) );
     }
 }
 
