@@ -1,14 +1,12 @@
 #ifndef SIMQ_CORE_SERVER_STORE 
 #define SIMQ_CORE_SERVER_STORE 
 
-#include <list>
 #include <string>
 #include <string.h>
 #include <mutex>
 #include <vector>
 #include <thread>
 #include <arpa/inet.h>
-#include <iostream>
 #include <map>
 #include "../../crypto/hash.hpp"
 #include "../../util/types.h"
