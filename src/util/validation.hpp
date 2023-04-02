@@ -71,7 +71,7 @@ namespace simq::util {
             isNum = ch >= '0' && ch <= '9';
             isWord = ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z';
 
-            if( !isNum && isWord ) {
+            if( !isNum && !isWord ) {
                 return false;
             }
         }
