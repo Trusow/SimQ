@@ -24,6 +24,7 @@ namespace simq::util {
             unsigned int read( void *data, unsigned int length, unsigned long int offset );
             unsigned long int size();
             void expand( unsigned int size );
+            void rename( const char *name );
             unsigned int fd();
             ~File();
     };
@@ -126,6 +127,31 @@ namespace simq::util {
         fclose( file );
 
         return size;
+    }
+
+    void File::rename( const char *name ) {
+        unsigned int lastOffset = 0;
+
+        for( unsigned int i = 0; ;i++ ) {
+            if( filePath[i] == 0 ) {
+                break;
+            } else if ( filePath[i] == '/' ) {
+                lastOffset = i;
+            }
+        }
+
+        auto l = strlen( name );
+        char *newPath = new char[lastOffset+1+l+1]{};
+        memcpy( newPath, filePath, lastOffset+1 );
+        memcpy( &newPath[lastOffset+1], name, l );
+
+        if( ::rename( filePath, newPath ) != 0 ) {
+            delete[] newPath;
+            throw util::Error::FS_ERROR;
+        } else {
+            delete[] filePath;
+            filePath = newPath;
+        }
     }
 
     void File::expand( unsigned int size ) {
