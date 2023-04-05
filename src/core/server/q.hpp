@@ -36,8 +36,17 @@ namespace simq::core::server {
             };
 
             std::map<unsigned int, Session> sessions;
+
+            std::map<unsigned int, Session> sessionsConsumers;
+            std::map<unsigned int, Session> sessionsProducers;
+
             std::shared_timed_mutex mSess;
+            std::shared_timed_mutex mSessConsumers;
+            std::shared_timed_mutex mSessProducers;
+
             std::atomic_uint countSessWrited {0};
+            std::atomic_uint countSessConsumersWrited {0};
+            std::atomic_uint countSessProducersWrited {0};
 
             const unsigned int MESSAGES_IN_PACKET = 10'000;
 
@@ -68,7 +77,8 @@ namespace simq::core::server {
             void _wait( std::atomic_uint &atom );
             void _expandMessagesPacket( const char *group, const char *channel );
             void _addMessage( const char *group, const char *channel, unsigned int id, unsigned int length, bool isMemory );
-            void _getGroupChannelByFd( unsigned int fd, std::string &group, std::string &channel );
+            void _getGroupChannelByFDConsumer( unsigned int fd, std::string &group, std::string &channel );
+            void _getGroupChannelByFDProducer( unsigned int fd, std::string &group, std::string &channel );
         public:
             void addGroup( const char *group );
             void addChannel(
@@ -85,8 +95,10 @@ namespace simq::core::server {
             void removeGroup( const char *group );
             void removeChannel( const char *group, const char *channel );
 
-            void join( const char *group, const char *channel, unsigned int fd );
-            void leave( unsigned int fd );
+            void joinConsumer( const char *group, const char *channel, unsigned int fd );
+            void leaveConsumer( unsigned int fd );
+            void joinProducer( const char *group, const char *channel, unsigned int fd );
+            void leaveProducer( unsigned int fd );
 
             unsigned int createMessage( unsigned int fd, unsigned int length );
             void removeMessage( unsigned int fd, unsigned int id );
@@ -258,26 +270,39 @@ namespace simq::core::server {
         groups[group][channel].messages[offsetPacket][offset] = data;
     }
 
-    void Q::_getGroupChannelByFd( unsigned int fd, std::string &group, std::string &channel ) {
-        _wait( countSessWrited );
-        std::shared_lock<std::shared_timed_mutex> lockSess( mSess );
+    void Q::_getGroupChannelByFDConsumer( unsigned int fd, std::string &group, std::string &channel ) {
+        _wait( countSessConsumersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockSess( mSessConsumers );
 
-        auto iter = sessions.find( fd );
+        auto iter = sessionsConsumers.find( fd );
 
-        if( iter == sessions.end() ) {
+        if( iter == sessionsConsumers.end() ) {
             throw util::Error::NOT_FOUND_SESSION;
         }
 
         group = iter->second.group;
         channel = iter->second.channel;
-
     }
 
-    void Q::join( const char *group, const char *channel, unsigned int fd ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+    void Q::_getGroupChannelByFDProducer( unsigned int fd, std::string &group, std::string &channel ) {
+        _wait( countSessProducersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockSess( mSessProducers );
+
+        auto iter = sessionsProducers.find( fd );
+
+        if( iter == sessionsProducers.end() ) {
+            throw util::Error::NOT_FOUND_SESSION;
+        }
+
+        group = iter->second.group;
+        channel = iter->second.channel;
+    }
+
+    void Q::joinProducer( const char *group, const char *channel, unsigned int fd ) {
+        util::LockAtomic lockAtomicSess( countSessProducersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockSess( mSessProducers );
         
-        if( sessions.count( fd ) ) {
+        if( sessionsProducers.count( fd ) ) {
             throw util::Error::DUPLICATE_SESSION;
         }
         
@@ -301,29 +326,76 @@ namespace simq::core::server {
         sess.group = new char[lGroup+1]{};
         sess.channel = new char[lChannel+1]{};
 
-        sessions[fd] = sess;
+        sessionsProducers[fd] = sess;
     }
 
-    void Q::leave( unsigned int fd ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+    void Q::joinConsumer( const char *group, const char *channel, unsigned int fd ) {
+        util::LockAtomic lockAtomicSess( countSessConsumersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockSess( mSessConsumers );
         
-        auto iter = sessions.find( fd );
+        if( sessionsConsumers.count( fd ) ) {
+            throw util::Error::DUPLICATE_SESSION;
+        }
+        
+        _wait( countGroupWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroup( mGroup );
 
-        if( iter == sessions.end() ) {
+        if( !groups.count( group ) ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        _wait( countChannelWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannel( mChannel );
+
+        if( !groups[group].count( channel ) ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        Session sess;
+        auto lGroup = strlen( group );
+        auto lChannel = strlen( group );
+        sess.group = new char[lGroup+1]{};
+        sess.channel = new char[lChannel+1]{};
+
+        sessionsConsumers[fd] = sess;
+    }
+
+    void Q::leaveConsumer( unsigned int fd ) {
+        util::LockAtomic lockAtomicSess( countSessConsumersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockSess( mSessConsumers );
+        
+        auto iter = sessionsConsumers.find( fd );
+
+        if( iter == sessionsConsumers.end() ) {
             return;
         }
 
         delete[] iter->second.group;
         delete[] iter->second.channel;
 
-        sessions.erase( iter );
+        sessionsConsumers.erase( iter );
+    }
+
+    void Q::leaveProducer( unsigned int fd ) {
+        util::LockAtomic lockAtomicSess( countSessProducersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockSess( mSessProducers );
+        
+        auto iter = sessionsProducers.find( fd );
+
+        if( iter == sessionsProducers.end() ) {
+            return;
+        }
+
+        delete[] iter->second.group;
+        delete[] iter->second.channel;
+
+        sessionsProducers.erase( iter );
     }
 
     unsigned int Q::createMessage( unsigned int fd, unsigned int length ) {
         std::string _group;
         std::string _channel;
-        _getGroupChannelByFd( fd, _group, _channel );
+        _getGroupChannelByFDProducer( fd, _group, _channel );
         const char *group = _group.c_str();
         const char *channel = _channel.c_str();
         
@@ -375,7 +447,9 @@ namespace simq::core::server {
     void Q::removeMessage( unsigned int fd, unsigned int id ) {
         std::string _group;
         std::string _channel;
-        _getGroupChannelByFd( fd, _group, _channel );
+
+        _getGroupChannelByFDProducer( fd, _group, _channel );
+
         const char *group = _group.c_str();
         const char *channel = _channel.c_str();
 
@@ -417,7 +491,7 @@ namespace simq::core::server {
     ) {
         std::string _group;
         std::string _channel;
-        _getGroupChannelByFd( fd, _group, _channel );
+        _getGroupChannelByFDProducer( fd, _group, _channel );
         const char *group = _group.c_str();
         const char *channel = _channel.c_str();
 
@@ -448,7 +522,7 @@ namespace simq::core::server {
     ) {
         std::string _group;
         std::string _channel;
-        _getGroupChannelByFd( fd, _group, _channel );
+        _getGroupChannelByFDConsumer( fd, _group, _channel );
         const char *group = _group.c_str();
         const char *channel = _channel.c_str();
 
@@ -475,7 +549,7 @@ namespace simq::core::server {
     void Q::pushMessageToQ( unsigned int fd, unsigned int id ) {
         std::string _group;
         std::string _channel;
-        _getGroupChannelByFd( fd, _group, _channel );
+        _getGroupChannelByFDProducer( fd, _group, _channel );
         const char *group = _group.c_str();
         const char *channel = _channel.c_str();
 
@@ -502,7 +576,7 @@ namespace simq::core::server {
     unsigned int Q::popMessageFromQ( unsigned int fd ) {
         std::string _group;
         std::string _channel;
-        _getGroupChannelByFd( fd, _group, _channel );
+        _getGroupChannelByFDConsumer( fd, _group, _channel );
         const char *group = _group.c_str();
         const char *channel = _channel.c_str();
 
@@ -528,7 +602,7 @@ namespace simq::core::server {
     void Q::revertMessageToQ( unsigned int fd, unsigned int id ) {
         std::string _group;
         std::string _channel;
-        _getGroupChannelByFd( fd, _group, _channel );
+        _getGroupChannelByFDConsumer( fd, _group, _channel );
         const char *group = _group.c_str();
         const char *channel = _channel.c_str();
 
