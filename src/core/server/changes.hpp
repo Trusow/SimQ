@@ -72,13 +72,24 @@ namespace simq::core::server {
             void _popFile();
             void _generateUniqFileName( char *name );
             bool _isAllowedType( unsigned int type );
+            Change *_buildGroupChange(
+                unsigned int type,
+                const char *group,
+                unsigned char password[crypto::HASH_LENGTH]
+            );
 
         public:
             Changes( const char *path );
             ~Changes();
 
-            Change *addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] );
-            Change *updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] );
+            Change *addGroup(
+                const char *group,
+                unsigned char password[crypto::HASH_LENGTH]
+            );
+            Change *updateGroupPassword(
+                const char *group,
+                unsigned char password[crypto::HASH_LENGTH]
+            );
             Change *removeGroup( const char *group );
 
             bool isAddGroup( Change *change );
@@ -131,65 +142,48 @@ namespace simq::core::server {
         }
     }
 
-    Changes::Change *Changes::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+    Changes::Change *Changes::_buildGroupChange(
+        unsigned int type,
+        const char *group,
+        unsigned char password[crypto::HASH_LENGTH]
+    ) {
         if( !util::Validation::isGroupName( group ) ) {
             throw util::Error::WRONG_GROUP;
         }
 
         auto groupLength = strlen( group );
 
+
         auto change = new Change{};
+        change->type = type;
 
-        change->type = CH_CREATE_GROUP;
-        change->values[0] = groupLength;
-        change->values[1] = crypto::HASH_LENGTH;
+        if( password != nullptr ) {
+            change->data = new char[groupLength+1+crypto::HASH_LENGTH]{};
 
-        change->data = new char[groupLength+crypto::HASH_LENGTH+1]{};
+            change->values[0] = groupLength;
+            memcpy( change->data, group, groupLength );
+            change->values[1] = crypto::HASH_LENGTH;
+            memcpy( &change->data[groupLength+1], password, crypto::HASH_LENGTH );
+        } else {
+            change->data = new char[groupLength+1]{};
 
-        memcpy( change->data, group, groupLength );
-        memcpy( &change->data[groupLength+1], password, crypto::HASH_LENGTH );
+            change->values[0] = groupLength;
+            memcpy( change->data, group, groupLength );
+        }
 
         return change;
+    }
+
+    Changes::Change *Changes::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+        return _buildGroupChange( CH_CREATE_GROUP, group, password );
     }
 
     Changes::Change *Changes::updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
-        if( !util::Validation::isGroupName( group ) ) {
-            throw util::Error::WRONG_GROUP;
-        }
-
-        auto groupLength = strlen( group );
-
-        auto change = new Change{};
-
-        change->type = CH_UPDATE_GROUP_PASSWORD;
-        change->values[0] = groupLength;
-        change->values[1] = crypto::HASH_LENGTH;
-
-        change->data = new char[groupLength+crypto::HASH_LENGTH+1]{};
-
-        memcpy( change->data, group, groupLength );
-        memcpy( &change->data[groupLength+1], password, crypto::HASH_LENGTH );
-
-        return change;
+        return _buildGroupChange( CH_UPDATE_GROUP_PASSWORD, group, password );
     }
 
     Changes::Change *Changes::removeGroup( const char *group ) {
-        if( !util::Validation::isGroupName( group ) ) {
-            throw util::Error::WRONG_GROUP;
-        }
-
-        auto groupLength = strlen( group );
-
-        auto change = new Change{};
-
-        change->type = CH_REMOVE_GROUP;
-        change->values[0] = groupLength;
-
-        change->data = new char[groupLength+crypto::HASH_LENGTH+1]{};
-
-        memcpy( change->data, group, groupLength );
-
-        return change;
+        return _buildGroupChange( CH_REMOVE_GROUP, group, nullptr );
     }
 
     const char *Changes::getGroup( Change *change ) {
@@ -361,6 +355,7 @@ namespace simq::core::server {
     void Changes::_addChangesFromFiles() {
         std::vector<std::string> files;
 
+        // TODO: получать файлы отсортированные по дате
         util::FS::files( _path, files );
 
         for( auto it = files.begin(); it != files.end(); it++ ) {
