@@ -78,6 +78,7 @@ namespace simq::core::server {
             ~Changes();
 
             Change *addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] );
+            Change *updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] );
             Change *removeGroup( const char *group );
 
             bool isAddGroup( Change *change );
@@ -140,6 +141,27 @@ namespace simq::core::server {
         auto change = new Change{};
 
         change->type = CH_CREATE_GROUP;
+        change->values[0] = groupLength;
+        change->values[1] = crypto::HASH_LENGTH;
+
+        change->data = new char[groupLength+crypto::HASH_LENGTH+1]{};
+
+        memcpy( change->data, group, groupLength );
+        memcpy( &change->data[groupLength+1], password, crypto::HASH_LENGTH );
+
+        return change;
+    }
+
+    Changes::Change *Changes::updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+        if( !util::Validation::isGroupName( group ) ) {
+            throw util::Error::WRONG_GROUP;
+        }
+
+        auto groupLength = strlen( group );
+
+        auto change = new Change{};
+
+        change->type = CH_UPDATE_GROUP_PASSWORD;
         change->values[0] = groupLength;
         change->values[1] = crypto::HASH_LENGTH;
 
