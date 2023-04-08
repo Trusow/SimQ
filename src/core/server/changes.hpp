@@ -54,6 +54,7 @@ namespace simq::core::server {
             void _addChangesFromFiles();
             void _addChangesFromFile( util::File &file, const char *name );
             void _popFile();
+            void _generateUniqFileName( char *name );
 
         public:
             Changes( const char *path );
@@ -210,20 +211,17 @@ namespace simq::core::server {
         for( unsigned int i = 0; i < LENGTH_VALUES; i++ ) {
             length += change->values[i];
             if( change->values[i] ) {
+                // null byte
                 length += 1;
             }
             ch.values[i] = htonl( change->values[i] );
         }
 
         // TODO: Доработать хранение числовых данных в дате
-        //
-        // TODO: Проверка файла на уникальность
-
-        length -= 1;
 
         char uuid[util::UUID::LENGTH+1];
-        memset( uuid, 0, util::UUID::LENGTH+1 );
-        util::UUID::generate( uuid );
+
+        _generateUniqFileName( uuid );
 
         std::string tmpPath = _path;
 
@@ -234,6 +232,24 @@ namespace simq::core::server {
         file.write( &ch, sizeof( ChangeFile ) );
         file.write( change->data, length );
         file.rename( uuid );
+    }
+
+    void Changes::_generateUniqFileName( char *uuid ) {
+        while( true ) {
+            memset( uuid, 0, util::UUID::LENGTH+1 );
+            util::UUID::generate( uuid );
+
+            std::string _tmpDev = _path;
+            _tmpDev += "_";
+            _tmpDev += uuid;
+
+            std::string _tmp = _path;
+            _tmp += uuid;
+
+            if( !util::FS::fileExists( _tmpDev.c_str() ) && !util::FS::fileExists( _tmp.c_str() ) ) {
+                break;
+            } 
+        }
     }
 
     void Changes::_addChangesFromFile( util::File &file, const char *name ) {
