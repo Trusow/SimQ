@@ -299,7 +299,7 @@ namespace simq::core::server {
             change->values[1] = channelLength;
             memcpy( &change->data[groupLength+1], channel, channelLength );
         } else {
-            change->data = new char[groupLength+1+channelLength+1+settingsLength]{};
+            change->data = new char[groupLength+1+channelLength+1+settingsLength+1]{};
 
             change->values[0] = groupLength;
             memcpy( change->data, group, groupLength );
@@ -359,7 +359,7 @@ namespace simq::core::server {
             change->values[2] = loginLength;
             memcpy( &change->data[groupLength+1+channelLength+1], login, loginLength );
         } else {
-            change->data = new char[groupLength+1+channelLength+1+loginLength+1+crypto::HASH_LENGTH]{};
+            change->data = new char[groupLength+1+channelLength+1+loginLength+1+crypto::HASH_LENGTH+1]{};
 
             change->values[0] = groupLength;
             memcpy( change->data, group, groupLength );
