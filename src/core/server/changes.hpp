@@ -65,6 +65,7 @@ namespace simq::core::server {
             std::list<ChangeDisk> listDisk;
             std::map<std::string, bool> unknownFiles;
             std::map<std::string, bool> passedFiles;
+            std::list<std::string> failedFiles;
             std::mutex m;
 
             void _addChangesFromFiles();
@@ -107,6 +108,8 @@ namespace simq::core::server {
             bool _isValidUpdateCountThreads( Change *change );
             bool _isValidUpdateMasterPassword( Change *change, unsigned int length );
             bool _isValidChangeFromFile( Change *change, unsigned int length );
+
+            void _clearFailedFiles();
 
         public:
             Changes( const char *path );
@@ -334,6 +337,17 @@ namespace simq::core::server {
         }
 
         return change;
+    }
+
+    void Changes::_clearFailedFiles() {
+        for( auto it = failedFiles.begin(); it != failedFiles.end(); it++ ) {
+            std::string p = _path;
+            p += *it;
+
+            util::FS::removeFile( p.c_str() );
+        }
+
+        failedFiles.clear();
     }
 
     Changes::Change *Changes::_buildUserChange(
@@ -1058,7 +1072,7 @@ namespace simq::core::server {
         }
 
         if( !_isValidChangeFromFile( ch, length ) ) {
-            failedFiles[name] = true;
+            failedFiles.push_back( name );
             free( ch );
             return;
         }
@@ -1128,6 +1142,7 @@ namespace simq::core::server {
 
     Changes::Change *Changes::pop() {
         std::lock_guard<std::mutex> lock( m );
+        _clearFailedFiles();
 
         Change *change = nullptr;
 
