@@ -98,7 +98,9 @@ namespace simq::util {
         char ch;
         bool isNum, isWord;
 
-        if( strlen( name ) > length ) {
+        auto l = strlen( name );
+
+        if( l > length || !l ) {
             return false;
         }
 
