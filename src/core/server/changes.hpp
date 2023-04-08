@@ -85,6 +85,14 @@ namespace simq::core::server {
                 util::Types::ChannelSettings *settings
             );
 
+            Change *_buildUserChange(
+                unsigned int type,
+                const char *group,
+                const char *channel,
+                const char *login,
+                unsigned char password[crypto::HASH_LENGTH]
+            );
+
         public:
             Changes( const char *path );
             ~Changes();
@@ -106,6 +114,42 @@ namespace simq::core::server {
                 util::Types::ChannelSettings *settings
             );
             Change *removeChannel( const char *group, const char *channel );
+
+            Change *addConsumer(
+                const char *group,
+                const char *channel,
+                const char *login,
+                unsigned char password[crypto::HASH_LENGTH]
+            );
+            Change *updateConsumerPassword(
+                const char *group,
+                const char *channel,
+                const char *login,
+                unsigned char password[crypto::HASH_LENGTH]
+            );
+            Change *removeConsumer(
+                const char *group,
+                const char *channel,
+                const char *login
+            );
+
+            Change *addProducer(
+                const char *group,
+                const char *channel,
+                const char *login,
+                unsigned char password[crypto::HASH_LENGTH]
+            );
+            Change *updateProducerPassword(
+                const char *group,
+                const char *channel,
+                const char *login,
+                unsigned char password[crypto::HASH_LENGTH]
+            );
+            Change *removeProducer(
+                const char *group,
+                const char *channel,
+                const char *login
+            );
 
             bool isAddGroup( Change *change );
             bool isRemoveGroup( Change *change );
@@ -243,6 +287,68 @@ namespace simq::core::server {
         return change;
     }
 
+    Changes::Change *Changes::_buildUserChange(
+        unsigned int type,
+        const char *group,
+        const char *channel,
+        const char *login,
+        unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        if( !util::Validation::isGroupName( group ) ) {
+            throw util::Error::WRONG_GROUP;
+        }
+
+        if( !util::Validation::isChannelName( channel ) ) {
+            throw util::Error::WRONG_CHANNEL;
+        }
+
+        switch( type ) {
+            case CH_CREATE_CONSUMER:
+            case CH_UPDATE_CONSUMER_PASSWORD:
+            case CH_REMOVE_CONSUMER:
+                if( !util::Validation::isConsumerName( login ) ) {
+                    throw util::Error::WRONG_LOGIN;
+                }
+            break;
+            default:
+                if( !util::Validation::isProducerName( login ) ) {
+                    throw util::Error::WRONG_LOGIN;
+                }
+            break;
+        }
+
+        auto groupLength = strlen( group );
+        auto channelLength = strlen( channel );
+        auto loginLength = strlen( login );
+
+        auto change = new Change{};
+        change->type = type;
+
+        if( password != nullptr ) {
+            change->data = new char[groupLength+1+channelLength+1+loginLength+1]{};
+
+            change->values[0] = groupLength;
+            memcpy( change->data, group, groupLength );
+            change->values[1] = channelLength;
+            memcpy( &change->data[groupLength+1], channel, channelLength );
+            change->values[2] = loginLength;
+            memcpy( &change->data[groupLength+1+channelLength+1], login, loginLength );
+        } else {
+            change->data = new char[groupLength+1+channelLength+1+loginLength+1+crypto::HASH_LENGTH]{};
+
+            change->values[0] = groupLength;
+            memcpy( change->data, group, groupLength );
+            change->values[1] = channelLength;
+            memcpy( &change->data[groupLength+1], channel, channelLength );
+            change->values[2] = loginLength;
+            memcpy( &change->data[groupLength+1+channelLength+1], login, loginLength );
+            change->values[3] = crypto::HASH_LENGTH;
+            memcpy( &change->data[groupLength+1+channelLength+1+loginLength+1], password, crypto::HASH_LENGTH );
+        }
+
+        return change;
+    }
+
     Changes::Change *Changes::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
         return _buildGroupChange( CH_CREATE_GROUP, group, password );
     }
@@ -269,6 +375,58 @@ namespace simq::core::server {
 
     Changes::Change *Changes::removeChannel( const char *group, const char *channel ) {
         return _buildChannelChange( CH_REMOVE_CHANNEL, group, channel, nullptr );
+    }
+    
+    Changes::Change *Changes::addConsumer(
+        const char *group,
+        const char *channel,
+        const char *login,
+        unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        return _buildUserChange( CH_CREATE_CONSUMER, group, channel, login, password );
+    }
+
+    Changes::Change *Changes::updateConsumerPassword(
+        const char *group,
+        const char *channel,
+        const char *login,
+        unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        return _buildUserChange( CH_UPDATE_CONSUMER_PASSWORD, group, channel, login, password );
+    }
+
+    Changes::Change *Changes::removeConsumer(
+        const char *group,
+        const char *channel,
+        const char *login
+    ) {
+        return _buildUserChange( CH_REMOVE_CONSUMER, group, channel, login, nullptr );
+    }
+
+    Changes::Change *Changes::addProducer(
+        const char *group,
+        const char *channel,
+        const char *login,
+        unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        return _buildUserChange( CH_CREATE_PRODUCER, group, channel, login, password );
+    }
+
+    Changes::Change *Changes::updateProducerPassword(
+        const char *group,
+        const char *channel,
+        const char *login,
+        unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        return _buildUserChange( CH_UPDATE_PRODUCER_PASSWORD, group, channel, login, password );
+    }
+
+    Changes::Change *Changes::removeProducer(
+        const char *group,
+        const char *channel,
+        const char *login
+    ) {
+        return _buildUserChange( CH_REMOVE_PRODUCER, group, channel, login, nullptr );
     }
 
     const char *Changes::getGroup( Change *change ) {
