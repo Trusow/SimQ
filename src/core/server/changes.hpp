@@ -311,7 +311,7 @@ namespace simq::core::server {
         auto change = new Change{};
         change->type = type;
 
-        if( settings != nullptr ) {
+        if( settings == nullptr ) {
             change->data = new char[groupLength+1+channelLength+1]{};
 
             change->values[0] = groupLength;
