@@ -151,6 +151,12 @@ namespace simq::core::server {
                 const char *login
             );
 
+            Change *updatePort( unsigned short int port );
+            Change *updateCountThreads( unsigned short int port );
+            Change *updateMasterPassword(
+                unsigned char password[crypto::HASH_LENGTH]
+            );
+
             bool isAddGroup( Change *change );
             bool isRemoveGroup( Change *change );
 
@@ -158,6 +164,8 @@ namespace simq::core::server {
             const char *getChannel( Change *change );
             const char *getLogin( Change *change );
             const util::Types::ChannelSettings *getChannelSettings( Change *change );
+            unsigned int getPort( Change *change );
+            unsigned int getCountThreads( Change *change );
             void getPassword( Change *change, unsigned char password[crypto::HASH_LENGTH] );
 
             void push( Change *change );
@@ -429,6 +437,43 @@ namespace simq::core::server {
         return _buildUserChange( CH_REMOVE_PRODUCER, group, channel, login, nullptr );
     }
 
+    Changes::Change *Changes::updatePort( unsigned short int port ) {
+        if( port == 0 ) {
+            throw util::Error::WRONG_PARAM;
+        }
+
+        auto change = new Change{};
+        change->type = CH_UPDATE_PORT;
+        change->values[0] = port;
+
+        return change;
+    }
+
+    Changes::Change *Changes::updateCountThreads( unsigned short int threads ) {
+        if( threads == 0 ) {
+            throw util::Error::WRONG_PARAM;
+        }
+
+        auto change = new Change{};
+        change->type = CH_UPDATE_COUNT_THREADS;
+        change->values[0] = threads;
+
+        return change;
+    }
+
+    Changes::Change *Changes::updateMasterPassword(
+        unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        auto change = new Change{};
+        change->type = CH_UPDATE_COUNT_THREADS;
+        change->values[0] = crypto::HASH_LENGTH;
+
+        change->data = new char[crypto::HASH_LENGTH]{};
+        memcpy( change->data, password, crypto::HASH_LENGTH );
+
+        return change;
+    }
+
     const char *Changes::getGroup( Change *change ) {
         return change->data;
     }
@@ -448,11 +493,38 @@ namespace simq::core::server {
         return (util::Types::ChannelSettings *)&change->data[offset];
     }
 
+    unsigned int Changes::getPort( Change *change ) {
+        return change->values[0];
+    }
+
+    unsigned int Changes::getCountThreads( Change *change ) {
+        return change->values[0];
+    }
+
     void Changes::getPassword( Change *change, unsigned char password[crypto::HASH_LENGTH] ) {
-        if( isAddGroup( change ) ) {
-            auto offset = change->values[0] + 1;
-            memcpy( password, &change->data[offset], crypto::HASH_LENGTH );
+        unsigned int offset = 0;
+
+        switch( change->type ) {
+            case CH_UPDATE_MASTER_PASSWORD:
+                offset = 0;
+                break;
+            case CH_CREATE_GROUP:
+            case CH_UPDATE_GROUP_PASSWORD:
+                offset = change->values[0]+1;
+                break;
+            case CH_CREATE_CONSUMER:
+            case CH_UPDATE_CONSUMER_PASSWORD:
+            case CH_CREATE_PRODUCER:
+            case CH_UPDATE_PRODUCER_PASSWORD:
+                offset = change->values[0]+1;
+                offset += change->values[1]+1;
+                offset += change->values[2]+1;
+                break;
+            default:
+                return;
         }
+
+        memcpy( password, &change->data[offset], crypto::HASH_LENGTH );
     }
 
     bool Changes::isAddGroup( Change *change ) {
