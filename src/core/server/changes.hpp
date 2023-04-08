@@ -96,6 +96,13 @@ namespace simq::core::server {
             char *_convertChannelSettingsDataToFile( Change *change );
             char *_convertChannelSettingsDataFromFile( Change *change );
 
+            bool _isValidGroup( Change *change, unsigned int length );
+            bool _isValidChannel( Change *change, unsigned int length );
+            bool _isValidUser( Change *change, unsigned int length );
+            bool _isValidUpdatePort( Change *change );
+            bool _isValidUpdateCountThreads( Change *change );
+            bool _isValidUpdateMasterPassword( Change *change, unsigned int length );
+
         public:
             Changes( const char *path );
             ~Changes();
@@ -458,7 +465,7 @@ namespace simq::core::server {
     }
 
     Changes::Change *Changes::updatePort( unsigned short int port ) {
-        if( port == 0 ) {
+        if( !util::Validation::isPort( port ) ) {
             throw util::Error::WRONG_PARAM;
         }
 
@@ -663,6 +670,130 @@ namespace simq::core::server {
         memcpy( &data[offset], &_settings, sizeof( util::Types::ChannelSettings ) );
 
         return data;
+    }
+
+    bool Changes::_isValidGroup( Change *change, unsigned int length ) {
+        if( change->values[0] == 0 ) {
+            return false;
+        }
+
+        auto l = change->values[0] + 1;
+
+        if( change->type != CH_REMOVE_GROUP ) {
+            l += change->values[1] + 1;
+            if( change->values[1] != crypto::HASH_LENGTH ) {
+                return false;
+            }
+        }
+
+        if( l != length ) {
+            return false;
+        }
+
+        return util::Validation::isGroupName( change->data );
+    }
+
+    bool Changes::_isValidChannel( Change *change, unsigned int length ) {
+        if( change->values[0] == 0 || change->values[1] == 0 ) {
+            return false;
+        }
+
+        auto l = change->values[0] + 1;
+        l += change->values[1] + 1;
+        auto lengthSettings = sizeof( util::Types::ChannelSettings );
+
+        if( change->type != CH_REMOVE_CHANNEL ) {
+            l += change->values[2] + 1;
+
+            if( change->values[2] != lengthSettings ) {
+                return false;
+            }
+
+            util::Types::ChannelSettings settings;
+            memcpy( &settings, &change->data[change->values[0]+1+change->values[1]+1], lengthSettings );
+
+            if( settings.minMessageSize > settings.maxMessageSize ) {
+                return false;
+            }
+
+            if( settings.minMessageSize == 0 || settings.maxMessageSize == 0 ) {
+                return false;
+            }
+
+            unsigned long int _size = settings.maxMessagesOnDisk + settings.maxMessagesInMemory;
+
+            if( _size > 0xFF'FF'FF'FF ) {
+                return false;
+            }
+
+            if( settings.maxMessagesOnDisk == 0 && settings.maxMessagesInMemory == 0 ) {
+                return false;
+            }
+        }
+
+        if( l != length ) {
+            return false;
+        }
+
+        if( !util::Validation::isGroupName( change->data ) ) {
+            return false;
+        }
+
+        return util::Validation::isChannelName( &change->data[change->values[0]+1] );
+    }
+
+    bool Changes::_isValidUser( Change *change, unsigned int length ) {
+        if( change->values[0] == 0 || change->values[1] == 0 || change->values[2] == 0 ) {
+            return false;
+        }
+
+        auto l = change->values[0] + 1;
+        l += change->values[1] + 1;
+        l += change->values[2] + 1;
+
+        if( change->type != CH_REMOVE_CONSUMER && change->type != CH_REMOVE_PRODUCER ) {
+            l += change->values[3] + 1;
+            if( change->values[3] != crypto::HASH_LENGTH ) {
+                return false;
+            }
+        }
+
+        if( l != length ) {
+            return false;
+        }
+
+        if( !util::Validation::isGroupName( change->data ) ) {
+            return false;
+        }
+
+        if( !util::Validation::isChannelName( &change->data[change->values[0]+1] ) ) {
+            return false;
+        }
+
+        switch( change->type ) {
+            case CH_CREATE_CONSUMER:
+            case CH_UPDATE_CONSUMER_PASSWORD:
+            case CH_REMOVE_CONSUMER:
+                return util::Validation::isConsumerName(
+                    &change->data[change->values[0]+1+change->values[1]+1]
+                );
+            default:
+                return util::Validation::isProducerName(
+                    &change->data[change->values[0]+1+change->values[1]+1]
+                );
+        }
+    }
+
+    bool Changes::_isValidUpdatePort( Change *change ) {
+        return util::Validation::isPort( change->values[0] );
+    }
+
+    bool Changes::_isValidUpdateCountThreads( Change *change ) {
+        return change->values[0] != 0;
+    }
+
+    bool Changes::_isValidUpdateMasterPassword( Change *change, unsigned int length ) {
+        return change->values[0] != crypto::HASH_LENGTH || length != crypto::HASH_LENGTH + 1;
     }
 
     void Changes::pushDefered( Change *change ) {
