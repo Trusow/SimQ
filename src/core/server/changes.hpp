@@ -1036,22 +1036,22 @@ namespace simq::core::server {
 
             _addChangesFromFiles();
 
-            if( listDisk.empty() ) {
-                return nullptr;
+            if( !listDisk.empty() ) {
+                change = listDisk.front().change;
+
+                _popFile();
+                listDisk.pop_front();
+
+                return change;
             }
-
-            change = listDisk.front().change;
-
-            _popFile();
-            listDisk.pop_front();
-        } else {
-            if( listMemory.empty() ) {
-                return nullptr;
-            }
-
-            change = listMemory.front();
-            listMemory.pop_front();
         }
+
+        if( listMemory.empty() ) {
+            return nullptr;
+        }
+
+        change = listMemory.front();
+        listMemory.pop_front();
 
         return change;
     }
