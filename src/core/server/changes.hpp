@@ -102,6 +102,7 @@ namespace simq::core::server {
             bool _isValidUpdatePort( Change *change );
             bool _isValidUpdateCountThreads( Change *change );
             bool _isValidUpdateMasterPassword( Change *change, unsigned int length );
+            bool _isValidChangeFromFile( Change *change, unsigned int length );
 
         public:
             Changes( const char *path );
@@ -801,6 +802,34 @@ namespace simq::core::server {
         return change->values[0] != crypto::HASH_LENGTH || length != crypto::HASH_LENGTH + 1;
     }
 
+    bool Changes::_isValidChangeFromFile( Change *change, unsigned int length ) {
+        switch( change->type ) {
+            case CH_CREATE_GROUP:
+            case CH_UPDATE_GROUP_PASSWORD:
+            case CH_REMOVE_GROUP:
+                return _isValidGroup( change, length );
+            case CH_CREATE_CHANNEL:
+            case CH_UPDATE_CHANNEL_SETTINGS:
+            case CH_REMOVE_CHANNEL:
+                return _isValidChannel( change, length );
+            case CH_CREATE_CONSUMER:
+            case CH_UPDATE_CONSUMER_PASSWORD:
+            case CH_REMOVE_CONSUMER:
+            case CH_CREATE_PRODUCER:
+            case CH_UPDATE_PRODUCER_PASSWORD:
+            case CH_REMOVE_PRODUCER:
+                return _isValidUser( change, length );
+            case CH_UPDATE_PORT:
+                return _isValidUpdatePort( change );
+            case CH_UPDATE_COUNT_THREADS:
+                return _isValidUpdateCountThreads( change );
+            case CH_UPDATE_MASTER_PASSWORD:
+                return _isValidUpdateMasterPassword( change, length );
+        }
+
+        return false;
+    }
+
     void Changes::pushDefered( Change *change ) {
 
         ChangeFile ch;
@@ -900,9 +929,7 @@ namespace simq::core::server {
 
         cf.type = ntohl( cf.type );
 
-        if( _isAllowedType( cf.type ) ) {
-            passedFiles[name] = true;
-        } else {
+        if( !_isAllowedType( cf.type ) ) {
             unknownFiles[name] = true;
             return;
         }
@@ -918,8 +945,19 @@ namespace simq::core::server {
         }
 
         auto length = file.size() - sizeof( ChangeFile );
-        ch->data = new char[length]{};
-        file.read( ch->data, length );
+        if( length != 0 ) {
+            ch->data = new char[length]{};
+            file.read( ch->data, length );
+        }
+
+        if( !_isValidChangeFromFile( ch, length ) ) {
+            failedFiles[name] = true;
+            free( ch );
+            return;
+        }
+
+        passedFiles[name] = true;
+
 
         ChangeDisk cd;
         cd.change = ch;
