@@ -747,6 +747,9 @@ namespace simq::core::server {
             return;
         }
 
+        // TODO валидация значений из файлов
+        // TODO конверт настроек для канала
+
         Change *ch = new Change{};
 
         ch->type = cf.type;
