@@ -94,6 +94,7 @@ namespace simq::core::server {
             );
 
             char *_convertChannelSettingsDataToFile( Change *change );
+            char *_convertChannelSettingsDataFromFile( Change *change );
 
         public:
             Changes( const char *path );
@@ -636,6 +637,29 @@ namespace simq::core::server {
         _settings.maxMessageSize = htonl( _settings.maxMessageSize );
         _settings.maxMessagesOnDisk = htonl( _settings.maxMessagesOnDisk );
         _settings.maxMessagesInMemory = htonl( _settings.maxMessagesInMemory );
+        memcpy( &data[offset], &_settings, sizeof( util::Types::ChannelSettings ) );
+
+        return data;
+    }
+
+    char *Changes::_convertChannelSettingsDataFromFile( Change *change ) {
+        unsigned int length = 0;
+        length += change->values[0] + 1;
+        length += change->values[1] + 1;
+        length += crypto::HASH_LENGTH + 1;
+
+        auto data = new char[length];
+        memcpy( data, change->data, length );
+
+        auto offset = change->values[0] + 1;
+        offset += change->values[1] + 1;
+
+        util::Types::ChannelSettings _settings;
+        memcpy( &_settings, &data[offset], sizeof( util::Types::ChannelSettings ) );
+        _settings.minMessageSize = ntohl( _settings.minMessageSize );
+        _settings.maxMessageSize = ntohl( _settings.maxMessageSize );
+        _settings.maxMessagesOnDisk = ntohl( _settings.maxMessagesOnDisk );
+        _settings.maxMessagesInMemory = ntohl( _settings.maxMessagesInMemory );
         memcpy( &data[offset], &_settings, sizeof( util::Types::ChannelSettings ) );
 
         return data;
