@@ -16,12 +16,28 @@
 
 namespace simq::core::server {
     class Changes {
-        public:
-            enum Type {
-                CH_CREATE_GROUP,
-                CH_REMOVE_GROUP,
-            };
         private:
+            enum Type {
+                CH_CREATE_GROUP = 1000,
+                CH_UPDATE_GROUP_PASSWORD,
+                CH_REMOVE_GROUP,
+
+                CH_CREATE_CHANNEL = 2000,
+                CH_UPDATE_CHANNEL_SETTINGS,
+                CH_REMOVE_CHANNEL,
+
+                CH_CREATE_CONSUMER = 3000,
+                CH_UPDATE_CONSUMER_PASSWORD,
+                CH_REMOVE_CONSUMER,
+
+                CH_CREATE_PRODUCER = 4000,
+                CH_UPDATE_PRODUCER_PASSWORD,
+                CH_REMOVE_PRODUCER,
+
+                CH_UPDATE_MASTER_PASSWORD = 5000,
+                CH_UPDATE_PORT,
+                CH_UPDATE_COUNT_THREADS,
+            };
             const char *defPath = "changes";
             const unsigned int LENGTH_VALUES = 16;
 
@@ -55,6 +71,7 @@ namespace simq::core::server {
             void _addChangesFromFile( util::File &file, const char *name );
             void _popFile();
             void _generateUniqFileName( char *name );
+            bool _isAllowedType( unsigned int type );
 
         public:
             Changes( const char *path );
@@ -234,6 +251,29 @@ namespace simq::core::server {
         file.rename( uuid );
     }
 
+    bool Changes::_isAllowedType( unsigned int type ) {
+        switch( type ) {
+            case CH_UPDATE_PORT:
+            case CH_UPDATE_MASTER_PASSWORD:
+            case CH_UPDATE_COUNT_THREADS:
+            case CH_CREATE_GROUP:
+            case CH_UPDATE_GROUP_PASSWORD:
+            case CH_REMOVE_GROUP:
+            case CH_CREATE_CHANNEL:
+            case CH_UPDATE_CHANNEL_SETTINGS:
+            case CH_REMOVE_CHANNEL:
+            case CH_CREATE_CONSUMER:
+            case CH_UPDATE_CONSUMER_PASSWORD:
+            case CH_REMOVE_CONSUMER:
+            case CH_CREATE_PRODUCER:
+            case CH_UPDATE_PRODUCER_PASSWORD:
+            case CH_REMOVE_PRODUCER:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     void Changes::_generateUniqFileName( char *uuid ) {
         while( true ) {
             memset( uuid, 0, util::UUID::LENGTH+1 );
@@ -271,14 +311,11 @@ namespace simq::core::server {
 
         cf.type = ntohl( cf.type );
 
-        switch( cf.type ) {
-            case CH_CREATE_GROUP:
-            case CH_REMOVE_GROUP:
-                passedFiles[name] = true;
-                break;
-            default:
-                unknownFiles[name] = true;
-                return;
+        if( _isAllowedType( cf.type ) ) {
+            passedFiles[name] = true;
+        } else {
+            unknownFiles[name] = true;
+            return;
         }
 
         Change *ch = new Change{};
