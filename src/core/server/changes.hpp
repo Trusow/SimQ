@@ -285,7 +285,12 @@ namespace simq::core::server {
         if( settings != nullptr ) {
             unsigned long int _size = settings->maxMessagesOnDisk + settings->maxMessagesInMemory;
 
-            if( _size > 0xFF'FF'FF'FF ) {
+            if( _size > 0xFF'FF'FF'FF || _size == 0 ) {
+                throw util::Error::WRONG_SETTINGS;
+            }
+
+
+            if( settings->minMessageSize == 0 || settings->maxMessageSize == 0 ) {
                 throw util::Error::WRONG_SETTINGS;
             }
 
