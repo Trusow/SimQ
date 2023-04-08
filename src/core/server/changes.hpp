@@ -295,18 +295,7 @@ namespace simq::core::server {
         }
 
         if( settings != nullptr ) {
-            unsigned long int _size = settings->maxMessagesOnDisk + settings->maxMessagesInMemory;
-
-            if( _size > 0xFF'FF'FF'FF || _size == 0 ) {
-                throw util::Error::WRONG_SETTINGS;
-            }
-
-
-            if( settings->minMessageSize == 0 || settings->maxMessageSize == 0 ) {
-                throw util::Error::WRONG_SETTINGS;
-            }
-
-            if( settings->minMessageSize > settings->maxMessageSize ) {
+            if( !util::Validation::isChannelSettings( settings ) ) {
                 throw util::Error::WRONG_SETTINGS;
             }
         }
@@ -831,21 +820,7 @@ namespace simq::core::server {
             util::Types::ChannelSettings settings;
             memcpy( &settings, &change->data[change->values[0]+1+change->values[1]+1], lengthSettings );
 
-            if( settings.minMessageSize > settings.maxMessageSize ) {
-                return false;
-            }
-
-            if( settings.minMessageSize == 0 || settings.maxMessageSize == 0 ) {
-                return false;
-            }
-
-            unsigned long int _size = settings.maxMessagesOnDisk + settings.maxMessagesInMemory;
-
-            if( _size > 0xFF'FF'FF'FF ) {
-                return false;
-            }
-
-            if( settings.maxMessagesOnDisk == 0 && settings.maxMessagesInMemory == 0 ) {
+            if( !util::Validation::isChannelSettings( &settings ) ) {
                 return false;
             }
         }

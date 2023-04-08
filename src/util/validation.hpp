@@ -2,6 +2,7 @@
 #define SIMQ_UTIL_VALIDATION 
 
 #include "uuid.hpp"
+#include "types.h"
 #include <string.h>
 
 namespace simq::util {
@@ -16,6 +17,7 @@ namespace simq::util {
             static bool isProducerName( const char *name );
             static bool isUUID( const char *name );
             static bool isPort( unsigned int port );
+            static bool isChannelSettings( util::Types::ChannelSettings *settings );
     };
 
     bool Validation::isIPv4( const char *ip ) {
@@ -139,6 +141,25 @@ namespace simq::util {
 
     bool Validation::isPort( unsigned int port ) {
         return port > 0 && port <= 0xFF'FF;
+    }
+
+    bool Validation::isChannelSettings( util::Types::ChannelSettings *settings ) {
+        unsigned long int _size = settings->maxMessagesOnDisk + settings->maxMessagesInMemory;
+
+        if( _size > 0xFF'FF'FF'FF || _size == 0 ) {
+            return false;
+        }
+
+
+        if( settings->minMessageSize == 0 || settings->maxMessageSize == 0 ) {
+            return false;
+        }
+
+        if( settings->minMessageSize > settings->maxMessageSize ) {
+            return false;
+        }
+
+        return true;
     }
 }
 
