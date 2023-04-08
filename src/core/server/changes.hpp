@@ -637,7 +637,21 @@ namespace simq::core::server {
     void Changes::push( Change *change ) {
         std::lock_guard<std::mutex> lock( m );
 
-        listMemory.push_back( change );
+        auto ch = new Change{};
+        memcpy( ch, change, sizeof( Change ) );
+
+        auto length = 0;
+        for( int i = 0; i < LENGTH_VALUES; i++ ) {
+            length += change->values[i];
+            if( change->values[i] ) {
+                length += 1;
+            }
+        }
+
+        ch->data = new char[length]{};
+        memcpy( ch->data, change->data, length );
+
+        listMemory.push_back( ch );
     }
 
     char *Changes::_convertChannelSettingsDataToFile( Change *change ) {
