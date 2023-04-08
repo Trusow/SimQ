@@ -93,6 +93,8 @@ namespace simq::core::server {
                 unsigned char password[crypto::HASH_LENGTH]
             );
 
+            char *_convertChannelSettingsDataToFile( Change *change );
+
         public:
             Changes( const char *path );
             ~Changes();
@@ -616,6 +618,29 @@ namespace simq::core::server {
         listMemory.push_back( change );
     }
 
+    char *Changes::_convertChannelSettingsDataToFile( Change *change ) {
+        unsigned int length = 0;
+        length += change->values[0] + 1;
+        length += change->values[1] + 1;
+        length += crypto::HASH_LENGTH + 1;
+
+        auto data = new char[length];
+        memcpy( data, change->data, length );
+
+        auto offset = change->values[0] + 1;
+        offset += change->values[1] + 1;
+
+        util::Types::ChannelSettings _settings;
+        memcpy( &_settings, &data[offset], sizeof( util::Types::ChannelSettings ) );
+        _settings.minMessageSize = htonl( _settings.minMessageSize );
+        _settings.maxMessageSize = htonl( _settings.maxMessageSize );
+        _settings.maxMessagesOnDisk = htonl( _settings.maxMessagesOnDisk );
+        _settings.maxMessagesInMemory = htonl( _settings.maxMessagesInMemory );
+        memcpy( &data[offset], &_settings, sizeof( util::Types::ChannelSettings ) );
+
+        return data;
+    }
+
     void Changes::pushDefered( Change *change ) {
 
         ChangeFile ch;
@@ -633,8 +658,6 @@ namespace simq::core::server {
             ch.values[i] = htonl( change->values[i] );
         }
 
-        // TODO: Доработать хранение числовых данных в дате
-
         char uuid[util::UUID::LENGTH+1];
 
         _generateUniqFileName( uuid );
@@ -646,7 +669,14 @@ namespace simq::core::server {
 
         auto file = util::File( tmpPath.c_str(), true );
         file.write( &ch, sizeof( ChangeFile ) );
-        file.write( change->data, length );
+
+        if( isUpdateChannelSettings( change ) ) {
+            auto data = _convertChannelSettingsDataToFile( change );
+            file.write( data, length );
+            delete[] data;
+        } else {
+            file.write( change->data, length );
+        }
         file.rename( uuid );
     }
 
