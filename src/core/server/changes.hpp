@@ -158,7 +158,24 @@ namespace simq::core::server {
             );
 
             bool isAddGroup( Change *change );
+            bool isUpdateGroupPassword( Change *change );
             bool isRemoveGroup( Change *change );
+
+            bool isAddChannel( Change *change );
+            bool isUpdageChannelSettings( Change *change );
+            bool isRemoveChannel( Change *change );
+
+            bool isAddConsumer( Change *change );
+            bool isUpdateConsumerPassword( Change *change );
+            bool isRemoveConsumer( Change *change );
+
+            bool isAddProducer( Change *change );
+            bool isUpdateProducerPassword( Change *change );
+            bool isRemoveProducer( Change *change );
+
+            bool isUpdatePort( Change *change );
+            bool isUpdateCountThreads( Change *change );
+            bool isUpdateMasterPassword( Change *change );
 
             const char *getGroup( Change *change );
             const char *getChannel( Change *change );
@@ -531,8 +548,59 @@ namespace simq::core::server {
         return change->type == CH_CREATE_GROUP;
     }
 
+    bool Changes::isUpdateGroupPassword( Change *change ) {
+        return change->type == CH_UPDATE_GROUP_PASSWORD;
+    }
+
     bool Changes::isRemoveGroup( Change *change ) {
         return change->type == CH_REMOVE_GROUP;
+    }
+
+    bool Changes::isAddChannel( Change *change ) {
+        return change->type == CH_CREATE_CHANNEL;
+    }
+
+    bool Changes::isUpdageChannelSettings( Change *change ) {
+        return change->type == CH_UPDATE_CHANNEL_SETTINGS;
+    }
+
+    bool Changes::isRemoveChannel( Change *change ) {
+        return change->type == CH_REMOVE_CHANNEL;
+    }
+
+    bool Changes::isAddConsumer( Change *change ) {
+        return change->type == CH_CREATE_CONSUMER;
+    }
+
+    bool Changes::isUpdateConsumerPassword( Change *change ) {
+        return change->type == CH_UPDATE_CONSUMER_PASSWORD;
+    }
+
+    bool Changes::isRemoveConsumer( Change *change ) {
+        return change->type == CH_REMOVE_CONSUMER;
+    }
+
+    bool Changes::isAddProducer( Change *change ) {
+        return change->type == CH_CREATE_PRODUCER;
+    }
+
+    bool Changes::isUpdateProducerPassword( Change *change ) {
+        return change->type == CH_UPDATE_PRODUCER_PASSWORD;
+    }
+
+    bool Changes::isRemoveProducer( Change *change ) {
+        return change->type == CH_REMOVE_PRODUCER;
+    }
+
+    bool Changes::isUpdatePort( Change *change ) {
+        return change->type == CH_UPDATE_PORT;
+    }
+    bool Changes::isUpdateCountThreads( Change *change ) {
+        return change->type == CH_UPDATE_COUNT_THREADS;
+    }
+
+    bool Changes::isUpdateMasterPassword( Change *change ) {
+        return change->type == CH_UPDATE_MASTER_PASSWORD;
     }
 
     void Changes::free( Change *change ) {
