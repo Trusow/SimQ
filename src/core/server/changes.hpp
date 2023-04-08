@@ -78,6 +78,13 @@ namespace simq::core::server {
                 unsigned char password[crypto::HASH_LENGTH]
             );
 
+            Change *_buildChannelChange(
+                unsigned int type,
+                const char *group,
+                const char *channel,
+                util::Types::ChannelSettings *settings
+            );
+
         public:
             Changes( const char *path );
             ~Changes();
@@ -91,6 +98,14 @@ namespace simq::core::server {
                 unsigned char password[crypto::HASH_LENGTH]
             );
             Change *removeGroup( const char *group );
+
+            Change *addChannel( const char *group, const char *channel );
+            Change *updateChannelSettings(
+                const char *group,
+                const char *channel,
+                util::Types::ChannelSettings *settings
+            );
+            Change *removeChannel( const char *group, const char *channel );
 
             bool isAddGroup( Change *change );
             bool isRemoveGroup( Change *change );
@@ -174,6 +189,60 @@ namespace simq::core::server {
         return change;
     }
 
+    Changes::Change *Changes::_buildChannelChange(
+        unsigned int type,
+        const char *group,
+        const char *channel,
+        util::Types::ChannelSettings *settings
+    ) {
+        if( !util::Validation::isGroupName( group ) ) {
+            throw util::Error::WRONG_GROUP;
+        }
+
+        if( !util::Validation::isChannelName( channel ) ) {
+            throw util::Error::WRONG_CHANNEL;
+        }
+
+        if( settings != nullptr ) {
+            unsigned long int _size = settings->maxMessagesOnDisk + settings->maxMessagesInMemory;
+
+            if( _size > 0xFF'FF'FF'FF ) {
+                throw util::Error::WRONG_SETTINGS;
+            }
+
+            if( settings->minMessageSize > settings->maxMessageSize ) {
+                throw util::Error::WRONG_SETTINGS;
+            }
+        }
+
+        auto groupLength = strlen( group );
+        auto channelLength = strlen( channel );
+        auto settingsLength = sizeof( util::Types::ChannelSettings );
+
+        auto change = new Change{};
+        change->type = type;
+
+        if( settings != nullptr ) {
+            change->data = new char[groupLength+1+channelLength+1]{};
+
+            change->values[0] = groupLength;
+            memcpy( change->data, group, groupLength );
+            change->values[1] = channelLength;
+            memcpy( &change->data[groupLength+1], channel, channelLength );
+        } else {
+            change->data = new char[groupLength+1+channelLength+1+settingsLength]{};
+
+            change->values[0] = groupLength;
+            memcpy( change->data, group, groupLength );
+            change->values[1] = channelLength;
+            memcpy( &change->data[groupLength+1], channel, channelLength );
+            change->values[2] = settingsLength;
+            memcpy( &change->data[groupLength+1+channelLength+1], settings, settingsLength );
+        }
+
+        return change;
+    }
+
     Changes::Change *Changes::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
         return _buildGroupChange( CH_CREATE_GROUP, group, password );
     }
@@ -184,6 +253,22 @@ namespace simq::core::server {
 
     Changes::Change *Changes::removeGroup( const char *group ) {
         return _buildGroupChange( CH_REMOVE_GROUP, group, nullptr );
+    }
+
+    Changes::Change *Changes::addChannel( const char *group, const char *channel ) {
+        return _buildChannelChange( CH_CREATE_CHANNEL, group, channel, nullptr );
+    }
+
+    Changes::Change *Changes::updateChannelSettings(
+        const char *group,
+        const char *channel,
+        util::Types::ChannelSettings *settings
+    ) {
+        return _buildChannelChange( CH_UPDATE_CHANNEL_SETTINGS, group, channel, settings );
+    }
+
+    Changes::Change *Changes::removeChannel( const char *group, const char *channel ) {
+        return _buildChannelChange( CH_REMOVE_CHANNEL, group, channel, nullptr );
     }
 
     const char *Changes::getGroup( Change *change ) {

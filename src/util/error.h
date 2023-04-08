@@ -12,6 +12,7 @@ namespace simq::util {
                 WRONG_CHANNEL,
                 WRONG_LOGIN,
                 WRONG_MESSAGE_SIZE,
+                WRONG_SETTINGS,
                 EXCEED_LIMIT,
                 IS_EXISTS,
                 ACCESS_DENY,
