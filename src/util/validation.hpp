@@ -15,6 +15,7 @@ namespace simq::util {
             static bool isConsumerName( const char *name );
             static bool isProducerName( const char *name );
             static bool isUUID( const char *name );
+            static bool isPort( unsigned int port );
     };
 
     bool Validation::isIPv4( const char *ip ) {
@@ -132,6 +133,10 @@ namespace simq::util {
 
     bool Validation::isProducerName( const char *name ) {
         return isName( name, 32 );
+    }
+
+    bool Validation::isPort( unsigned int port ) {
+        return port > 0 && port <= 0xFF'FF;
     }
 }
 
