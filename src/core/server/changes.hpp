@@ -8,8 +8,10 @@
 #include "../../util/validation.hpp"
 #include "../../util/uuid.hpp"
 #include <list>
+#include <map>
 #include <string>
 #include <mutex>
+#include <vector>
 #include <arpa/inet.h>
 
 namespace simq::core::server {
@@ -45,7 +47,13 @@ namespace simq::core::server {
 
             std::list<Change *> listMemory;
             std::list<ChangeDisk> listDisk;
+            std::map<std::string, bool> unknownFiles;
+            std::map<std::string, bool> passedFiles;
             std::mutex m;
+
+            void _addChangesFromFiles();
+            void _addChangesFromFile( util::File &file, const char *name );
+            void _popFile();
 
         public:
             Changes( const char *path );
@@ -226,6 +234,120 @@ namespace simq::core::server {
         file.write( &ch, sizeof( ChangeFile ) );
         file.write( change->data, length );
         file.rename( uuid );
+    }
+
+    void Changes::_addChangesFromFile( util::File &file, const char *name ) {
+        if( unknownFiles.find( name ) != unknownFiles.end() ) {
+            return;
+        }
+
+        if( passedFiles.find( name ) != passedFiles.end() ) {
+            return;
+        }
+
+        if( file.size() < sizeof( ChangeFile ) ) {
+            return;
+        }
+
+        ChangeFile cf;
+
+        file.read( &cf, sizeof( ChangeFile ) );
+
+        cf.type = ntohl( cf.type );
+
+        switch( cf.type ) {
+            case CH_CREATE_GROUP:
+            case CH_REMOVE_GROUP:
+                passedFiles[name] = true;
+                break;
+            default:
+                unknownFiles[name] = true;
+                return;
+        }
+
+        Change *ch = new Change{};
+
+        ch->type = cf.type;
+        for( int i = 0; i < LENGTH_VALUES; i++ ) {
+            ch->values[i] = ntohl( cf.values[i] );
+        }
+
+        auto length = file.size() - sizeof( ChangeFile );
+        ch->data = new char[length]{};
+        file.read( ch->data, length );
+
+        ChangeDisk cd;
+        cd.change = ch;
+        memcpy( cd.uuid, name, util::UUID::LENGTH );
+
+        listDisk.push_back( cd );
+    }
+
+    void Changes::_addChangesFromFiles() {
+        std::vector<std::string> files;
+
+        util::FS::files( _path, files );
+
+        for( auto it = files.begin(); it != files.end(); it++ ) {
+            if( !util::Validation::isUUID( (*it).c_str() ) ) {
+                continue;
+            }
+
+            std::string p = _path;
+            p += *it;
+
+            util::File file( p.c_str() );
+
+            _addChangesFromFile( file, (*it).c_str() );
+        }
+
+    }
+
+    void Changes::_popFile() {
+        std::string p = _path;
+
+        auto name = listDisk.front().uuid;
+
+        auto fileName = std::string( name, util::UUID::LENGTH );
+
+        p += fileName;
+
+        util::FS::removeFile( p.c_str() );
+
+        auto it = passedFiles.find( name );
+
+        if( it != passedFiles.end() ) {
+            passedFiles.erase( it );
+        }
+    }
+
+    Changes::Change *Changes::pop() {
+        std::lock_guard<std::mutex> lock( m );
+
+        Change *change = nullptr;
+
+        if( listDisk.empty() ) {
+
+            _addChangesFromFiles();
+
+            if( listDisk.empty() ) {
+                return nullptr;
+            }
+
+            change = listDisk.front().change;
+
+            _popFile();
+            listDisk.pop_front();
+        } else {
+            if( listMemory.empty() ) {
+                return nullptr;
+            }
+
+            change = listMemory.front();
+            listMemory.pop_front();
+        }
+
+        return change;
     }
 }
 
