@@ -162,7 +162,7 @@ namespace simq::core::server {
             bool isRemoveGroup( Change *change );
 
             bool isAddChannel( Change *change );
-            bool isUpdageChannelSettings( Change *change );
+            bool isUpdateChannelSettings( Change *change );
             bool isRemoveChannel( Change *change );
 
             bool isAddConsumer( Change *change );
@@ -560,7 +560,7 @@ namespace simq::core::server {
         return change->type == CH_CREATE_CHANNEL;
     }
 
-    bool Changes::isUpdageChannelSettings( Change *change ) {
+    bool Changes::isUpdateChannelSettings( Change *change ) {
         return change->type == CH_UPDATE_CHANNEL_SETTINGS;
     }
 
