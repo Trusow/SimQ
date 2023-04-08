@@ -1,6 +1,9 @@
 #ifndef SIMQ_UTIL_VALIDATION 
 #define SIMQ_UTIL_VALIDATION 
 
+#include "uuid.hpp"
+#include <string.h>
+
 namespace simq::util {
     class Validation {
         private:
@@ -11,6 +14,7 @@ namespace simq::util {
             static bool isChannelName( const char *name );
             static bool isConsumerName( const char *name );
             static bool isProducerName( const char *name );
+            static bool isUUID( const char *name );
     };
 
     bool Validation::isIPv4( const char *ip ) {
@@ -58,9 +62,44 @@ namespace simq::util {
         return accSeparator == 3 && partI != 0;
     }
 
+    bool Validation::isUUID( const char *name ) {
+        char ch;
+        bool isNum, isWord;
+
+        if( strlen( name ) != util::UUID::LENGTH ) {
+            return false;
+        }
+
+        for (int i = 0; i < util::UUID::LENGTH; i++) {
+            ch = name[i];
+            if( i == 8 || i == 13 || i == 18 || i == 23 ) {
+                if( ch != '-' ) {
+                    return false;
+                }
+            } else if( i == 14 ) {
+                if( ch != '4' ) {
+                    return false;
+                }
+            } else {
+                isWord = ch >= 'a' && ch <= 'z';
+                isNum = ch >= '0' && ch <= '9';
+
+                if( !isWord && !isNum ) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     bool Validation::isName( const char *name, unsigned int length ) {
         char ch;
         bool isNum, isWord;
+
+        if( strlen( name ) > length ) {
+            return false;
+        }
 
         for( unsigned int i = 0; name[i] != 0; i++ ) {
             if( i == length ) {
