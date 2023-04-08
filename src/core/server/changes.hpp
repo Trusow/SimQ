@@ -118,7 +118,11 @@ namespace simq::core::server {
             );
             Change *removeGroup( const char *group );
 
-            Change *addChannel( const char *group, const char *channel );
+            Change *addChannel(
+                const char *group,
+                const char *channel,
+                util::Types::ChannelSettings *settings
+            );
             Change *updateChannelSettings(
                 const char *group,
                 const char *channel,
@@ -402,8 +406,12 @@ namespace simq::core::server {
         return _buildGroupChange( CH_REMOVE_GROUP, group, nullptr );
     }
 
-    Changes::Change *Changes::addChannel( const char *group, const char *channel ) {
-        return _buildChannelChange( CH_CREATE_CHANNEL, group, channel, nullptr );
+    Changes::Change *Changes::addChannel(
+        const char *group,
+        const char *channel,
+        util::Types::ChannelSettings *settings
+    ) {
+        return _buildChannelChange( CH_CREATE_CHANNEL, group, channel, settings );
     }
 
     Changes::Change *Changes::updateChannelSettings(
