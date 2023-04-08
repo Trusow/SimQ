@@ -95,6 +95,10 @@ namespace simq::core::server {
 
             char *_convertChannelSettingsDataToFile( Change *change );
             char *_convertChannelSettingsDataFromFile( Change *change );
+            char *_convertPortDataToFile( Change *change );
+            char *_convertPortDataFromFile( Change *change );
+            char *_convertCountThreadsDataToFile( Change *change );
+            char *_convertCountThreadsDataFromFile( Change *change );
 
             bool _isValidGroup( Change *change, unsigned int length );
             bool _isValidChannel( Change *change, unsigned int length );
@@ -196,8 +200,8 @@ namespace simq::core::server {
             const char *getChannel( Change *change );
             const char *getLogin( Change *change );
             const util::Types::ChannelSettings *getChannelSettings( Change *change );
-            unsigned int getPort( Change *change );
-            unsigned int getCountThreads( Change *change );
+            unsigned short int getPort( Change *change );
+            unsigned short int getCountThreads( Change *change );
             void getPassword( Change *change, unsigned char password[crypto::HASH_LENGTH] );
 
             void push( Change *change );
@@ -485,7 +489,11 @@ namespace simq::core::server {
 
         auto change = new Change{};
         change->type = CH_UPDATE_PORT;
-        change->values[0] = port;
+        auto size = sizeof( unsigned short int );
+        change->values[0] = size;
+
+        change->data = new char[size+1]{};
+        memcpy( change->data, &port, size );
 
         return change;
     }
@@ -497,7 +505,11 @@ namespace simq::core::server {
 
         auto change = new Change{};
         change->type = CH_UPDATE_COUNT_THREADS;
-        change->values[0] = threads;
+        auto size = sizeof( unsigned short int );
+        change->values[0] = size;
+
+        change->data = new char[size+1]{};
+        memcpy( change->data, &threads, size );
 
         return change;
     }
@@ -509,7 +521,7 @@ namespace simq::core::server {
         change->type = CH_UPDATE_COUNT_THREADS;
         change->values[0] = crypto::HASH_LENGTH;
 
-        change->data = new char[crypto::HASH_LENGTH]{};
+        change->data = new char[crypto::HASH_LENGTH+1]{};
         memcpy( change->data, password, crypto::HASH_LENGTH );
 
         return change;
@@ -534,12 +546,16 @@ namespace simq::core::server {
         return (util::Types::ChannelSettings *)&change->data[offset];
     }
 
-    unsigned int Changes::getPort( Change *change ) {
-        return change->values[0];
+    unsigned short int Changes::getPort( Change *change ) {
+        unsigned short int port;
+        memcpy( &port, change->data, change->values[0] );
+        return port;
     }
 
-    unsigned int Changes::getCountThreads( Change *change ) {
-        return change->values[0];
+    unsigned short int Changes::getCountThreads( Change *change ) {
+        unsigned short int count;
+        memcpy( &count, change->data, change->values[0] );
+        return count;
     }
 
     void Changes::getPassword( Change *change, unsigned char password[crypto::HASH_LENGTH] ) {
@@ -660,11 +676,12 @@ namespace simq::core::server {
         length += change->values[1] + 1;
         length += crypto::HASH_LENGTH + 1;
 
-        auto data = new char[length];
+        auto data = new char[length]{};
         memcpy( data, change->data, length );
 
         auto offset = change->values[0] + 1;
         offset += change->values[1] + 1;
+
 
         util::Types::ChannelSettings _settings;
         memcpy( &_settings, &data[offset], sizeof( util::Types::ChannelSettings ) );
@@ -683,7 +700,7 @@ namespace simq::core::server {
         length += change->values[1] + 1;
         length += crypto::HASH_LENGTH + 1;
 
-        auto data = new char[length];
+        auto data = new char[length]{};
         memcpy( data, change->data, length );
 
         auto offset = change->values[0] + 1;
@@ -696,6 +713,66 @@ namespace simq::core::server {
         _settings.maxMessagesOnDisk = ntohl( _settings.maxMessagesOnDisk );
         _settings.maxMessagesInMemory = ntohl( _settings.maxMessagesInMemory );
         memcpy( &data[offset], &_settings, sizeof( util::Types::ChannelSettings ) );
+
+        return data;
+    }
+
+    char *Changes::_convertPortDataToFile( Change *change ) {
+        unsigned int length = change->values[0] + 1;
+        unsigned short int port;
+        auto size = sizeof( unsigned short int );
+
+        auto data = new char[length]{};
+        memcpy( data, change->data, length );
+
+        memcpy( &port, data, size );
+        port = htons( port );
+        memcpy( data, &port, size );
+
+        return data;
+    }
+
+    char *Changes::_convertPortDataFromFile( Change *change ) {
+        unsigned int length = change->values[0] + 1;
+        unsigned short int port;
+        auto size = sizeof( unsigned short int );
+
+        auto data = new char[length]{};
+        memcpy( data, change->data, length );
+
+        memcpy( &port, data, size );
+        port = ntohs( port );
+        memcpy( data, &port, size );
+
+        return data;
+    }
+
+    char *Changes::_convertCountThreadsDataToFile( Change *change ) {
+        unsigned int length = change->values[0] + 1;
+        unsigned short int count;
+        auto size = sizeof( unsigned short int );
+
+        auto data = new char[length]{};
+        memcpy( data, change->data, length );
+
+        memcpy( &count, data, size );
+        count = htons( count );
+        memcpy( data, &count, size );
+
+        return data;
+    }
+
+    char *Changes::_convertCountThreadsDataFromFile( Change *change ) {
+        unsigned int length = change->values[0] + 1;
+        unsigned short int count;
+        auto size = sizeof( unsigned short int );
+
+        auto data = new char[length]{};
+        memcpy( data, change->data, length );
+
+        memcpy( &count, data, size );
+        count = ntohs( count );
+        memcpy( data, &count, size );
 
         return data;
     }
@@ -861,8 +938,8 @@ namespace simq::core::server {
         auto length = 0;
 
         for( unsigned int i = 0; i < LENGTH_VALUES; i++ ) {
-            length += change->values[i];
             if( change->values[i] ) {
+                length += change->values[i];
                 // null byte
                 length += 1;
             }
@@ -881,8 +958,16 @@ namespace simq::core::server {
         auto file = util::File( tmpPath.c_str(), true );
         file.write( &ch, sizeof( ChangeFile ) );
 
-        if( isUpdateChannelSettings( change ) ) {
+        if( isUpdateChannelSettings( change ) || isAddChannel( change ) ) {
             auto data = _convertChannelSettingsDataToFile( change );
+            file.write( data, length );
+            delete[] data;
+        } else if( isUpdatePort( change ) ) {
+            auto data = _convertPortDataToFile( change );
+            file.write( data, length );
+            delete[] data;
+        } else if( isUpdateCountThreads( change ) ) {
+            auto data = _convertCountThreadsDataToFile( change );
             file.write( data, length );
             delete[] data;
         } else {
@@ -976,6 +1061,20 @@ namespace simq::core::server {
             failedFiles[name] = true;
             free( ch );
             return;
+        }
+
+        if( isUpdateChannelSettings( ch ) || isAddChannel( ch ) ) {
+            auto _tmpData = ch->data;
+            ch->data = _convertChannelSettingsDataFromFile( ch );
+            delete[] _tmpData;
+        } else if( isUpdatePort( ch ) ) {
+            auto _tmpData = ch->data;
+            ch->data = _convertPortDataFromFile( ch );
+            delete[] _tmpData;
+        } else if( isUpdateCountThreads( ch ) ) {
+            auto _tmpData = ch->data;
+            ch->data = _convertCountThreadsDataFromFile( ch );
+            delete[] _tmpData;
         }
 
         passedFiles[name] = true;
