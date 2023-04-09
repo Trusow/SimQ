@@ -63,7 +63,18 @@ namespace simq::core::server {
         public:
             Store( const char *path );
 
-            void getGroups( std::vector<std::string> &groups, bool force = false );
+            void getDirectGroups( std::vector<std::string> &list );
+            void getDirectChannels( const char *group, std::vector<std::string> &list );
+            void getDirectChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings );
+            void getDirectConsumers( const char *group, const char *channel, std::vector<std::string> &list );
+            void getDirectProducers( const char *group, const char *channel, std::vector<std::string> &list );
+            unsigned short int getDirectPort();
+            unsigned short int getDirectCountThreads();
+            void getDirectMasterPassword(
+                unsigned char password[crypto::HASH_LENGTH]
+            );
+
+            void getGroups( std::vector<std::string> &groups );
             void getGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] );
             void addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] );
             void removeGroup( const char *group );
@@ -465,12 +476,156 @@ namespace simq::core::server {
 
     }
 
-    void Store::getGroups( std::vector<std::string> &list, bool force ) {
-        std::lock_guard<std::mutex> lock( m );
+    void Store::getDirectGroups( std::vector<std::string> &list ) {
+        std::string p = _path;
+        p += "/";
+        p += pathGroups;
 
-        if( force ) {
-            _initGroups( _path );
+        std::vector<std::string> _groups;
+        util::FS::dirs( p.c_str(), _groups );
+
+        for( auto it = _groups.begin(); it != _groups.end(); it++ ) {
+            if( util::Validation::isGroupName( (*it).c_str() ) ) {
+                list.push_back( *it );
+            }
         }
+    }
+
+    void Store::getDirectChannels( const char *group, std::vector<std::string> &list ) {
+        std::string p = _path;
+        p += "/";
+        p += pathGroups;
+        p += "/";
+        p += group;
+
+        std::vector<std::string> _groups;
+        util::FS::dirs( p.c_str(), _groups );
+
+        for( auto it = _groups.begin(); it != _groups.end(); it++ ) {
+            if( util::Validation::isChannelName( (*it).c_str() ) ) {
+                list.push_back( *it );
+            }
+        }
+    }
+
+    void Store::getDirectChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings ) {
+        std::string p = _path;
+        p += "/";
+        p += pathGroups;
+        p += "/";
+        p += group;
+        p += "/";
+        p += channel;
+        p += "/";
+        p += fileSettings;
+
+        {
+            auto file = util::File( p.c_str() );
+            file.read( &settings, sizeof( util::Types::ChannelSettings ) );
+        }
+
+        settings.minMessageSize = ntohl( settings.minMessageSize );
+        settings.maxMessageSize = ntohl( settings.maxMessageSize );
+        settings.maxMessagesInMemory = ntohl( settings.maxMessagesInMemory );
+        settings.maxMessagesOnDisk = ntohl( settings.maxMessagesOnDisk );
+    }
+
+    void Store::getDirectConsumers( const char *group, const char *channel, std::vector<std::string> &list ) {
+        std::string p = _path;
+        p += "/";
+        p += pathGroups;
+        p += "/";
+        p += group;
+        p += "/";
+        p += channel;
+        p += "/";
+        p += pathConsumers;
+
+        std::cout << p << std::endl;
+
+        std::vector<std::string> _groups;
+        util::FS::dirs( p.c_str(), _groups );
+
+        for( auto it = _groups.begin(); it != _groups.end(); it++ ) {
+            if( util::Validation::isConsumerName( (*it).c_str() ) ) {
+                list.push_back( *it );
+            }
+        }
+    }
+
+    void Store::getDirectProducers( const char *group, const char *channel, std::vector<std::string> &list ) {
+        std::string p = _path;
+        p += "/";
+        p += pathGroups;
+        p += "/";
+        p += group;
+        p += "/";
+        p += channel;
+        p += "/";
+        p += pathProducers;
+
+        std::vector<std::string> _groups;
+        util::FS::dirs( p.c_str(), _groups );
+
+        for( auto it = _groups.begin(); it != _groups.end(); it++ ) {
+            if( util::Validation::isProducerName( (*it).c_str() ) ) {
+                list.push_back( *it );
+            }
+        }
+    }
+
+    unsigned short int Store::getDirectPort() {
+        std::string p = _path;
+        p += "/";
+        p += pathSettings;
+        p += "/";
+        p += fileSettings;
+
+        Settings settings;
+        {
+            auto file = util::File( p.c_str() );
+            file.read( &settings, sizeof( settings ) );
+        }
+
+        return ntohs( settings.port );
+    }
+
+    unsigned short int Store::getDirectCountThreads() {
+        std::string p = _path;
+        p += "/";
+        p += pathSettings;
+        p += "/";
+        p += fileSettings;
+
+        Settings settings;
+        {
+            auto file = util::File( p.c_str() );
+            file.read( &settings, sizeof( settings ) );
+        }
+
+        return ntohs( settings.countThreads );
+    }
+
+    void Store::getDirectMasterPassword(
+        unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        std::string p = _path;
+        p += "/";
+        p += pathSettings;
+        p += "/";
+        p += fileSettings;
+
+        Settings settings;
+        {
+            auto file = util::File( p.c_str() );
+            file.read( &settings, sizeof( settings ) );
+        }
+
+        memcpy( password, settings.password, crypto::HASH_LENGTH );
+    }
+
+    void Store::getGroups( std::vector<std::string> &list ) {
+        std::lock_guard<std::mutex> lock( m );
 
         for( auto it = groups.begin(); it != groups.end(); it++ ) {
             list.push_back( it->first );
