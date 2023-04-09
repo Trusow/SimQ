@@ -63,7 +63,7 @@ namespace simq::core::server {
         public:
             Store( const char *path );
 
-            void getGroups( std::vector<std::string> &groups );
+            void getGroups( std::vector<std::string> &groups, bool force = false );
             void getGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] );
             void addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] );
             void removeGroup( const char *group );
@@ -338,6 +338,8 @@ namespace simq::core::server {
             }
         }
 
+        groups.clear();
+
         std::vector<std::string> dirs;
         util::FS::dirs( _pathGroups, dirs );
 
@@ -463,11 +465,15 @@ namespace simq::core::server {
 
     }
 
-    void Store::getGroups( std::vector<std::string> &groups ) {
+    void Store::getGroups( std::vector<std::string> &list, bool force ) {
         std::lock_guard<std::mutex> lock( m );
 
+        if( force ) {
+            _initGroups( _path );
+        }
+
         for( auto it = groups.begin(); it != groups.end(); it++ ) {
-            groups.push_back( *it );
+            list.push_back( it->first );
         }
     }
 
