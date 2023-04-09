@@ -108,11 +108,11 @@ namespace simq::core::server {
     }
 
     void CLIData::getGroups( std::vector<std::string> &list ) {
-        _store->getGroups( list, true );
+        _store->getDirectGroups( list );
     }
 
     void CLIData::getChannels( const char *group, std::vector<std::string> &list ) {
-        _store->getChannels( group, list );
+        _store->getDirectChannels( group, list );
     }
 
     void CLIData::getConsumers(
@@ -120,7 +120,7 @@ namespace simq::core::server {
         const char *channel,
         std::vector<std::string> &list
     ) {
-        _store->getConsumers( group, channel, list );
+        _store->getDirectConsumers( group, channel, list );
     }
 
     void CLIData::getProducers(
@@ -128,7 +128,7 @@ namespace simq::core::server {
         const char *channel,
         std::vector<std::string> &list
     ) {
-        _store->getProducers( group, channel, list );
+        _store->getDirectProducers( group, channel, list );
     }
 
     void CLIData::getChannelSettings(
@@ -136,21 +136,21 @@ namespace simq::core::server {
         const char *channel,
         util::Types::ChannelSettings &settings
     ) {
-        _store->getChannelSettings( group, channel, settings );
+        _store->getDirectChannelSettings( group, channel, settings );
     }
 
     unsigned short int CLIData::getPort() {
-        return _store->getPort();
+        return _store->getDirectPort();
     }
 
     unsigned short int CLIData::getCountThreads() {
-        return _store->getCountThreads();
+        return _store->getDirectCountThreads();
     }
 
     void CLIData::getMasterPassword(
         unsigned char password[crypto::HASH_LENGTH]
     ) {
-        return _store->getMasterPassword( password );
+        return _store->getDirectMasterPassword( password );
     }
 
     void CLIData::addGroup(
