@@ -30,8 +30,8 @@ namespace simq::core::server {
             const unsigned int DEFAULT_PORT = 4012;
 
             struct Settings {
-                unsigned int countThreads;
-                unsigned int port;
+                unsigned short int countThreads;
+                unsigned short int port;
                 unsigned char password[crypto::HASH_LENGTH];
             };
 
@@ -89,11 +89,11 @@ namespace simq::core::server {
             void getMasterPassword( unsigned char password[crypto::HASH_LENGTH] );
             void updateMasterPassword( const unsigned char password[crypto::HASH_LENGTH] );
 
-            unsigned int getCountThreads();
-            void updateCountThreads( unsigned int count );
+            unsigned short int getCountThreads();
+            void updateCountThreads( unsigned short int count );
 
-            unsigned int getPort();
-            void updatePort( unsigned int port );
+            unsigned short int getPort();
+            void updatePort( unsigned short int port );
     };
 
     Store::Store( const char *path ) {
@@ -140,30 +140,30 @@ namespace simq::core::server {
         }
 
         if( isNewSettings ) {
-            settings.countThreads = htonl( hc );
-            settings.port = htonl( DEFAULT_PORT );
+            settings.countThreads = htons( hc );
+            settings.port = htons( DEFAULT_PORT );
             crypto::Hash::hash( "simq", settings.password );
 
             file.write( &settings, sizeof( Settings ), 0 );
         } else {
             file.read( &settings, sizeof( Settings ), 0 );
 
-            settings.countThreads = ntohl( settings.countThreads );
-            settings.port = ntohl( settings.port );
+            settings.countThreads = ntohs( settings.countThreads );
+            settings.port = ntohs( settings.port );
 
             bool isWrong = false;
 
             if( settings.countThreads > hc + hc / 2 ) {
-                settings.countThreads = htonl( hc + hc / 2 );
+                settings.countThreads = htons( hc + hc / 2 );
                 isWrong = true;
             } else if( settings.countThreads == 0 ) {
-                settings.countThreads = htonl( 1 );
+                settings.countThreads = htons( 1 );
                 isWrong = true;
             }
 
             if( settings.port > 65535 || settings.port == 0 ) {
                 isWrong = true;
-                settings.port = htonl( DEFAULT_PORT );
+                settings.port = htons( DEFAULT_PORT );
             }
 
             if( isWrong ) {
@@ -263,7 +263,7 @@ namespace simq::core::server {
         }
 
         unsigned long int maxMessages = settings.maxMessagesOnDisk + settings.maxMessagesInMemory;
-        if( maxMessages > 0xFF'FF'FF'FF'FF'FF'FF'FF ) {
+        if( maxMessages > 0xFF'FF'FF'FF ) {
             settings.maxMessagesInMemory = 100;
             settings.maxMessagesOnDisk = 0;
         }
@@ -374,7 +374,7 @@ namespace simq::core::server {
         path += fileSettings;
     }
 
-    unsigned int Store::getCountThreads() {
+    unsigned short int Store::getCountThreads() {
         std::lock_guard<std::mutex> lock( m );
         Settings settings;
 
@@ -384,10 +384,10 @@ namespace simq::core::server {
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
 
-        return ntohl( settings.countThreads );
+        return ntohs( settings.countThreads );
     }
 
-    void Store::updateCountThreads( unsigned int countThreads ) {
+    void Store::updateCountThreads( unsigned short int countThreads ) {
         std::lock_guard<std::mutex> lock( m );
         Settings settings;
         const unsigned int hc = std::thread::hardware_concurrency();
@@ -403,11 +403,11 @@ namespace simq::core::server {
 
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
-        settings.countThreads = htonl( countThreads );
+        settings.countThreads = htons( countThreads );
         file.write( &settings, sizeof( Settings ), 0 );
     }
 
-    unsigned int Store::getPort() {
+    unsigned short int Store::getPort() {
         std::lock_guard<std::mutex> lock( m );
         Settings settings;
 
@@ -417,10 +417,10 @@ namespace simq::core::server {
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
 
-        return ntohl( settings.port );
+        return ntohs( settings.port );
     }
 
-    void Store::updatePort( unsigned int port ) {
+    void Store::updatePort( unsigned short int port ) {
         std::lock_guard<std::mutex> lock( m );
         Settings settings;
 
@@ -433,7 +433,7 @@ namespace simq::core::server {
 
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
-        settings.port = htonl( port );
+        settings.port = htons( port );
         file.write( &settings, sizeof( Settings ), 0 );
     }
 
