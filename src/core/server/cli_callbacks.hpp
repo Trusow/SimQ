@@ -99,6 +99,8 @@ namespace simq::core::server {
             virtual void updateMasterPassword(
                 unsigned char password[crypto::HASH_LENGTH]
             ) = 0;
+            virtual void updatePort( unsigned short int port ) = 0;
+            virtual void updateCountThreads( unsigned short int port ) = 0;
     };
 }
 
