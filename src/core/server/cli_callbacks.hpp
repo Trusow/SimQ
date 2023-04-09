@@ -24,7 +24,7 @@ namespace simq::core::server {
             virtual void getChannelSettings(
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings *settings
+                util::Types::ChannelSettings &settings
             ) = 0;
 
             virtual unsigned short int getPort() = 0;
