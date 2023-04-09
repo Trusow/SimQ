@@ -46,6 +46,15 @@ namespace simq::core::server {
             const char *_pathConsumers = "consumers";
             const char *_pathProducers = "producers";
 
+            const char *_cmdLs = "ls";
+            const char *_cmdH = "h";
+            const char *_cmdCd = "cd";
+            const char *_cmdInfo = "info";
+            const char *_cmdSet = "set";
+            const char *_cmdPswd = "passwd";
+            const char *_cmdRemove = "rm";
+            const char *_cmdAdd = "add";
+
             void _getCtxPath( std::string &path );
             void _getLS( std::vector<std::string> &list );
             void _getAllowedCommands( std::vector<std::string> &list );
@@ -167,44 +176,44 @@ namespace simq::core::server {
     }
 
     void CLI::_getAllowedCommands( std::vector<std::string> &list ) {
-        list.push_back( "h" );
-        list.push_back( "cd" );
+        list.push_back( _cmdH );
+        list.push_back( _cmdCd );
         switch( _ctx ) {
             case CTX_ROOT:
-                list.push_back( "ls" );
-                list.push_back( "info" );
-                list.push_back( "set" );
-                list.push_back( "passwd" );
+                list.push_back( _cmdLs );
+                list.push_back( _cmdInfo );
+                list.push_back( _cmdSet );
+                list.push_back( _cmdPswd );
                 break;
             case CTX_GROUPS:
-                list.push_back( "ls" );
-                list.push_back( "add" );
-                list.push_back( "rm" );
+                list.push_back( _cmdLs );
+                list.push_back( _cmdAdd );
+                list.push_back( _cmdRemove );
                 break;
             case CTX_GROUP:
-                list.push_back( "ls" );
-                list.push_back( "add" );
-                list.push_back( "passwd" );
+                list.push_back( _cmdLs );
+                list.push_back( _cmdAdd );
+                list.push_back( _cmdPswd );
                 break;
             case CTX_CHANNEL:
-                list.push_back( "ls" );
-                list.push_back( "info" );
-                list.push_back( "set" );
+                list.push_back( _cmdLs );
+                list.push_back( _cmdInfo );
+                list.push_back( _cmdSet );
                 break;
             case CTX_CONSUMERS:
             case CTX_PRODUCERS:
-                list.push_back( "ls" );
-                list.push_back( "add" );
-                list.push_back( "rm" );
+                list.push_back( _cmdLs );
+                list.push_back( _cmdAdd );
+                list.push_back( _cmdRemove );
                 break;
             case CTX_PRODUCER:
             case CTX_CONSUMER:
-                list.push_back( "passwd" );
+                list.push_back( _cmdPswd );
                 break;
             case CTX_SETTINGS:
-                list.push_back( "info" );
-                list.push_back( "set" );
-                list.push_back( "passwd" );
+                list.push_back( _cmdInfo );
+                list.push_back( _cmdSet );
+                list.push_back( _cmdPswd );
         }
     }
 
@@ -314,9 +323,9 @@ namespace simq::core::server {
         auto it = std::find( allowedCommands.begin(), allowedCommands.end(), cmd );
 
         if( it != allowedCommands.end() ) {
-            if( cmd == "cd" ) {
+            if( cmd == _cmdCd ) {
                 _parseCD( body.c_str() );
-            } else if( cmd == "ls" ) {
+            } else if( cmd == _cmdLs ) {
                 std::vector<std::string> list;
                 _getLS( list );
                 std::cout << std::endl;
@@ -324,7 +333,7 @@ namespace simq::core::server {
                     std::cout << "    " << *it << std::endl;
                 }
                 std::cout << std::endl;
-            } else if( cmd == "h" ) {
+            } else if( cmd == _cmdH ) {
                 std::vector<std::string> list;
                 _getAllowedCommands( list );
                 std::cout << std::endl;
