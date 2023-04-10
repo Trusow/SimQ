@@ -79,7 +79,7 @@ namespace simq::core::server {
         while( true ) {
             std::string line;
 
-            std::string path;
+            std::string path = "/";
             _getCtxPath( path, _nav->ctx );
 
             std::cout << "simq ";
@@ -92,8 +92,7 @@ namespace simq::core::server {
     }
 
     void CLI::_getCtxPath( std::string &path, CtxNavigation ctx ) {
-        path = "/";
-        switch( _nav->ctx ) {
+        switch( ctx ) {
             case CTX_ROOT:
                 break;
             case CTX_GROUPS:
