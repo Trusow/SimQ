@@ -327,10 +327,8 @@ namespace simq::core::server {
             if( ch == '/' ) {
                 if( i == 0 ) {
                     _goRoot( localNav );
-                    // root
                 } else if( path != "" ) {
                     _goNext( localNav, path.c_str() );
-                    // next
                 }
 
                 path = "";
@@ -345,7 +343,6 @@ namespace simq::core::server {
                 isSlash = false;
                 if( point == 2 ) {
                     _goBack( localNav );
-                    // back
                 }
             } else {
                 if( point != 0 ) {
