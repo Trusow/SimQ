@@ -14,7 +14,7 @@ namespace simq::core::server {
         private:
             CLICallbacks *_cb = nullptr;
 
-            enum Ctx {
+            enum CtxNavigation {
                 CTX_ROOT,
 
                 CTX_GROUPS,
@@ -28,18 +28,14 @@ namespace simq::core::server {
                 CTX_SETTINGS,
             };
 
-            Ctx _ctx = CTX_GROUPS;
-
-            struct CDCommand {
-                Ctx ctx;
+            struct Navigation {
+                CtxNavigation ctx;
                 char *group;
                 char *channel;
                 char *login;
             };
 
-            char *_group = nullptr;
-            char *_channel = nullptr;
-            char *_login = nullptr;
+            Navigation *_nav = nullptr;
 
             const char *_pathGroups = "groups";
             const char *_pathSettings = "settings";
@@ -58,8 +54,14 @@ namespace simq::core::server {
             void _getCtxPath( std::string &path );
             void _getLS( std::vector<std::string> &list );
             void _getAllowedCommands( std::vector<std::string> &list );
-            CDCommand *_parseCD( const char *line );
-            void _freeCD( CDCommand *command );
+
+            Navigation *_parseNavigation( const char *line );
+            void _goNext( Navigation *nav, const char *path );
+            void _goBack( Navigation *nav );
+            void _goRoot( Navigation *nav );
+            void _freeNavigation( Navigation *nav );
+            void _applyNavigation( Navigation *nav );
+
             void _parseCommand( const char *line );
 
         public:
@@ -68,6 +70,9 @@ namespace simq::core::server {
 
     CLI::CLI( CLICallbacks *cb ) {
         _cb = cb;
+
+        _nav = new Navigation{};
+        _nav->ctx = CTX_GROUPS;
 
         while( true ) {
             std::string line;
@@ -86,7 +91,7 @@ namespace simq::core::server {
 
     void CLI::_getCtxPath( std::string &path ) {
         path = "/";
-        switch( _ctx ) {
+        switch( _nav->ctx ) {
             case CTX_ROOT:
                 break;
             case CTX_GROUPS:
@@ -95,54 +100,54 @@ namespace simq::core::server {
             case CTX_GROUP:
                 path += _pathGroups;
                 path += "/";
-                path += _group;
+                path += _nav->group;
                 break;
             case CTX_CHANNEL:
                 path += _pathGroups;
                 path += "/";
-                path += _group;
+                path += _nav->group;
                 path += "/";
-                path += _channel;
+                path += _nav->channel;
                 break;
             case CTX_CONSUMERS:
                 path += _pathGroups;
                 path += "/";
-                path += _group;
+                path += _nav->group;
                 path += "/";
-                path += _channel;
+                path += _nav->channel;
                 path += "/";
                 path += _pathConsumers;
                 break;
             case CTX_PRODUCERS:
                 path += _pathGroups;
                 path += "/";
-                path += _group;
+                path += _nav->group;
                 path += "/";
-                path += _channel;
+                path += _nav->channel;
                 path += "/";
                 path += _pathProducers;
                 break;
             case CTX_CONSUMER:
                 path += _pathGroups;
                 path += "/";
-                path += _group;
+                path += _nav->group;
                 path += "/";
-                path += _channel;
+                path += _nav->channel;
                 path += "/";
                 path += _pathConsumers;
                 path += "/";
-                path += _login;
+                path += _nav->login;
                 break;
             case CTX_PRODUCER:
                 path += _pathGroups;
                 path += "/";
-                path += _group;
+                path += _nav->group;
                 path += "/";
-                path += _channel;
+                path += _nav->channel;
                 path += "/";
                 path += _pathProducers;
                 path += "/";
-                path += _login;
+                path += _nav->login;
                 break;
             case CTX_SETTINGS:
                 path += _pathSettings;
@@ -151,7 +156,7 @@ namespace simq::core::server {
     }
 
     void CLI::_getLS( std::vector<std::string> &list ) {
-        switch( _ctx ) {
+        switch( _nav->ctx ) {
             case CTX_ROOT:
                 list.push_back( _pathGroups );
                 list.push_back( _pathSettings );
@@ -160,17 +165,17 @@ namespace simq::core::server {
                 _cb->getGroups( list );
                 break;
             case CTX_GROUP:
-                _cb->getChannels( _group, list );
+                _cb->getChannels( _nav->group, list );
                 break;
             case CTX_CHANNEL:
                 list.push_back( _pathConsumers );
                 list.push_back( _pathProducers );
                 break;
             case CTX_CONSUMERS:
-                _cb->getConsumers( _group, _channel, list );
+                _cb->getConsumers( _nav->group, _nav->channel, list );
                 break;
             case CTX_PRODUCERS:
-                _cb->getProducers( _group, _channel, list );
+                _cb->getProducers( _nav->group, _nav->channel, list );
                 break;
         }
     }
@@ -178,7 +183,7 @@ namespace simq::core::server {
     void CLI::_getAllowedCommands( std::vector<std::string> &list ) {
         list.push_back( _cmdH );
         list.push_back( _cmdCd );
-        switch( _ctx ) {
+        switch( _nav->ctx ) {
             case CTX_ROOT:
                 list.push_back( _cmdLs );
                 list.push_back( _cmdInfo );
@@ -217,7 +222,7 @@ namespace simq::core::server {
         }
     }
 
-    CLI::CDCommand *CLI::_parseCD( const char *line ) {
+    CLI::Navigation *CLI::_parseNavigation( const char *line ) {
         // TODO дописать CD
 
         std::string path = "";
@@ -229,29 +234,28 @@ namespace simq::core::server {
             char ch = line[i];
 
             if( ch == '/' ) {
-                if( isSlash || point == 1 ) {
-                    isSlash = false;
-                    continue;
+                if( i == 0 ) {
+                    std::cout << "root" << std::endl;
+                    // root
                 } else if( path != "" ) {
-                    list.clear();
-                    _getLS( list );
-                    auto it = std::find( list.begin(), list.end(), path );
-                    if( it != list.end() ) {
-                    } else {
-                        std::cout << "wrong param" << std::endl;
-                    }
-                } else if( point == 2 ) {
+                    std::cout << "next" << std::endl;
+                    // next
                 }
+
                 path = "";
                 point = 0;
                 isSlash = true;
             } else if( ch == '.' ) {
-                if( point == 2 ) {
+                if( path != "" || point == 2 ) {
                     throw -1;
                 }
                 path = "";
                 point++;
                 isSlash = false;
+                if( point == 2 ) {
+                    std::cout << "back" << std::endl;
+                    // back
+                }
             } else if( ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' ) {
                 if( point != 0 ) {
                     throw -1;
@@ -261,32 +265,8 @@ namespace simq::core::server {
             }
         }
 
-        if( isSlash ) {
-            _ctx = CTX_ROOT;
-        } if( path != "" ) {
-            list.clear();
-            _getLS( list );
-            auto it = std::find( list.begin(), list.end(), path );
-            if( it != list.end() ) {
-                switch( _ctx ) {
-                    case CTX_ROOT:
-                        if( path == _pathGroups ) {
-                            _ctx = CTX_GROUPS;
-                        } else {
-                            _ctx = CTX_SETTINGS;
-                        }
-                        break;
-                }
-            } else {
-                std::cout << "wrong param" << std::endl;
-            }
-        } else if( point == 2 ) {
-            switch( _ctx ) {
-                case CTX_GROUPS:
-                case CTX_SETTINGS:
-                    _ctx = CTX_ROOT;
-                    break;
-            }
+        if( path != "" ) {
+            std::cout << "next" << std::endl;
         }
 
         return nullptr;
@@ -324,7 +304,7 @@ namespace simq::core::server {
 
         if( it != allowedCommands.end() ) {
             if( cmd == _cmdCd ) {
-                _parseCD( body.c_str() );
+                _parseNavigation( body.c_str() );
             } else if( cmd == _cmdLs ) {
                 std::vector<std::string> list;
                 _getLS( list );
