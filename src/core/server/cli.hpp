@@ -347,7 +347,7 @@ namespace simq::core::server {
                     _goBack( localNav );
                     // back
                 }
-            } else if( ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' ) {
+            } else {
                 if( point != 0 ) {
                     throw -1;
                 }
