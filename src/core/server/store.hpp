@@ -541,8 +541,6 @@ namespace simq::core::server {
         p += "/";
         p += pathConsumers;
 
-        std::cout << p << std::endl;
-
         std::vector<std::string> _groups;
         util::FS::dirs( p.c_str(), _groups );
 
