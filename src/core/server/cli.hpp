@@ -51,7 +51,7 @@ namespace simq::core::server {
             const char *_cmdRemove = "rm";
             const char *_cmdAdd = "add";
 
-            void _getCtxPath( std::string &path );
+            void _getCtxPath( std::string &path, CtxNavigation ctx );
             void _getLS( std::vector<std::string> &list );
             void _getAllowedCommands( std::vector<std::string> &list );
 
@@ -78,7 +78,7 @@ namespace simq::core::server {
             std::string line;
 
             std::string path;
-            _getCtxPath( path );
+            _getCtxPath( path, _nav->ctx );
 
             std::cout << "simq ";
             std::cout << path;
@@ -89,7 +89,7 @@ namespace simq::core::server {
 
     }
 
-    void CLI::_getCtxPath( std::string &path ) {
+    void CLI::_getCtxPath( std::string &path, CtxNavigation ctx ) {
         path = "/";
         switch( _nav->ctx ) {
             case CTX_ROOT:
@@ -98,54 +98,32 @@ namespace simq::core::server {
                 path += _pathGroups;
                 break;
             case CTX_GROUP:
-                path += _pathGroups;
+                _getCtxPath( path, CTX_GROUPS );
                 path += "/";
                 path += _nav->group;
                 break;
             case CTX_CHANNEL:
-                path += _pathGroups;
-                path += "/";
-                path += _nav->group;
+                _getCtxPath( path, CTX_GROUP );
                 path += "/";
                 path += _nav->channel;
                 break;
             case CTX_CONSUMERS:
-                path += _pathGroups;
-                path += "/";
-                path += _nav->group;
-                path += "/";
-                path += _nav->channel;
+                _getCtxPath( path, CTX_CHANNEL );
                 path += "/";
                 path += _pathConsumers;
                 break;
             case CTX_PRODUCERS:
-                path += _pathGroups;
-                path += "/";
-                path += _nav->group;
-                path += "/";
-                path += _nav->channel;
+                _getCtxPath( path, CTX_CHANNEL );
                 path += "/";
                 path += _pathProducers;
                 break;
             case CTX_CONSUMER:
-                path += _pathGroups;
-                path += "/";
-                path += _nav->group;
-                path += "/";
-                path += _nav->channel;
-                path += "/";
-                path += _pathConsumers;
+                _getCtxPath( path, CTX_CONSUMERS );
                 path += "/";
                 path += _nav->login;
                 break;
             case CTX_PRODUCER:
-                path += _pathGroups;
-                path += "/";
-                path += _nav->group;
-                path += "/";
-                path += _nav->channel;
-                path += "/";
-                path += _pathProducers;
+                _getCtxPath( path, CTX_PRODUCERS );
                 path += "/";
                 path += _nav->login;
                 break;
