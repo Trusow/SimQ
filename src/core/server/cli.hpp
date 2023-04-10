@@ -276,15 +276,18 @@ namespace simq::core::server {
             case CTX_GROUPS:
                 nav->ctx = CTX_GROUP;
                 nav->group = util::String::copy( path );
+                break;
             case CTX_GROUP:
                 nav->ctx = CTX_CHANNEL;
                 nav->channel = util::String::copy( path );
+                break;
             case CTX_CHANNEL:
                 if( std::string( path ) == _pathConsumers ) {
                     nav->ctx = CTX_CONSUMERS;
                 } else {
                     nav->ctx = CTX_PRODUCERS;
                 }
+                break;
             case CTX_CONSUMERS:
                 nav->ctx = CTX_CONSUMER;
                 nav->login = util::String::copy( path );
