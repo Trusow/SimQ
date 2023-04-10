@@ -144,17 +144,17 @@ namespace simq::core::server {
                 _cb->getGroups( list );
                 break;
             case CTX_GROUP:
-                _cb->getChannels( _nav->group, list );
+                _cb->getChannels( nav->group, list );
                 break;
             case CTX_CHANNEL:
                 list.push_back( _pathConsumers );
                 list.push_back( _pathProducers );
                 break;
             case CTX_CONSUMERS:
-                _cb->getConsumers( _nav->group, _nav->channel, list );
+                _cb->getConsumers( nav->group, nav->channel, list );
                 break;
             case CTX_PRODUCERS:
-                _cb->getProducers( _nav->group, _nav->channel, list );
+                _cb->getProducers( nav->group, nav->channel, list );
                 break;
         }
     }
@@ -219,6 +219,9 @@ namespace simq::core::server {
         util::String::free( nav->group );
         util::String::free( nav->channel );
         util::String::free( nav->login );
+        nav->group = nullptr;
+        nav->channel = nullptr;
+        nav->login = nullptr;
     }
 
     void CLI::_goBack( Navigation *nav ) {
@@ -231,11 +234,15 @@ namespace simq::core::server {
                 util::String::free( nav->group );
                 util::String::free( nav->channel );
                 util::String::free( nav->login );
+                nav->group = nullptr;
+                nav->channel = nullptr;
+                nav->login = nullptr;
                 nav->ctx = CTX_GROUPS;
                 break;
             case CTX_CHANNEL:
                 // TODO detect isset group
                 util::String::free( nav->channel );
+                nav->channel = nullptr;
                 nav->ctx = CTX_GROUP;
                 break;
             case CTX_CONSUMERS:
@@ -246,11 +253,13 @@ namespace simq::core::server {
             case CTX_CONSUMER:
                 // TODO detect isset group
                 util::String::free( nav->login );
+                nav->login = nullptr;
                 nav->ctx = CTX_CONSUMERS;
                 break;
             case CTX_PRODUCER:
                 // TODO detect isset group
                 util::String::free( nav->login );
+                nav->login = nullptr;
                 nav->ctx = CTX_PRODUCERS;
                 break;
         }
