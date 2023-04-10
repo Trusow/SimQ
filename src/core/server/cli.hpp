@@ -54,10 +54,10 @@ namespace simq::core::server {
             const char *_cmdAdd = "add";
 
             void _getCtxPath( std::string &path, CtxNavigation ctx );
-            void _getLS( std::vector<std::string> &list );
+            void _getLS( Navigation *nav, std::vector<std::string> &list );
             void _getAllowedCommands( std::vector<std::string> &list );
 
-            Navigation *_parseNavigation( const char *line );
+            Navigation *_buildNavigation( const char *line );
             void _goNext( Navigation *nav, const char *path );
             void _goBack( Navigation *nav );
             void _goRoot( Navigation *nav );
@@ -135,8 +135,8 @@ namespace simq::core::server {
         }
     }
 
-    void CLI::_getLS( std::vector<std::string> &list ) {
-        switch( _nav->ctx ) {
+    void CLI::_getLS( Navigation *nav, std::vector<std::string> &list ) {
+        switch( nav->ctx ) {
             case CTX_ROOT:
                 list.push_back( _pathGroups );
                 list.push_back( _pathSettings );
@@ -214,7 +214,92 @@ namespace simq::core::server {
         target->login = util::String::copy( src->login );
     }
 
-    CLI::Navigation *CLI::_parseNavigation( const char *line ) {
+    void CLI::_goRoot( Navigation *nav ) {
+        nav->ctx = CTX_ROOT;
+
+        util::String::free( nav->group );
+        util::String::free( nav->channel );
+        util::String::free( nav->login );
+    }
+
+    void CLI::_goBack( Navigation *nav ) {
+        switch( nav->ctx ) {
+            case CTX_GROUPS:
+            case CTX_SETTINGS:
+                _goRoot( nav );
+                break;
+            case CTX_GROUP:
+                util::String::free( nav->group );
+                util::String::free( nav->channel );
+                util::String::free( nav->login );
+                nav->ctx = CTX_GROUPS;
+                break;
+            case CTX_CHANNEL:
+                // TODO detect isset group
+                util::String::free( nav->channel );
+                nav->ctx = CTX_GROUP;
+                break;
+            case CTX_CONSUMERS:
+            case CTX_PRODUCERS:
+                // TODO detect isset group
+                nav->ctx = CTX_CHANNEL;
+                break;
+            case CTX_CONSUMER:
+                // TODO detect isset group
+                util::String::free( nav->login );
+                nav->ctx = CTX_CONSUMERS;
+                break;
+            case CTX_PRODUCER:
+                // TODO detect isset group
+                util::String::free( nav->login );
+                nav->ctx = CTX_PRODUCERS;
+                break;
+        }
+    }
+
+    void CLI::_goNext( Navigation *nav, const char *path ) {
+        std::vector<std::string> list;
+        _getLS( nav, list );
+
+        auto it = std::find( list.begin(), list.end(), path );
+        if( it == list.end() ) {
+            throw -1;
+        }
+
+        switch( nav->ctx ) {
+            case CTX_ROOT:
+                if( std::string( path ) == _pathGroups ) {
+                    nav->ctx = CTX_GROUPS;
+                } else {
+                    nav->ctx = CTX_SETTINGS;
+                }
+                break;
+            case CTX_GROUPS:
+                nav->ctx = CTX_GROUP;
+                nav->group = util::String::copy( path );
+            case CTX_GROUP:
+                nav->ctx = CTX_CHANNEL;
+                nav->channel = util::String::copy( path );
+            case CTX_CHANNEL:
+                if( std::string( path ) == _pathConsumers ) {
+                    nav->ctx = CTX_CONSUMERS;
+                } else {
+                    nav->ctx = CTX_PRODUCERS;
+                }
+            case CTX_CONSUMERS:
+                nav->ctx = CTX_CONSUMER;
+                nav->login = util::String::copy( path );
+                break;
+            case CTX_PRODUCERS:
+                nav->ctx = CTX_PRODUCER;
+                nav->login = util::String::copy( path );
+                break;
+            default:
+                throw -1;
+        }
+    }
+
+    CLI::Navigation *CLI::_buildNavigation( const char *line ) {
         // TODO дописать CD
 
         std::string path = "";
@@ -222,18 +307,18 @@ namespace simq::core::server {
         unsigned int point = 0;
         std::vector<std::string> list;
 
-        auto tmpNav = new Navigation{};
-        _applyNavigation( tmpNav, _nav );
+        auto localNav = new Navigation{};
+        _applyNavigation( localNav, _nav );
 
         for( unsigned int i = 0; line[i] != 0; i++ ) {
             char ch = line[i];
 
             if( ch == '/' ) {
                 if( i == 0 ) {
-                    std::cout << "root" << std::endl;
+                    _goRoot( localNav );
                     // root
                 } else if( path != "" ) {
-                    std::cout << "next" << std::endl;
+                    _goNext( localNav, path.c_str() );
                     // next
                 }
 
@@ -248,7 +333,7 @@ namespace simq::core::server {
                 point++;
                 isSlash = false;
                 if( point == 2 ) {
-                    std::cout << "back" << std::endl;
+                    _goBack( localNav );
                     // back
                 }
             } else if( ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' ) {
@@ -261,10 +346,10 @@ namespace simq::core::server {
         }
 
         if( path != "" ) {
-            std::cout << "next" << std::endl;
+            _goNext( localNav, path.c_str() );
         }
 
-        return nullptr;
+        return localNav;
     }
 
     void CLI::_parseCommand( const char *line ) {
@@ -299,10 +384,11 @@ namespace simq::core::server {
 
         if( it != allowedCommands.end() ) {
             if( cmd == _cmdCd ) {
-                _parseNavigation( body.c_str() );
+                auto nav = _buildNavigation( body.c_str() );
+                _applyNavigation( _nav, nav );
             } else if( cmd == _cmdLs ) {
                 std::vector<std::string> list;
-                _getLS( list );
+                _getLS( _nav, list );
                 std::cout << std::endl;
                 for( auto it = list.begin(); it != list.end(); it++ ) {
                     std::cout << "    " << *it << std::endl;
