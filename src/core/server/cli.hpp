@@ -2,8 +2,10 @@
 #define SIMQ_CORE_SERVER_CLI
 
 #include "cli_callbacks.hpp"
+#include "../../util/string.hpp"
 #include <vector>
 #include <string>
+#include <string.h>
 #include <algorithm>
 #include <iostream>
 
@@ -60,7 +62,7 @@ namespace simq::core::server {
             void _goBack( Navigation *nav );
             void _goRoot( Navigation *nav );
             void _freeNavigation( Navigation *nav );
-            void _applyNavigation( Navigation *nav );
+            void _applyNavigation( Navigation *target, Navigation *src );
 
             void _parseCommand( const char *line );
 
@@ -200,6 +202,18 @@ namespace simq::core::server {
         }
     }
 
+    void CLI::_applyNavigation( Navigation *target, Navigation *src ) {
+        target->ctx = src->ctx;
+
+        util::String::free( target->group );
+        util::String::free( target->channel );
+        util::String::free( target->login );
+
+        target->group = util::String::copy( src->group );
+        target->channel = util::String::copy( src->channel );
+        target->login = util::String::copy( src->login );
+    }
+
     CLI::Navigation *CLI::_parseNavigation( const char *line ) {
         // TODO дописать CD
 
@@ -207,6 +221,9 @@ namespace simq::core::server {
         bool isSlash = false;
         unsigned int point = 0;
         std::vector<std::string> list;
+
+        auto tmpNav = new Navigation{};
+        _applyNavigation( tmpNav, _nav );
 
         for( unsigned int i = 0; line[i] != 0; i++ ) {
             char ch = line[i];
