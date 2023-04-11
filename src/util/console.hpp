@@ -5,6 +5,7 @@
 #include <chrono>
 #include <thread>
 #include <string>
+#include <string.h>
 #include <stdio.h>
 #include <termios.h>
 #include <unistd.h>
@@ -28,7 +29,8 @@ namespace simq::util {
             void _prev( std::string &line, unsigned int &position );
             void _next( std::string &line, unsigned int &position );
 
-            void _paste( std::string &line, unsigned int &position, char ch );
+            void _input( std::string &line, unsigned int &position, char ch );
+            void _clear( std::string &line, unsigned int &position );
 
             bool _isAllowedChar( char ch );
 
@@ -121,7 +123,7 @@ namespace simq::util {
                 std::cout << _prefix;
             } else if( ch == KEY_BACKSPACE ) {
             } else if( _isAllowedChar( ch ) ) {
-                _paste( line, position, ch );
+                _input( line, position, ch );
             }
         }
     }
@@ -144,13 +146,60 @@ namespace simq::util {
         std::cout << (char)27 << char(91) << char(68);
     }
 
-    void Console::_paste( std::string &line, unsigned int &position, char ch ) {
+    void Console::_input( std::string &line, unsigned int &position, char ch ) {
         if( position == line.length() ) {
             line += ch;
             position++;
             std::cout << ch;
-            return;
+        } else if( position == 0 ) {
+
+            auto l = line.length();
+            char *str = new char[l+2]{};
+            str[0] = ch;
+            memcpy( &str[1], line.c_str(), l );
+
+            std::string dline = str;
+            delete[] str;
+
+            _clear( line, position );
+            line = dline;
+            std::cout << dline;
+            position = line.length();
+
+            for( int i = 0; i < line.length() -1; i++ ) {
+                _prev( line, position );
+            }
+
+        } else {
+            auto l = line.length();
+            unsigned int origPosition = position;
+            char *str = new char[l+2]{};
+            str[position] = ch;
+            memcpy( &str[0], line.c_str(), position );
+            memcpy( &str[position+1], &line.c_str()[position], l-position );
+
+            std::string dline = str;
+            delete[] str;
+
+            _clear( line, position );
+            line = dline;
+            std::cout << line;
+            position = line.length();
+
+            for( int i = line.length() - 1; i >= 0; i-- ) {
+                if( i == origPosition ) {
+                    break;
+                }
+                _prev( line, position );
+            }
         }
+    }
+
+    void Console::_clear( std::string &line, unsigned int &position ) {
+        std::cout << "\33[2K\r";
+        std::cout << _prefix;
+        line = "";
+        position = 0;
     }
 }
 
