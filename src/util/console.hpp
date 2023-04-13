@@ -65,9 +65,9 @@ namespace simq::util {
             std::string _passwordPrefix;
             std::string _currentPrefix = "test> ";
 
-            void _prev( std::string &line, unsigned int &position );
+            void _prevChar( std::string &line, unsigned int &position );
             void _prevWord( std::string &line, unsigned int &position );
-            void _next( std::string &line, unsigned int &position );
+            void _nextChar( std::string &line, unsigned int &position );
             void _nextWord( std::string &line, unsigned int &position );
 
             void _input( std::string &line, unsigned int &position, char ch );
@@ -86,8 +86,8 @@ namespace simq::util {
             Console();
             ~Console();
             void run();
-            void setConfirm( const char *str );
-            void setPassword( const char *str );
+            void confirm( const char *str );
+            void password( const char *str );
             void setPrefix( const char *str );
     };
 
@@ -185,11 +185,11 @@ namespace simq::util {
 
             if( _mode == MODE_NORMAL ) {
                 if( code == KEY_LEFT ) {
-                    _prev( line, position );
+                    _prevChar( line, position );
                 } else if( code == KEY_CTRL_LEFT ) {
                     _prevWord( line, position );
                 } else if( code == KEY_RIGHT ) {
-                    _next( line, position );
+                    _nextChar( line, position );
                 } else if( code == KEY_CTRL_RIGHT ) {
                     _nextWord( line, position );
                 } else if( code == KEY_DOWN ) {
@@ -237,7 +237,7 @@ namespace simq::util {
         }
     }
 
-    void Console::_next( std::string &line, unsigned int &position ) {
+    void Console::_nextChar( std::string &line, unsigned int &position ) {
         if( position == line.length() ) {
             return;
         }
@@ -246,7 +246,7 @@ namespace simq::util {
         std::cout << (char)27 << char(91) << char(67);
     }
 
-    void Console::_prev( std::string &line, unsigned int &position ) {
+    void Console::_prevChar( std::string &line, unsigned int &position ) {
         if( position == 0 ) {
             return;
         }
@@ -260,24 +260,24 @@ namespace simq::util {
         bool isBreak = false;
 
         if( position == line.length() ) {
-            _prev( line, position );
+            _prevChar( line, position );
         }
 
         if( line[position] != ' ' ) {
-            _prev( line, position );
+            _prevChar( line, position );
         }
 
         for( unsigned int i = position; i > 0; i-- ) {
             if( line[i] == ' ' ) {
                 if( isBreak ) {
-                    _next( line, position );
+                    _nextChar( line, position );
                     break;
                 }
                 isSpace = true;
             } else if( isSpace || i == position ) {
                 isBreak = true;
             }
-            _prev( line, position );
+            _prevChar( line, position );
         }
     }
 
@@ -294,7 +294,7 @@ namespace simq::util {
             } else if ( isSpace || i == position ) {
                 isBreak = true;
             }
-            _next( line, position );
+            _nextChar( line, position );
         }
     }
 
@@ -322,7 +322,7 @@ namespace simq::util {
             if( i == origPosition ) {
                 break;
             }
-            _prev( line, position );
+            _prevChar( line, position );
         }
     }
 
@@ -350,7 +350,7 @@ namespace simq::util {
             if( i == origPosition ) {
                 break;
             }
-            _prev( line, position );
+            _prevChar( line, position );
         }
     }
 
@@ -374,7 +374,7 @@ namespace simq::util {
             if( i == origPosition ) {
                 break;
             }
-            _prev( line, position );
+            _prevChar( line, position );
         }
     }
 
@@ -451,12 +451,12 @@ namespace simq::util {
         return code;
     }
 
-    void Console::setConfirm( const char *str ) {
+    void Console::confirm( const char *str ) {
         _confirmPrefix = str;
         _mode = MODE_CONFIRM;
     }
 
-    void Console::setPassword( const char *str ) {
+    void Console::password( const char *str ) {
         _passwordPrefix = str;
         _mode = MODE_CONFIRM;
     }
