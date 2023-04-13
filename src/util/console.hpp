@@ -47,7 +47,9 @@ namespace simq::util {
             const char *_prefix = "test> ";
 
             void _prev( std::string &line, unsigned int &position );
+            void _prevWord( std::string &line, unsigned int &position );
             void _next( std::string &line, unsigned int &position );
+            void _nextWord( std::string &line, unsigned int &position );
 
             void _input( std::string &line, unsigned int &position, char ch );
             void _clear( std::string &line, unsigned int &position );
@@ -125,8 +127,12 @@ namespace simq::util {
                 break;
             } else if( code == KEY_LEFT ) {
                 _prev( line, position );
+            } else if( code == KEY_CTRL_LEFT ) {
+                _prevWord( line, position );
             } else if( code == KEY_RIGHT ) {
                 _next( line, position );
+            } else if( code == KEY_CTRL_RIGHT ) {
+                _nextWord( line, position );
             } else if( code == KEY_DOWN ) {
             } else if( code == KEY_UP ) {
             } else if( code == KEY_ENTER ) {
@@ -135,7 +141,9 @@ namespace simq::util {
                 std::cout << std::endl;
                 std::cout << _prefix;
             } else if( code == KEY_BACKSPACE ) {
+                _backspace( line, position );
             } else if( code == KEY_DELETE ) {
+                _delete( line, position );
             } else if( code == KEY_NONE && ch >= 32 && ch <= 126 ) {
                 _input( line, position, ch );
             }
@@ -160,10 +168,95 @@ namespace simq::util {
         std::cout << (char)27 << char(91) << char(68);
     }
 
+    void Console::_prevWord( std::string &line, unsigned int &position ) {
+        bool isSpace = position == line.length();
+        bool isBreak = false;
+
+        for( unsigned int i = position; i > 0; i-- ) {
+            if( line[i] == ' ' ) {
+                if( isBreak ) {
+                    _next( line, position );
+                    break;
+                }
+                isSpace = true;
+            } else if( isSpace ) {
+                isBreak = true;
+            }
+            _prev( line, position );
+        }
+    }
+
+    void Console::_nextWord( std::string &line, unsigned int &position ) {
+        bool isSpace = position == 0;
+        bool isBreak = false;
+
+        for( unsigned int i = position; i < line.length(); i++ ) {
+            if( line[i] == ' ' ) {
+                if( isBreak ) {
+                    break;
+                }
+                isSpace = true;
+            } else if( isSpace ) {
+                isBreak = true;
+            }
+            _next( line, position );
+        }
+    }
+
     void Console::_backspace( std::string &line, unsigned int &position ) {
+        unsigned int origPosition = position;
+        if( position == 0 ) {
+            return;
+        }
+
+        auto l = line.length();
+        char *str = new char[l]{};
+        memcpy( &str[0], line.c_str(), position-1 );
+        memcpy( &str[position-1], &line.c_str()[position], l-position );
+
+        std::string dline = str;
+        delete[] str;
+
+        _clear( line, position );
+        line = dline;
+        std::cout << line;
+        position = line.length();
+
+        origPosition -= 2;
+        for( int i = line.length() - 1; i >= 0; i-- ) {
+            if( i == origPosition ) {
+                break;
+            }
+            _prev( line, position );
+        }
     }
 
     void Console::_delete( std::string &line, unsigned int &position ) {
+        unsigned int origPosition = position;
+        if( position == line.length() ) {
+            return;
+        }
+
+        auto l = line.length();
+        char *str = new char[l]{};
+        memcpy( &str[0], line.c_str(), position );
+        memcpy( &str[position], &line.c_str()[position+1], l-position-1 );
+
+        std::string dline = str;
+        delete[] str;
+
+        _clear( line, position );
+        line = dline;
+        std::cout << line;
+        position = line.length();
+
+        origPosition--;
+        for( int i = line.length() - 1; i >= 0; i-- ) {
+            if( i == origPosition ) {
+                break;
+            }
+            _prev( line, position );
+        }
     }
 
     void Console::_input( std::string &line, unsigned int &position, char ch ) {
