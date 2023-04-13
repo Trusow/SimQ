@@ -253,6 +253,14 @@ namespace simq::util {
         bool isSpace = position == line.length();
         bool isBreak = false;
 
+        if( position == line.length() ) {
+            _prev( line, position );
+        }
+
+        if( line[position] != ' ' ) {
+            _prev( line, position );
+        }
+
         for( unsigned int i = position; i > 0; i-- ) {
             if( line[i] == ' ' ) {
                 if( isBreak ) {
@@ -260,7 +268,7 @@ namespace simq::util {
                     break;
                 }
                 isSpace = true;
-            } else if( isSpace ) {
+            } else if( isSpace || i == position ) {
                 isBreak = true;
             }
             _prev( line, position );
@@ -277,7 +285,7 @@ namespace simq::util {
                     break;
                 }
                 isSpace = true;
-            } else if( isSpace ) {
+            } else if ( isSpace || i == position ) {
                 isBreak = true;
             }
             _next( line, position );
