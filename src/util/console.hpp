@@ -61,6 +61,8 @@ namespace simq::util {
             void _nextHistory( std::string &line );
             void _prevHistory( std::string &line );
             void _startHistory();
+
+            bool _isExit = false;
  
             std::list<Code> _codes;
 
@@ -99,6 +101,8 @@ namespace simq::util {
             void printDanger( const char *text );
 
             void printList( std::vector<std::string> &list, const char *text = nullptr );
+
+            void exit();
     };
 
     Console::Console() {
@@ -176,6 +180,11 @@ namespace simq::util {
         std::cout << "\x1b[0m";
 
         while( true ) {
+            if( _isExit ) {
+                std::cout << std::endl;
+                break;
+            }
+
             ch = getchar();
 
             if( ch == -1 ) {
@@ -582,6 +591,10 @@ namespace simq::util {
         }
 
         std::cout << std::endl;
+    }
+
+    void Console::exit() {
+        _isExit = true;
     }
 }
 
