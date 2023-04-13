@@ -13,6 +13,7 @@
 #include <vector>
 #include <list>
 #include <stdarg.h>
+#include <sys/ioctl.h>
 
 namespace simq::util {
     class Console {
@@ -80,6 +81,8 @@ namespace simq::util {
             void _bindCode( KeyCode code, int c, ... );
             void _initCodes();
             KeyCode _getCode( int ch );
+
+            unsigned int _getTerminalWidth();
 
 
         public:
@@ -202,6 +205,8 @@ namespace simq::util {
                     _prevHistory( line );
                     position = line.length();
                     std::cout << line;
+                } else if( code == KEY_CTRL_UP ) {
+                    std::cout << _getTerminalWidth() << std::endl;
                 } else if( code == KEY_ENTER ) {
                     _startHistory();
                     if( line != "" ) {
@@ -379,7 +384,15 @@ namespace simq::util {
     }
 
     void Console::_clear( std::string &line, unsigned int &position ) {
-        std::cout << "\33[2K\r";
+        auto width = _getTerminalWidth();
+        auto l = line.length() + _currentPrefix.length();
+        unsigned int count = l / width;
+
+        std::cout << "\x1b[2K\x1b[0G";
+        for( int i = 0; i < count; i++ ) {
+            std::cout << "\x1b[F\x1b[2K\x1b[0G";
+        }
+
         std::cout << _currentPrefix;
         line = "";
         position = 0;
@@ -464,6 +477,12 @@ namespace simq::util {
     void Console::setPrefix( const char *str ) {
         _normalPrefix = str;
         _mode = MODE_NORMAL;
+    }
+
+    unsigned int Console::_getTerminalWidth() {
+        winsize w;
+        ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+        return w.ws_col;
     }
 }
 
