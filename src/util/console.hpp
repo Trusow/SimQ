@@ -35,11 +35,11 @@ namespace simq::util {
 
             bool _isAllowedChar( char ch );
 
-            void _run();
 
         public:
             Console();
             ~Console();
+            void run();
     };
 
     Console::Console() {
@@ -52,8 +52,6 @@ namespace simq::util {
         tcsetattr( STDIN_FILENO, TCSANOW, &newt );
         oldf = fcntl( STDIN_FILENO, F_GETFL, 0 );
         fcntl( STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK );
-
-        _run();
     }
 
     Console::~Console() {
@@ -76,7 +74,7 @@ namespace simq::util {
         return isNum || isLetterD || isLetterU || isOther;
     }
 
-    void Console::_run() {
+    void Console::run() {
         int ch;
         unsigned int navigation = 0;
 
