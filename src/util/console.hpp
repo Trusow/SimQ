@@ -62,8 +62,8 @@ namespace simq::util {
  
             std::list<Code> _codes;
 
-            std::string _normalPrefix;
-            std::string _currentPrefix = "test> ";
+            std::string _normalPrefix = "test> ";
+            std::string _currentPrefix;
 
             void _prevChar( std::string &line, unsigned int &position );
             void _prevWord( std::string &line, unsigned int &position );
@@ -104,6 +104,7 @@ namespace simq::util {
 
     Console::Console() {
         _initCodes();
+        _currentPrefix = _normalPrefix;
 
         struct termios oldt, newt;
         int oldf;
@@ -177,7 +178,12 @@ namespace simq::util {
 
         std::chrono::milliseconds ts(50);
 
+        if( _mode == MODE_CONFIRM ) {
+            std::cout << "\x1b[36m";
+        }
+
         std::cout << _currentPrefix;
+        std::cout << "\x1b[0m";
 
         while( true ) {
             ch = getchar();
@@ -241,9 +247,13 @@ namespace simq::util {
                 switch( ch ) {
                     case 'Y': case 'y':
                         _mode = MODE_NORMAL;
+                        _currentPrefix = _normalPrefix;
+                        std::cout << std::endl << _currentPrefix;
                         break;
                     case 'N': case 'n':
                         _mode = MODE_NORMAL;
+                        _currentPrefix = _normalPrefix;
+                        std::cout << std::endl << _currentPrefix;
                         break;
                 }
             }
@@ -474,6 +484,7 @@ namespace simq::util {
 
     void Console::confirm( const char *prefix ) {
         _currentPrefix = prefix;
+        _currentPrefix += "\n\nPress Y(y)/N(n) to continue";
         _mode = MODE_CONFIRM;
     }
 
