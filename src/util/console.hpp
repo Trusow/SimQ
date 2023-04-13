@@ -51,7 +51,8 @@ namespace simq::util {
 
             void _input( std::string &line, unsigned int &position, char ch );
             void _clear( std::string &line, unsigned int &position );
-            void _remove( std::string &line, unsigned int &position );
+            void _backspace( std::string &line, unsigned int &position );
+            void _delete( std::string &line, unsigned int &position );
 
             bool _isAllowedChar( char ch );
 
@@ -159,7 +160,10 @@ namespace simq::util {
         std::cout << (char)27 << char(91) << char(68);
     }
 
-    void Console::_remove( std::string &line, unsigned int &position ) {
+    void Console::_backspace( std::string &line, unsigned int &position ) {
+    }
+
+    void Console::_delete( std::string &line, unsigned int &position ) {
     }
 
     void Console::_input( std::string &line, unsigned int &position, char ch ) {
