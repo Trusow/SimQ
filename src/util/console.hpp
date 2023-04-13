@@ -55,6 +55,8 @@ namespace simq::util {
             std::vector<std::string> _history;
             unsigned int _navigationHistory = 0;
 
+            const char *_margin = "    ";
+
             void _pushHistory( std::string &line );
             void _nextHistory( std::string &line );
             void _prevHistory( std::string &line );
@@ -62,7 +64,7 @@ namespace simq::util {
  
             std::list<Code> _codes;
 
-            std::string _normalPrefix = "test> ";
+            std::string _normalPrefix = "> ";
             std::string _currentPrefix;
 
             void _prevChar( std::string &line, unsigned int &position );
@@ -515,7 +517,7 @@ namespace simq::util {
         while( std::getline( stream, str, '\n' ) ) {
 
             auto l = str.length();
-            auto width = _getTerminalWidth() - 8;
+            auto width = _getTerminalWidth() - strlen( _margin ) * 2;
             unsigned int count = l / width;
 
             if( l - count * width != 0 ) {
@@ -526,10 +528,10 @@ namespace simq::util {
             unsigned int offset = 0;
 
             for( unsigned int i = 0; i < count; i++ ) {
-                std::cout << "    ";
+                std::cout << _margin;
                 std::cout << str.substr( offset, width );
                 offset += width;
-                std::cout << "    " << std::endl;
+                std::cout << _margin << std::endl;
             }
         }
 
@@ -559,7 +561,7 @@ namespace simq::util {
 
         if( text == nullptr ) {
             for( unsigned int i = 0; i < list.size(); i++ ) {
-                std::cout << "    " << list[i] << std::endl;
+                std::cout << _margin << list[i] << std::endl;
             }
         } else {
             for( unsigned int i = 0; i < list.size(); i++ ) {
@@ -571,7 +573,7 @@ namespace simq::util {
                 auto l = strlen( text );
                 unsigned int count = 0;
                 bool isSearch = false;
-                std::cout << "    ";
+                std::cout << _margin;
                 for( unsigned int c = 0; c < list[i].length(); c++ ) {
                     if( c == offset ) {
                         isSearch = true;
