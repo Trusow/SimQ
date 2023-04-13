@@ -3,6 +3,9 @@
 
 #include "cli_callbacks.hpp"
 #include "../../util/string.hpp"
+#include "../../crypto/hash.hpp"
+#include "../../util/console_callbacks.h"
+#include "../../util/console.hpp"
 #include <vector>
 #include <string>
 #include <string.h>
@@ -12,9 +15,10 @@
 // TODO Красивый вывод
 
 namespace simq::core::server {
-    class CLI {
+    class CLI: public util::ConsoleCallbacks {
         private:
             CLICallbacks *_cb = nullptr;
+            util::Console *_console = nullptr;
 
             enum CtxNavigation {
                 CTX_ROOT,
@@ -68,6 +72,10 @@ namespace simq::core::server {
 
         public:
             CLI( CLICallbacks *cb );
+            ~CLI();
+            void input( std::vector<std::string> &list );
+            void inputPassword( const char *password );
+            void prompt( bool value );
     };
 
     CLI::CLI( CLICallbacks *cb ) {
@@ -76,6 +84,11 @@ namespace simq::core::server {
         _nav = new Navigation{};
         _nav->ctx = CTX_GROUPS;
 
+        _console = new util::Console( this );
+        _console->getPassword( "Input password to continue: " );
+        _console->run();
+
+        /*
         while( true ) {
             std::string line;
 
@@ -88,7 +101,12 @@ namespace simq::core::server {
             std::getline( std::cin, line, '\n' );
             _parseCommand( line.c_str() );
         }
+        */
 
+    }
+
+    CLI::~CLI() {
+        delete this->_console;
     }
 
     void CLI::_getCtxPath( std::string &path, CtxNavigation ctx ) {
@@ -416,6 +434,32 @@ namespace simq::core::server {
             std::cout << "    Unknown command. Use 'h' to get allowed commands" << std::endl;
             std::cout << std::endl;
         }
+    }
+
+    void CLI::input( std::vector<std::string> &list ) {
+    }
+
+    void CLI::inputPassword( const char *password ) {
+        unsigned char hash[simq::crypto::HASH_LENGTH];
+        unsigned char hashOrig[simq::crypto::HASH_LENGTH];
+        simq::crypto::Hash::hash( password, hash );
+
+        _cb->getMasterPassword( hashOrig );
+
+        if( strncmp(
+            ( const char * )hash,
+            ( const char * )hashOrig,
+            simq::crypto::HASH_LENGTH
+        ) != 0 ) {
+            _console->printDanger( "\nError password" );
+            _console->exit();
+        } else {
+            _console->printSuccess( "\nWelcome to SimQ - a simple message queue.\nAuthor - Sergej Trusow, version - 1.0\nPress 'h' to help." );
+        }
+
+    }
+
+    void CLI::prompt( bool value ) {
     }
 }
 
