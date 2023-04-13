@@ -17,6 +17,13 @@
 namespace simq::util {
     class Console {
         private:
+            enum Mode {
+                MODE_NORMAL,
+                MODE_PASSWORD,
+            };
+
+            Mode _mode = MODE_NORMAL;
+
             enum KeyCode {
                 KEY_PROGRESS,
                 KEY_NONE,
@@ -122,30 +129,42 @@ namespace simq::util {
             }
 
             auto code = _getCode( ch );
-            if( code == KEY_KILL ) {
-                std::cout << std::endl;
-                break;
-            } else if( code == KEY_LEFT ) {
-                _prev( line, position );
-            } else if( code == KEY_CTRL_LEFT ) {
-                _prevWord( line, position );
-            } else if( code == KEY_RIGHT ) {
-                _next( line, position );
-            } else if( code == KEY_CTRL_RIGHT ) {
-                _nextWord( line, position );
-            } else if( code == KEY_DOWN ) {
-            } else if( code == KEY_UP ) {
-            } else if( code == KEY_ENTER ) {
-                line = "";
-                position = 0;
-                std::cout << std::endl;
-                std::cout << _prefix;
-            } else if( code == KEY_BACKSPACE ) {
-                _backspace( line, position );
-            } else if( code == KEY_DELETE ) {
-                _delete( line, position );
-            } else if( code == KEY_NONE && ch >= 32 && ch <= 126 ) {
-                _input( line, position, ch );
+
+            if( _mode == MODE_NORMAL ) {
+                if( code == KEY_KILL ) {
+                    std::cout << std::endl;
+                    break;
+                } else if( code == KEY_LEFT ) {
+                    _prev( line, position );
+                } else if( code == KEY_CTRL_LEFT ) {
+                    _prevWord( line, position );
+                } else if( code == KEY_RIGHT ) {
+                    _next( line, position );
+                } else if( code == KEY_CTRL_RIGHT ) {
+                    _nextWord( line, position );
+                } else if( code == KEY_DOWN ) {
+                } else if( code == KEY_UP ) {
+                } else if( code == KEY_ENTER ) {
+                    line = "";
+                    position = 0;
+                    std::cout << std::endl;
+                    std::cout << _prefix;
+                } else if( code == KEY_BACKSPACE ) {
+                    _backspace( line, position );
+                } else if( code == KEY_DELETE ) {
+                    _delete( line, position );
+                } else if( code == KEY_NONE && ch >= 32 && ch <= 126 ) {
+                    _input( line, position, ch );
+                }
+            } else if( _mode == MODE_PASSWORD ) {
+                if( code == KEY_KILL ) {
+                    std::cout << std::endl;
+                    break;
+                } else if( code == KEY_ENTER ) {
+                    _mode = MODE_NORMAL;
+                } else {
+                    line += (char)ch;
+                }
             }
         }
     }
