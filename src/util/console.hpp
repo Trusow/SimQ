@@ -15,6 +15,7 @@
 #include <stdarg.h>
 #include <sys/ioctl.h>
 #include <sstream>
+#include "console_callbacks.h"
 
 namespace simq::util {
     class Console {
@@ -26,6 +27,8 @@ namespace simq::util {
             };
 
             Mode _mode = MODE_NORMAL;
+
+            ConsoleCallbacks *_cb = nullptr;
 
             enum KeyCode {
                 KEY_PROGRESS,
@@ -84,10 +87,10 @@ namespace simq::util {
             KeyCode _getCode( int ch );
 
             unsigned int _getTerminalWidth();
-
+            void _getSplitString( const char *text, std::vector<std::string> &list, char separator );
 
         public:
-            Console();
+            Console( ConsoleCallbacks *cb );
             ~Console();
             void run();
 
@@ -105,7 +108,8 @@ namespace simq::util {
             void exit();
     };
 
-    Console::Console() {
+    Console::Console( ConsoleCallbacks *cb ) {
+        _cb = cb;
         _initCodes();
         _currentPrefix = _normalPrefix;
 
@@ -239,8 +243,12 @@ namespace simq::util {
             } else if( _mode == MODE_PASSWORD ) {
                 if( code == KEY_ENTER ) {
                     _currentPrefix = _normalPrefix;
-                    std::cout << std::endl << _currentPrefix;
                     _mode = MODE_NORMAL;
+
+                    _cb->inputPassword( line.c_str() );
+                    std::cout << std::endl << _currentPrefix;
+                    line = "";
+                    position = 0;
                 } else {
                     line += (char)ch;
                 }
@@ -250,11 +258,13 @@ namespace simq::util {
                         _mode = MODE_NORMAL;
                         _currentPrefix = _normalPrefix;
                         std::cout << std::endl << _currentPrefix;
+                        _cb->prompt( true );
                         break;
                     case 'N': case 'n':
                         _mode = MODE_NORMAL;
                         _currentPrefix = _normalPrefix;
                         std::cout << std::endl << _currentPrefix;
+                        _cb->prompt( false );
                         break;
                 }
             }
@@ -509,10 +519,11 @@ namespace simq::util {
     void Console::printText( const char *text ) {
         // XXX No UTF-8!!!
 
-        std::stringstream stream( text );
-        std::string str;
+        std::vector<std::string> list;
+        _getSplitString( text, list, '\n' );
 
-        while( std::getline( stream, str, '\n' ) ) {
+        for( unsigned int i = 0; i < list.size(); i++ ) {
+            std::string str = list[i];
 
             auto l = str.length();
             auto width = _getTerminalWidth() - strlen( _margin ) * 2;
@@ -595,6 +606,15 @@ namespace simq::util {
 
     void Console::exit() {
         _isExit = true;
+    }
+
+    void Console::_getSplitString( const char *text, std::vector<std::string> &list, char separator ) {
+        std::stringstream stream( text );
+        std::string line;
+
+        while( std::getline( stream, line, separator ) ) {
+            list.push_back( line );
+        }
     }
 }
 
