@@ -167,51 +167,26 @@ namespace simq::util {
     }
 
     void Console::_input( std::string &line, unsigned int &position, char ch ) {
-        if( position == line.length() ) {
-            line += ch;
-            position++;
-            std::cout << ch;
-        } else if( position == 0 ) {
+        auto l = line.length();
+        unsigned int origPosition = position;
+        char *str = new char[l+2]{};
+        str[position] = ch;
+        memcpy( &str[0], line.c_str(), position );
+        memcpy( &str[position+1], &line.c_str()[position], l-position );
 
-            auto l = line.length();
-            char *str = new char[l+2]{};
-            str[0] = ch;
-            memcpy( &str[1], line.c_str(), l );
+        std::string dline = str;
+        delete[] str;
 
-            std::string dline = str;
-            delete[] str;
+        _clear( line, position );
+        line = dline;
+        std::cout << line;
+        position = line.length();
 
-            _clear( line, position );
-            line = dline;
-            std::cout << dline;
-            position = line.length();
-
-            for( int i = 0; i < line.length() -1; i++ ) {
-                _prev( line, position );
+        for( int i = line.length() - 1; i >= 0; i-- ) {
+            if( i == origPosition ) {
+                break;
             }
-
-        } else {
-            auto l = line.length();
-            unsigned int origPosition = position;
-            char *str = new char[l+2]{};
-            str[position] = ch;
-            memcpy( &str[0], line.c_str(), position );
-            memcpy( &str[position+1], &line.c_str()[position], l-position );
-
-            std::string dline = str;
-            delete[] str;
-
-            _clear( line, position );
-            line = dline;
-            std::cout << line;
-            position = line.length();
-
-            for( int i = line.length() - 1; i >= 0; i-- ) {
-                if( i == origPosition ) {
-                    break;
-                }
-                _prev( line, position );
-            }
+            _prev( line, position );
         }
     }
 
