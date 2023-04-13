@@ -77,8 +77,6 @@ namespace simq::util {
             void _backspace( std::string &line, unsigned int &position );
             void _delete( std::string &line, unsigned int &position );
 
-            bool _isAllowedChar( char ch );
-
             void _bindCode( KeyCode code, int c, ... );
             void _initCodes();
             KeyCode _getCode( int ch );
@@ -160,15 +158,6 @@ namespace simq::util {
 
     void Console::_startHistory() {
         _navigationHistory = _history.size();
-    }
-
-    bool Console::_isAllowedChar( char ch ) {
-        bool isNum = ch >= '0' && ch <= '9';
-        bool isLetterD = ch >= 'a' && ch <= 'z';
-        bool isLetterU = ch >= 'A' && ch <= 'Z';
-        bool isOther = ch == ' ' || ch == '.' || ch == '/';
- 
-        return isNum || isLetterD || isLetterU || isOther;
     }
 
     void Console::run() {
