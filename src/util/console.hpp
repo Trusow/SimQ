@@ -239,6 +239,8 @@ namespace simq::util {
                 }
             } else if( _mode == MODE_PASSWORD ) {
                 if( code == KEY_ENTER ) {
+                    _currentPrefix = _normalPrefix;
+                    std::cout << std::endl << _currentPrefix;
                     _mode = MODE_NORMAL;
                 } else {
                     line += (char)ch;
@@ -490,7 +492,7 @@ namespace simq::util {
 
     void Console::getPassword( const char *prefix ) {
         _currentPrefix = prefix;
-        _mode = MODE_CONFIRM;
+        _mode = MODE_PASSWORD;
     }
 
     void Console::setPrefix( const char *prefix ) {
