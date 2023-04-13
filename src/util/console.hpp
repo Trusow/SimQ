@@ -10,19 +10,39 @@
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <vector>
+#include <list>
+#include <stdarg.h>
 
 namespace simq::util {
     class Console {
         private:
-            enum Codes {
-                KEY_SIGNAL = 3,
-                KEY_UP = 65,
-                KEY_DOWN = 66,
-                KEY_RIGHT = 67,
-                KEY_LEFT = 68,
-                KEY_ENTER = 10,
-                KEY_BACKSPACE = 127,
+            enum KeyCode {
+                KEY_PROGRESS,
+                KEY_NONE,
+             
+                KEY_KILL,
+                KEY_LEFT,
+                KEY_RIGHT,
+                KEY_UP,
+                KEY_DOWN,
+                KEY_CTRL_LEFT,
+                KEY_CTRL_RIGHT,
+                KEY_CTRL_UP,
+                KEY_CTRL_DOWN,
+                KEY_BACKSPACE,
+                KEY_DELETE,
+                KEY_ENTER,
+                KEY_F,
             };
+ 
+            struct Code {
+                std::vector<unsigned int> sequense;
+                unsigned int step;
+                KeyCode code;
+            };
+ 
+            std::list<Code> _codes;
 
             const char *_prefix = "test> ";
 
@@ -35,6 +55,10 @@ namespace simq::util {
 
             bool _isAllowedChar( char ch );
 
+            void _bindCode( KeyCode code, int c, ... );
+            void _initCodes();
+            KeyCode _getCode( int ch );
+
 
         public:
             Console();
@@ -43,6 +67,8 @@ namespace simq::util {
     };
 
     Console::Console() {
+        _initCodes();
+
         struct termios oldt, newt;
         int oldf;
          
@@ -76,7 +102,6 @@ namespace simq::util {
 
     void Console::run() {
         int ch;
-        unsigned int navigation = 0;
 
         std::string line = "";
         unsigned int position = 0;
@@ -90,39 +115,27 @@ namespace simq::util {
 
             if( ch == -1 ) {
                 std::this_thread::sleep_for(ts);
-            } else if( ch == KEY_SIGNAL ) {
+                continue;
+            }
+
+            auto code = _getCode( ch );
+            if( code == KEY_KILL ) {
                 std::cout << std::endl;
                 break;
-            } else if( ch == 27 ) {
-                if( navigation == 0 ) {
-                    navigation++;
-                } else {
-                    navigation = 0;
-                }
-            } else if( ch == 91 ) {
-                if( navigation == 1 ) {
-                    navigation++;
-                } else {
-                    navigation = 0;
-                }
-            } else if( ch == KEY_UP && navigation == 2 ) {
-                navigation = 0;
-            } else if( ch == KEY_DOWN && navigation == 2 ) {
-                navigation = 0;
-            } else if( ch == KEY_RIGHT && navigation == 2 ) {
-                navigation = 0;
-                _next( line, position );
-            } else if( ch == KEY_LEFT && navigation == 2 ) {
-                navigation = 0;
+            } else if( code == KEY_LEFT ) {
                 _prev( line, position );
-            } else if( ch == KEY_ENTER ) {
+            } else if( code == KEY_RIGHT ) {
+                _next( line, position );
+            } else if( code == KEY_DOWN ) {
+            } else if( code == KEY_UP ) {
+            } else if( code == KEY_ENTER ) {
                 line = "";
                 position = 0;
                 std::cout << std::endl;
                 std::cout << _prefix;
-            } else if( ch == KEY_BACKSPACE ) {
-                _remove( line, position );
-            } else if( _isAllowedChar( ch ) ) {
+            } else if( code == KEY_BACKSPACE ) {
+            } else if( code == KEY_DELETE ) {
+            } else if( code == KEY_NONE && ch >= 32 && ch <= 126 ) {
                 _input( line, position, ch );
             }
         }
@@ -203,6 +216,72 @@ namespace simq::util {
         std::cout << _prefix;
         line = "";
         position = 0;
+    }
+
+    void Console::_bindCode( KeyCode code, int c, ... ) {
+        Code _code{};
+        _code.code = code;
+        _code.sequense.push_back( c );
+        va_list args;
+        va_start( args, c );
+ 
+        while( c-- ) {
+            auto co = va_arg( args, int );
+            if( co == 0 ) {
+                break;
+            }
+            _code.sequense.push_back( co );
+        }
+ 
+        _codes.push_back( _code );
+    }
+
+    void Console::_initCodes() {
+        _bindCode( KEY_KILL, 3, 0 );
+
+        _bindCode( KEY_LEFT, 27, 91, 68, 0 );
+        _bindCode( KEY_RIGHT, 27, 91, 67, 0 );
+        _bindCode( KEY_UP, 27, 91, 65, 0 );
+        _bindCode( KEY_DOWN, 27, 91, 66, 0 );
+        _bindCode( KEY_CTRL_LEFT, 27, 91, 49, 59, 53, 68, 0 );
+        _bindCode( KEY_CTRL_RIGHT, 27, 91, 49, 59, 53, 67, 0 );
+        _bindCode( KEY_CTRL_UP, 27, 91, 49, 59, 53, 65, 0 );
+        _bindCode( KEY_CTRL_DOWN, 27, 91, 49, 59, 53, 66, 0 );
+        _bindCode( KEY_BACKSPACE, 127, 0 );
+        _bindCode( KEY_ENTER, 10, 0 );
+        _bindCode( KEY_DELETE, 27, 91, 51, 126, 0 );
+
+        _bindCode( KEY_F, 27, 79, 80, 0 );
+        _bindCode( KEY_F, 27, 79, 81, 0 );
+        _bindCode( KEY_F, 27, 79, 82, 0 );
+        _bindCode( KEY_F, 27, 79, 83, 0 );
+        _bindCode( KEY_F, 27, 91, 49, 53, 126, 0 );
+        _bindCode( KEY_F, 27, 91, 49, 55, 126, 0 );
+        _bindCode( KEY_F, 27, 91, 49, 56, 126, 0 );
+    }
+
+    Console::KeyCode Console::_getCode( int ch ) {
+        KeyCode code = KEY_NONE;
+        for( auto it = _codes.begin(); it != _codes.end(); it++ ) {
+            if( (*it).sequense[(*it).step] == ch ) {
+                (*it).step++;
+                code = KEY_PROGRESS;
+                if( (*it).step == (*it).sequense.size() ) {
+                    code = (*it).code;
+                    break;
+                }
+            } else {
+                (*it).step = 0;
+            }
+        }
+     
+        if( code != KEY_NONE && code != KEY_PROGRESS ) {
+            for( auto it = _codes.begin(); it != _codes.end(); it++ ) {
+                (*it).step = 0;
+            }
+        }
+     
+        return code;
     }
 }
 
