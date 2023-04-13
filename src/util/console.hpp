@@ -48,6 +48,14 @@ namespace simq::util {
                 unsigned int step;
                 KeyCode code;
             };
+
+            std::vector<std::string> _history;
+            unsigned int _navigationHistory = 0;
+
+            void _pushHistory( std::string &line );
+            void _nextHistory( std::string &line );
+            void _prevHistory( std::string &line );
+            void _startHistory();
  
             std::list<Code> _codes;
 
@@ -101,6 +109,39 @@ namespace simq::util {
         fcntl( STDIN_FILENO, F_SETFL, oldf & ~O_NONBLOCK );
     }
 
+    void Console::_pushHistory( std::string &line ) {
+        if( !_history.empty() && _history[_history.size()-1] == line ) {
+            return;
+        }
+
+        _history.push_back( line );
+        _navigationHistory++;
+    }
+
+    void Console::_nextHistory( std::string &line ) {
+        if( _navigationHistory == _history.size() ) {
+            return;
+        }
+
+        line = _history[_navigationHistory];
+
+        _navigationHistory++;
+    }
+
+    void Console::_prevHistory( std::string &line ) {
+        if( _history.empty() || _navigationHistory == 0 ) {
+            return;
+        }
+
+        line = _history[_navigationHistory-1];
+
+        _navigationHistory--;
+    }
+
+    void Console::_startHistory() {
+        _navigationHistory = _history.size();
+    }
+
     bool Console::_isAllowedChar( char ch ) {
         bool isNum = ch >= '0' && ch <= '9';
         bool isLetterD = ch >= 'a' && ch <= 'z';
@@ -143,8 +184,20 @@ namespace simq::util {
                 } else if( code == KEY_CTRL_RIGHT ) {
                     _nextWord( line, position );
                 } else if( code == KEY_DOWN ) {
+                    _clear( line, position );
+                    _nextHistory( line );
+                    position = line.length();
+                    std::cout << line;
                 } else if( code == KEY_UP ) {
+                    _clear( line, position );
+                    _prevHistory( line );
+                    position = line.length();
+                    std::cout << line;
                 } else if( code == KEY_ENTER ) {
+                    _startHistory();
+                    if( line != "" ) {
+                        _pushHistory( line );
+                    }
                     line = "";
                     position = 0;
                     std::cout << std::endl;
