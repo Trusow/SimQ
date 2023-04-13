@@ -87,7 +87,12 @@ namespace simq::util {
             KeyCode _getCode( int ch );
 
             unsigned int _getTerminalWidth();
-            void _getSplitString( const char *text, std::vector<std::string> &list, char separator );
+            void _getSplitString(
+                const char *text,
+                std::vector<std::string> &list,
+                char separator,
+                bool skipEmpty = false
+            );
 
         public:
             Console( ConsoleCallbacks *cb );
@@ -229,10 +234,18 @@ namespace simq::util {
                     if( line != "" ) {
                         _pushHistory( line );
                     }
+
+                    std::vector<std::string> list;
+                    _getSplitString( line.c_str(), list, ' ', true );
+
                     line = "";
                     position = 0;
                     std::cout << std::endl;
                     std::cout << _currentPrefix;
+
+                    if( !list.empty() ) {
+                        _cb->input( list );
+                    }
                 } else if( code == KEY_BACKSPACE ) {
                     _backspace( line, position );
                 } else if( code == KEY_DELETE ) {
@@ -608,12 +621,19 @@ namespace simq::util {
         _isExit = true;
     }
 
-    void Console::_getSplitString( const char *text, std::vector<std::string> &list, char separator ) {
+    void Console::_getSplitString(
+        const char *text,
+        std::vector<std::string> &list,
+        char separator,
+        bool skipEmpty
+    ) {
         std::stringstream stream( text );
         std::string line;
 
         while( std::getline( stream, line, separator ) ) {
-            list.push_back( line );
+            if( skipEmpty && !line.empty() || !skipEmpty ) {
+                list.push_back( line );
+            }
         }
     }
 }
