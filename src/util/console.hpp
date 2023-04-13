@@ -20,6 +20,7 @@ namespace simq::util {
             enum Mode {
                 MODE_NORMAL,
                 MODE_PASSWORD,
+                MODE_CONFIRM,
             };
 
             Mode _mode = MODE_NORMAL;
@@ -171,11 +172,13 @@ namespace simq::util {
 
             auto code = _getCode( ch );
 
+            if( code == KEY_KILL ) {
+                std::cout << std::endl;
+                break;
+            }
+
             if( _mode == MODE_NORMAL ) {
-                if( code == KEY_KILL ) {
-                    std::cout << std::endl;
-                    break;
-                } else if( code == KEY_LEFT ) {
+                if( code == KEY_LEFT ) {
                     _prev( line, position );
                 } else if( code == KEY_CTRL_LEFT ) {
                     _prevWord( line, position );
@@ -210,13 +213,19 @@ namespace simq::util {
                     _input( line, position, ch );
                 }
             } else if( _mode == MODE_PASSWORD ) {
-                if( code == KEY_KILL ) {
-                    std::cout << std::endl;
-                    break;
-                } else if( code == KEY_ENTER ) {
+                if( code == KEY_ENTER ) {
                     _mode = MODE_NORMAL;
                 } else {
                     line += (char)ch;
+                }
+            } else if( _mode == MODE_CONFIRM ) {
+                switch( ch ) {
+                    case 'Y': case 'y':
+                        _mode = MODE_NORMAL;
+                        break;
+                    case 'N': case 'n':
+                        _mode = MODE_NORMAL;
+                        break;
                 }
             }
         }
