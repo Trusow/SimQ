@@ -60,7 +60,10 @@ namespace simq::util {
  
             std::list<Code> _codes;
 
-            const char *_prefix = "test> ";
+            std::string _normalPrefix;
+            std::string _confirmPrefix;
+            std::string _passwordPrefix;
+            std::string _currentPrefix = "test> ";
 
             void _prev( std::string &line, unsigned int &position );
             void _prevWord( std::string &line, unsigned int &position );
@@ -83,6 +86,9 @@ namespace simq::util {
             Console();
             ~Console();
             void run();
+            void setConfirm( const char *str );
+            void setPassword( const char *str );
+            void setPrefix( const char *str );
     };
 
     Console::Console() {
@@ -160,7 +166,7 @@ namespace simq::util {
 
         std::chrono::milliseconds ts(50);
 
-        std::cout << _prefix;
+        std::cout << _currentPrefix;
 
         while( true ) {
             ch = getchar();
@@ -204,7 +210,7 @@ namespace simq::util {
                     line = "";
                     position = 0;
                     std::cout << std::endl;
-                    std::cout << _prefix;
+                    std::cout << _currentPrefix;
                 } else if( code == KEY_BACKSPACE ) {
                     _backspace( line, position );
                 } else if( code == KEY_DELETE ) {
@@ -374,7 +380,7 @@ namespace simq::util {
 
     void Console::_clear( std::string &line, unsigned int &position ) {
         std::cout << "\33[2K\r";
-        std::cout << _prefix;
+        std::cout << _currentPrefix;
         line = "";
         position = 0;
     }
@@ -443,6 +449,21 @@ namespace simq::util {
         }
      
         return code;
+    }
+
+    void Console::setConfirm( const char *str ) {
+        _confirmPrefix = str;
+        _mode = MODE_CONFIRM;
+    }
+
+    void Console::setPassword( const char *str ) {
+        _passwordPrefix = str;
+        _mode = MODE_CONFIRM;
+    }
+
+    void Console::setPrefix( const char *str ) {
+        _normalPrefix = str;
+        _mode = MODE_NORMAL;
     }
 }
 
