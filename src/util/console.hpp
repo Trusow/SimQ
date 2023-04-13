@@ -14,6 +14,7 @@
 #include <list>
 #include <stdarg.h>
 #include <sys/ioctl.h>
+#include <sstream>
 
 namespace simq::util {
     class Console {
@@ -494,15 +495,51 @@ namespace simq::util {
     }
 
     void Console::printText( const char *text ) {
+        // XXX No UTF-8!!!
+
+        std::stringstream stream( text );
+        std::string str;
+
+        while( std::getline( stream, str, '\n' ) ) {
+
+            auto l = str.length();
+            auto width = _getTerminalWidth() - 8;
+            unsigned int count = l / width;
+
+            if( l - count * width != 0 ) {
+                count++;
+            }
+
+            std::cout << std::endl;
+            unsigned int offset = 0;
+
+            for( unsigned int i = 0; i < count; i++ ) {
+                std::cout << "    ";
+                std::cout << str.substr( offset, width );
+                offset += width;
+                std::cout << "    " << std::endl;
+            }
+        }
+
+        std::cout << std::endl;
     }
 
     void Console::printSuccess( const char *text ) {
+        std::cout << "\x1b[32m";
+        printText( text );
+        std::cout << "\x1b[0m";
     }
 
     void Console::printWarning( const char *text ) {
+        std::cout << "\x1b[33m";
+        printText( text );
+        std::cout << "\x1b[0m";
     }
 
     void Console::printDanger( const char *text ) {
+        std::cout << "\x1b[31m";
+        printText( text );
+        std::cout << "\x1b[0m";
     }
 
     void Console::printList( std::vector<std::string> &list ) {
