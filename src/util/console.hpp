@@ -87,9 +87,18 @@ namespace simq::util {
             Console();
             ~Console();
             void run();
+
             void confirm( const char *prefix );
             void getPassword( const char *prefix );
             void setPrefix( const char *prefix );
+
+            void printText( const char *text );
+            void printSuccess( const char *text );
+            void printWarning( const char *text );
+            void printDanger( const char *text );
+
+            void printList( std::vector<std::string> &list );
+            void printListBySearch( std::vector<std::string> &list, const char *text );
     };
 
     Console::Console() {
@@ -482,6 +491,24 @@ namespace simq::util {
         winsize w;
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
         return w.ws_col;
+    }
+
+    void Console::printText( const char *text ) {
+    }
+
+    void Console::printSuccess( const char *text ) {
+    }
+
+    void Console::printWarning( const char *text ) {
+    }
+
+    void Console::printDanger( const char *text ) {
+    }
+
+    void Console::printList( std::vector<std::string> &list ) {
+    }
+
+    void Console::printListBySearch( std::vector<std::string> &list, const char *text ) {
     }
 }
 
