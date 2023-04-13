@@ -98,8 +98,7 @@ namespace simq::util {
             void printWarning( const char *text );
             void printDanger( const char *text );
 
-            void printList( std::vector<std::string> &list );
-            void printListBySearch( std::vector<std::string> &list, const char *text );
+            void printList( std::vector<std::string> &list, const char *text = nullptr );
     };
 
     Console::Console() {
@@ -555,10 +554,43 @@ namespace simq::util {
         std::cout << "\x1b[0m";
     }
 
-    void Console::printList( std::vector<std::string> &list ) {
-    }
+    void Console::printList( std::vector<std::string> &list, const char *text ) {
+        std::cout << std::endl;
 
-    void Console::printListBySearch( std::vector<std::string> &list, const char *text ) {
+        if( text == nullptr ) {
+            for( unsigned int i = 0; i < list.size(); i++ ) {
+                std::cout << "    " << list[i] << std::endl;
+            }
+        } else {
+            for( unsigned int i = 0; i < list.size(); i++ ) {
+                auto offset = list[i].find( text );
+                if( offset == std::string::npos ) {
+                    continue;
+                }
+
+                auto l = strlen( text );
+                unsigned int count = 0;
+                bool isSearch = false;
+                std::cout << "    ";
+                for( unsigned int c = 0; c < list[i].length(); c++ ) {
+                    if( c == offset ) {
+                        isSearch = true;
+                        std::cout << "\x1b[33m";
+                    }
+                    if( isSearch ) {
+                        count++;
+                    }
+                    std::cout << list[i][c];
+                    if( l == count ) {
+                        isSearch = false;
+                        std::cout << "\x1b[0m";
+                    }
+                }
+                std::cout << std::endl;
+            }
+        }
+
+        std::cout << std::endl;
     }
 }
 
