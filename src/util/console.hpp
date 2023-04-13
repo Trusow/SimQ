@@ -62,8 +62,6 @@ namespace simq::util {
             std::list<Code> _codes;
 
             std::string _normalPrefix;
-            std::string _confirmPrefix;
-            std::string _passwordPrefix;
             std::string _currentPrefix = "test> ";
 
             void _prevChar( std::string &line, unsigned int &position );
@@ -89,9 +87,9 @@ namespace simq::util {
             Console();
             ~Console();
             void run();
-            void confirm( const char *str );
-            void password( const char *str );
-            void setPrefix( const char *str );
+            void confirm( const char *prefix );
+            void getPassword( const char *prefix );
+            void setPrefix( const char *prefix );
     };
 
     Console::Console() {
@@ -464,18 +462,19 @@ namespace simq::util {
         return code;
     }
 
-    void Console::confirm( const char *str ) {
-        _confirmPrefix = str;
+    void Console::confirm( const char *prefix ) {
+        _currentPrefix = prefix;
         _mode = MODE_CONFIRM;
     }
 
-    void Console::password( const char *str ) {
-        _passwordPrefix = str;
+    void Console::getPassword( const char *prefix ) {
+        _currentPrefix = prefix;
         _mode = MODE_CONFIRM;
     }
 
-    void Console::setPrefix( const char *str ) {
-        _normalPrefix = str;
+    void Console::setPrefix( const char *prefix ) {
+        _normalPrefix = prefix;
+        _currentPrefix = prefix;
         _mode = MODE_NORMAL;
     }
 
