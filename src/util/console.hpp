@@ -63,7 +63,7 @@ namespace simq::util {
             void _pushHistory( std::string &line );
             void _nextHistory( std::string &line );
             void _prevHistory( std::string &line );
-            void _startHistory();
+            void _toBeginHistory();
 
             bool _isExit = false;
  
@@ -175,7 +175,7 @@ namespace simq::util {
         _navigationHistory--;
     }
 
-    void Console::_startHistory() {
+    void Console::_toBeginHistory() {
         _navigationHistory = _history.size();
     }
 
@@ -206,7 +206,7 @@ namespace simq::util {
         } else if( code == KEY_CTRL_UP ) {
             std::cout << _getTerminalWidth() << std::endl;
         } else if( code == KEY_ENTER ) {
-            _startHistory();
+            _toBeginHistory();
             if( line != "" ) {
                 _pushHistory( line );
             }
