@@ -68,6 +68,8 @@ namespace simq::core::server {
             void _freeNavigation( Navigation *nav );
             void _applyNavigation( Navigation *target, Navigation *src );
 
+            void _printHelp( std::vector<std::string> &allowedCommands );
+
         public:
             CLI( CLICallbacks *cb );
             ~CLI();
@@ -165,9 +167,6 @@ namespace simq::core::server {
         switch( _nav->ctx ) {
             case CTX_ROOT:
                 list.push_back( _cmdLs );
-                list.push_back( _cmdInfo );
-                list.push_back( _cmdSet );
-                list.push_back( _cmdPswd );
                 break;
             case CTX_GROUPS:
                 list.push_back( _cmdLs );
@@ -177,6 +176,7 @@ namespace simq::core::server {
             case CTX_GROUP:
                 list.push_back( _cmdLs );
                 list.push_back( _cmdAdd );
+                list.push_back( _cmdRemove );
                 list.push_back( _cmdPswd );
                 break;
             case CTX_CHANNEL:
@@ -358,6 +358,103 @@ namespace simq::core::server {
         }
 
         return localNav;
+    }
+
+    void CLI::_printHelp( std::vector<std::string> &allowedCommands ) {
+        std::vector<std::string> help;
+
+        for( unsigned int i = 0; i < allowedCommands.size(); i++ ) {
+            std::string cmd = allowedCommands[i];
+            if( cmd == _cmdH ) {
+                continue;
+            }
+
+            std::string str = cmd;
+
+            if( cmd == _cmdAdd ) {
+                switch( _nav->ctx ) {
+                    case CTX_GROUPS:
+                        str += " - create group, example '";
+                        str += cmd + " groupTest'";
+                        break;
+                    case CTX_GROUP:
+                        str += " - create channel, example '";
+                        str += cmd + " channelTest'";
+                        break;
+                    case CTX_CONSUMERS:
+                        str += " - create consumer, example '";
+                        str += cmd + " consumerTest'";
+                        break;
+                    case CTX_PRODUCERS:
+                        str += " - create producer, example '";
+                        str += cmd + " producerTest'";
+                        break;
+                }
+            } else if( cmd == _cmdRemove ) {
+                switch( _nav->ctx ) {
+                    case CTX_GROUPS:
+                        str += " - remove group, example '";
+                        str += cmd + " groupTest'";
+                        break;
+                    case CTX_GROUP:
+                        str += " - remove channel, example '";
+                        str += cmd + " channelTest'";
+                        break;
+                    case CTX_CONSUMERS:
+                        str += " - remove consumer, example '";
+                        str += cmd + " consumerTest'";
+                        break;
+                    case CTX_PRODUCERS:
+                        str += " - remove producer, example '";
+                        str += cmd + " producerTest'";
+                        break;
+                }
+            } else if( cmd == _cmdPswd ) {
+                switch( _nav->ctx ) {
+                    case CTX_GROUP:
+                        str += " - update password of group";
+                        break;
+                    case CTX_CONSUMER:
+                        str += " - update password of consumer";
+                        break;
+                    case CTX_PRODUCER:
+                        str += " - update password of producer";
+                        break;
+                    case CTX_SETTINGS:
+                        str += " - update password of server";
+                        break;
+                }
+            } else if( cmd == _cmdInfo ) {
+                switch( _nav->ctx ) {
+                    case CTX_SETTINGS:
+                        str += " - show settings of server";
+                        break;
+                    case CTX_CHANNEL:
+                        str += " - show settings of channel";
+                        break;
+                }
+            } else if( cmd == _cmdSet ) {
+                switch( _nav->ctx ) {
+                    case CTX_SETTINGS:
+                        str += " - save settings of server, example '";
+                        str += cmd + " nameField valueField'";
+                        break;
+                    case CTX_CHANNEL:
+                        str += " - save settings of server, example '";
+                        str += cmd + " nameField valueField'";
+                        break;
+                }
+            } else if( cmd == _cmdLs ) {
+                str += " - show available paths, is set filter example '";
+                str += cmd + " query'";
+            } else if( cmd == _cmdCd ) {
+                str += " - go to path";
+            }
+
+            help.push_back( str );
+        }
+        
+        _console->printList( help );
     }
 
     void CLI::input( std::vector<std::string> &list ) {
