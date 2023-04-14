@@ -88,6 +88,7 @@ namespace simq::core::server {
             void _rm( std::vector<std::string> &list );
             void _cd( std::vector<std::string> &list );
             void _ls( std::vector<std::string> &list );
+            void _add( std::vector<std::string> &list );
 
             void _printConsolePrefix( bool isNewLine = false );
 
@@ -559,6 +560,14 @@ namespace simq::core::server {
         _removeConfirm( list[1].c_str() );
     }
 
+    void CLI::_add( std::vector<std::string> &list ) {
+        if( list.size() != 2 ) {
+            _console->printDanger( "Wrong params" );
+            _console->printPrefix();
+            return;
+        }
+    }
+
     void CLI::_ls( std::vector<std::string> &list ) {
         try {
             std::vector<std::string> lsList;
@@ -595,6 +604,8 @@ namespace simq::core::server {
             _printHelp( allowedCommands );
         } else if( cmd == _cmdRemove ) {
             _rm( list );
+        } else if( cmd == _cmdAdd ) {
+            _add( list );
         }
     }
 
