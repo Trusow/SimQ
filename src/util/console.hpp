@@ -116,7 +116,7 @@ namespace simq::util {
 
             void printList( std::vector<std::string> &list, const char *text = nullptr );
 
-            void printPrefix();
+            void printPrefix( bool newLine = false );
 
             void exit();
     };
@@ -604,6 +604,7 @@ namespace simq::util {
 
     void Console::printList( std::vector<std::string> &list, const char *text ) {
         std::cout << std::endl;
+        std::cout << std::endl;
 
         if( text == nullptr ) {
             for( unsigned int i = 0; i < list.size(); i++ ) {
@@ -661,7 +662,11 @@ namespace simq::util {
         }
     }
 
-    void Console::printPrefix() {
+    void Console::printPrefix( bool newLine ) {
+        if( newLine ) {
+            std::cout << std::endl;
+        }
+
         std::cout << _currentPrefix;
     }
 }
