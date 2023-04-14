@@ -369,8 +369,8 @@ namespace simq::core::server {
         auto it = std::find( allowedCommands.begin(), allowedCommands.end(), cmd );
 
         if( it == allowedCommands.end() ) {
-           _console->printDanger( "\nUnknown command" );
-           _console->printPrefix();
+            _console->printDanger( "\nUnknown command" );
+            _console->printPrefix();
         } else if( cmd == _cmdLs ) {
             std::vector<std::string> lsList;
             _getLS( _nav, lsList );
@@ -382,26 +382,25 @@ namespace simq::core::server {
             }
 
             _console->printPrefix();
-       } else if( cmd == _cmdCd && list.size() > 1 ) {
-           try {
-               auto nav = _buildNavigation( list[1].c_str() );
-               _applyNavigation( _nav, nav );
+        } else if( cmd == _cmdCd && list.size() > 1 ) {
+            try {
+                auto nav = _buildNavigation( list[1].c_str() );
+                _applyNavigation( _nav, nav );
 
-               std::string path = "simq: /";
-               _getCtxPath( path, _nav->ctx );
-               path += "> ";
+                std::string path = "simq: /";
+                _getCtxPath( path, _nav->ctx );
+                path += "> ";
 
-               _console->setPrefix( path.c_str() );
-               _console->printPrefix( true );
-           } catch( ... ) {
-               _console->printDanger( "\nNot found path" );
-               _console->printPrefix();
-           }
-       } else if( cmd == _cmdH ) {
-            _console->printList( allowedCommands );
+                _console->setPrefix( path.c_str() );
+                _console->printPrefix( true );
+            } catch( ... ) {
+                _console->printDanger( "\nNot found path" );
+                _console->printPrefix();
+            }
+        } else if( cmd == _cmdH ) {
+            _printHelp( allowedCommands );
             _console->printPrefix();
-       }
-
+        }
     }
 
     void CLI::inputPassword( const char *password ) {
