@@ -116,6 +116,8 @@ namespace simq::util {
 
             void printList( std::vector<std::string> &list, const char *text = nullptr );
 
+            void printPrefix();
+
             void exit();
     };
 
@@ -659,6 +661,10 @@ namespace simq::util {
                 list.push_back( line );
             }
         }
+    }
+
+    void Console::printPrefix() {
+        std::cout << _currentPrefix;
     }
 }
 
