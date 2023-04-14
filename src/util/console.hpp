@@ -267,13 +267,6 @@ namespace simq::util {
 
         std::chrono::milliseconds ts(50);
 
-        if( _mode == MODE_CONFIRM ) {
-            std::cout << "\x1b[36m";
-        }
-
-        std::cout << _currentPrefix;
-        std::cout << "\x1b[0m";
-
         while( true ) {
             if( _isExit ) {
                 std::cout << std::endl;
@@ -540,6 +533,7 @@ namespace simq::util {
     void Console::getPassword( const char *prefix ) {
         _currentPrefix = prefix;
         _mode = MODE_PASSWORD;
+        std::cout << std::endl << _currentPrefix;
     }
 
     void Console::setPrefix( const char *prefix ) {
