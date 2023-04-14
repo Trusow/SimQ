@@ -218,11 +218,12 @@ namespace simq::util {
 
             line = "";
             position = 0;
-            std::cout << std::endl;
-            std::cout << _currentPrefix;
 
             if( !list.empty() ) {
                 _cb->input( list );
+            } else {
+                std::cout << std::endl;
+                std::cout << _currentPrefix;
             }
         } else if( code == KEY_BACKSPACE ) {
             _backspace( line, position );
@@ -238,7 +239,6 @@ namespace simq::util {
             _revertToNormalMode();
 
             _cb->inputPassword( line.c_str() );
-            std::cout << std::endl << _currentPrefix;
             line = "";
             position = 0;
         } else {
@@ -250,12 +250,10 @@ namespace simq::util {
         switch( ch ) {
             case 'Y': case 'y':
                 _revertToNormalMode();
-                std::cout << std::endl << _currentPrefix;
                 _cb->prompt( true );
                 break;
             case 'N': case 'n':
                 _revertToNormalMode();
-                std::cout << std::endl << _currentPrefix;
                 _cb->prompt( false );
                 break;
         }
