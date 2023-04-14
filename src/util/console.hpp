@@ -559,6 +559,8 @@ namespace simq::util {
         std::vector<std::string> list;
         _getSplitString( text, list, '\n' );
 
+        std::cout << std::endl;
+
         for( unsigned int i = 0; i < list.size(); i++ ) {
             std::string str = list[i];
 
