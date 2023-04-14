@@ -28,6 +28,17 @@ namespace simq::core::server {
                 CONFIRM_REMOVE_PRODUCER,
             };
 
+            enum AddStep {
+                ADD_NONE,
+                ADD_GROUP_INPUT_PASSWORD,
+                ADD_GROUP_CONFIRM_PASSWORD,
+            };
+
+            AddStep _addStep = ADD_NONE;
+            std::string _addName = "";
+            std::string _password = "";
+            std::string _confirmPassword = "";
+
             enum CtxNavigation {
                 CTX_ROOT,
 
@@ -652,6 +663,33 @@ namespace simq::core::server {
             _auth( password );
             return;
         }
+
+        switch( _addStep ) {
+            case ADD_GROUP_INPUT_PASSWORD:
+                if( password[0] == 0 ) {
+                    _console->getPassword( "Password: " );
+                } else {
+                    _password = password;
+                    _addStep = ADD_GROUP_CONFIRM_PASSWORD;
+                    _console->getPassword( "Confirm password: " );
+                }
+                break;
+            case ADD_GROUP_CONFIRM_PASSWORD:
+                _confirmPassword = password;
+                if( _password != _confirmPassword ) {
+                    _console->printDanger( "Wrong confirm password" );
+                } else {
+                    try {
+                        unsigned char hash[crypto::HASH_LENGTH];
+                        crypto::Hash::hash( _password.c_str(), hash );
+                        _cb->addGroup( _addName.c_str(), hash );
+                        _console->printWarning( _warningChanges );
+                    } catch( ... ) {
+                        _console->printDanger( "Wrong name" );
+                    }
+                }
+                _console->printPrefix();
+        }
     }
 
     void CLI::confirm( bool value ) {
@@ -684,6 +722,9 @@ namespace simq::core::server {
     }
 
     void CLI::_addGroup( const char *name ) {
+        _addName = name;
+        _addStep = ADD_GROUP_INPUT_PASSWORD;
+        _console->getPassword( "password: " );
     }
 
     void CLI::_addChannel( const char *name ) {
