@@ -49,6 +49,9 @@ namespace simq::core::server {
             const char *_pathProducers = "producers";
 
             const char *_warningChanges = "The changes will be applied by the server.";
+            const char *_errNotFoundPath = "Not found path.";
+
+            const char *_defPrefix = "simq";
 
             const char *_cmdLs = "ls";
             const char *_cmdH = "h";
@@ -72,6 +75,9 @@ namespace simq::core::server {
 
             void _printHelp( std::vector<std::string> &allowedCommands );
             void _remove( const char *name );
+            void _cd( std::vector<std::string> &list );
+
+            void _printConsolePrefix( bool isNewLine = false );
 
         public:
             CLI( CLICallbacks *cb );
@@ -476,6 +482,24 @@ namespace simq::core::server {
         }
         
         _console->printList( help );
+        _console->printPrefix();
+    }
+
+    void CLI::_cd( std::vector<std::string> &list ) {
+        if( list.size() != 2 ) {
+            _console->printDanger( "Wrong param" );
+            _console->printPrefix();
+            return;
+        }
+
+        try {
+            auto nav = _buildNavigation( list[1].c_str() );
+            _applyNavigation( _nav, nav );
+            _printConsolePrefix( true );
+        } catch( ... ) {
+            _console->printDanger( _errNotFoundPath );
+            _console->printPrefix();
+        }
     }
 
     void CLI::input( std::vector<std::string> &list ) {
@@ -490,34 +514,25 @@ namespace simq::core::server {
             _console->printDanger( "\nUnknown command" );
             _console->printPrefix();
         } else if( cmd == _cmdLs ) {
-            std::vector<std::string> lsList;
-            _getLS( _nav, lsList );
-
-            if( list.size() > 1 ) {
-                _console->printList( lsList, list[1].c_str() );
-            } else {
-                _console->printList( lsList );
-            }
-
-            _console->printPrefix();
-        } else if( cmd == _cmdCd && list.size() > 1 ) {
             try {
-                auto nav = _buildNavigation( list[1].c_str() );
-                _applyNavigation( _nav, nav );
+                std::vector<std::string> lsList;
+                _getLS( _nav, lsList );
 
-                std::string path = "simq: /";
-                _getCtxPath( path, _nav->ctx );
-                path += "> ";
-
-                _console->setPrefix( path.c_str() );
-                _console->printPrefix( true );
+                if( list.size() > 1 ) {
+                    _console->printList( lsList, list[1].c_str() );
+                } else {
+                    _console->printList( lsList );
+                }
             } catch( ... ) {
-                _console->printDanger( "Not found path" );
+                _console->printDanger( _errNotFoundPath );
                 _console->printPrefix();
             }
+
+            _console->printPrefix();
+        } else if( cmd == _cmdCd ) {
+            _cd( list );
         } else if( cmd == _cmdH ) {
             _printHelp( allowedCommands );
-            _console->printPrefix();
         } else if( cmd == _cmdRemove ) {
             if( list.size() != 2 ) {
                 _console->printDanger( "Wrong params" );
@@ -552,16 +567,22 @@ namespace simq::core::server {
             _console->exit();
         } else {
             _console->printSuccess( "Welcome to SimQ - a simple message queue.\nAuthor - Sergej Trusow, version - 1.0\nPress 'h' to help." );
-            std::string path = "simq: /";
-            _getCtxPath( path, _nav->ctx );
-            path += "> ";
-            _console->setPrefix( path.c_str() );
-            _console->printPrefix();
+            _printConsolePrefix();
         }
 
     }
 
     void CLI::prompt( bool value ) {
+    }
+
+    void CLI::_printConsolePrefix( bool isNewLine ) {
+        std::string path = _defPrefix;
+        path += ": /";
+        _getCtxPath( path, _nav->ctx );
+        path += "> ";
+
+        _console->setPrefix( path.c_str() );
+        _console->printPrefix( isNewLine );
     }
 }
 
