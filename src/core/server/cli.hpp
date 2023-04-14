@@ -93,7 +93,6 @@ namespace simq::core::server {
             void _printConsolePrefix( bool isNewLine = false );
 
             void _remove( const char *name );
-            void _removeConfirm( const char *name );
 
         public:
             CLI( CLICallbacks *cb );
@@ -385,30 +384,6 @@ namespace simq::core::server {
         return localNav;
     }
 
-    void CLI::_removeConfirm( const char *name ) {
-        _removeName = name;
-
-        switch( _nav->ctx ) {
-            case CTX_GROUPS:
-                _confirmType = CONFIRM_REMOVE_GROUP;
-                _console->confirm( "Removing a group" );
-                break;
-            case CTX_GROUP:
-                _confirmType = CONFIRM_REMOVE_CHANNEL;
-                _console->confirm( "Removing a channel" );
-                break;
-            case CTX_CONSUMERS:
-                _confirmType = CONFIRM_REMOVE_CONSUMER;
-                _console->confirm( "Removing a consumer" );
-                break;
-            case CTX_PRODUCERS:
-                _confirmType = CONFIRM_REMOVE_PRODUCER;
-                _console->confirm( "Removing a producer" );
-                break;
-        }
-
-    }
-
     void CLI::_remove( const char *name ) {
         try {
             switch( _nav->ctx ) {
@@ -557,7 +532,26 @@ namespace simq::core::server {
             return;
         }
 
-        _removeConfirm( list[1].c_str() );
+        _removeName = list[1];
+
+        switch( _nav->ctx ) {
+            case CTX_GROUPS:
+                _confirmType = CONFIRM_REMOVE_GROUP;
+                _console->confirm( "Removing a group" );
+                break;
+            case CTX_GROUP:
+                _confirmType = CONFIRM_REMOVE_CHANNEL;
+                _console->confirm( "Removing a channel" );
+                break;
+            case CTX_CONSUMERS:
+                _confirmType = CONFIRM_REMOVE_CONSUMER;
+                _console->confirm( "Removing a consumer" );
+                break;
+            case CTX_PRODUCERS:
+                _confirmType = CONFIRM_REMOVE_PRODUCER;
+                _console->confirm( "Removing a producer" );
+                break;
+        }
     }
 
     void CLI::_add( std::vector<std::string> &list ) {
