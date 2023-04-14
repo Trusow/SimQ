@@ -91,6 +91,10 @@ namespace simq::core::server {
             void _cd( std::vector<std::string> &list );
             void _ls( std::vector<std::string> &list );
             void _add( std::vector<std::string> &list );
+            void _addGroup( const char *name );
+            void _addChannel( const char *name );
+            void _addConsumer( const char *name );
+            void _addProducer( const char *name );
 
             void _printConsolePrefix( bool isNewLine = false );
 
@@ -563,6 +567,21 @@ namespace simq::core::server {
             _console->printPrefix();
             return;
         }
+
+        switch( _nav->ctx ) {
+            case CTX_GROUPS:
+                _addGroup( list[1].c_str() );
+                break;
+            case CTX_GROUP:
+                _addChannel( list[1].c_str() );
+                break;
+            case CTX_CONSUMERS:
+                _addConsumer( list[1].c_str() );
+                break;
+            case CTX_PRODUCERS:
+                _addProducer( list[1].c_str() );
+                break;
+        }
     }
 
     void CLI::_ls( std::vector<std::string> &list ) {
@@ -663,6 +682,19 @@ namespace simq::core::server {
         _console->setPrefix( path.c_str() );
         _console->printPrefix( isNewLine );
     }
+
+    void CLI::_addGroup( const char *name ) {
+    }
+
+    void CLI::_addChannel( const char *name ) {
+    }
+
+    void CLI::_addConsumer( const char *name ) {
+    }
+
+    void CLI::_addProducer( const char *name ) {
+    }
+
 }
 
 #endif
