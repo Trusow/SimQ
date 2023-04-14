@@ -376,7 +376,7 @@ namespace simq::core::server {
         auto change = new Change{};
         change->type = type;
 
-        if( password != nullptr ) {
+        if( password == nullptr ) {
             change->data = new char[groupLength+1+channelLength+1+loginLength+1]{};
 
             change->values[0] = groupLength;
