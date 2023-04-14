@@ -20,6 +20,14 @@ namespace simq::core::server {
             CLICallbacks *_cb = nullptr;
             util::Console *_console = nullptr;
 
+            enum ConfirmType {
+                CONFIRM_NONE,
+                CONFIRM_REMOVE_GROUP,
+                CONFIRM_REMOVE_CHANNEL,
+                CONFIRM_REMOVE_CONSUMER,
+                CONFIRM_REMOVE_PRODUCER,
+            };
+
             enum CtxNavigation {
                 CTX_ROOT,
 
@@ -42,6 +50,9 @@ namespace simq::core::server {
             };
 
             Navigation *_nav = nullptr;
+
+            std::string _removeName = "";
+            ConfirmType _confirmType = CONFIRM_NONE;
 
             const char *_pathGroups = "groups";
             const char *_pathSettings = "settings";
@@ -74,18 +85,21 @@ namespace simq::core::server {
             void _applyNavigation( Navigation *target, Navigation *src );
 
             void _printHelp( std::vector<std::string> &allowedCommands );
-            void _remove( const char *name );
+            void _rm( std::vector<std::string> &list );
             void _cd( std::vector<std::string> &list );
             void _ls( std::vector<std::string> &list );
 
             void _printConsolePrefix( bool isNewLine = false );
+
+            void _remove( const char *name );
+            void _removeConfirm( const char *name );
 
         public:
             CLI( CLICallbacks *cb );
             ~CLI();
             void input( std::vector<std::string> &list );
             void inputPassword( const char *password );
-            void prompt( bool value );
+            void confirm( bool value );
     };
 
     CLI::CLI( CLICallbacks *cb ) {
@@ -370,20 +384,52 @@ namespace simq::core::server {
         return localNav;
     }
 
-    void CLI::_remove( const char *name ) {
+    void CLI::_removeConfirm( const char *name ) {
+        _removeName = name;
+
         switch( _nav->ctx ) {
             case CTX_GROUPS:
-                _cb->removeGroup( name );
+                _confirmType = CONFIRM_REMOVE_GROUP;
+                _console->confirm( "Removing a group" );
                 break;
-            case CTX_CHANNEL:
-                _cb->removeChannel( _nav->group, name );
+            case CTX_GROUP:
+                _confirmType = CONFIRM_REMOVE_CHANNEL;
+                _console->confirm( "Removing a channel" );
                 break;
             case CTX_CONSUMERS:
-                _cb->removeConsumer( _nav->group, _nav->channel, name );
+                _confirmType = CONFIRM_REMOVE_CONSUMER;
+                _console->confirm( "Removing a consumer" );
                 break;
             case CTX_PRODUCERS:
-                _cb->removeProducer( _nav->group, _nav->channel, name );
+                _confirmType = CONFIRM_REMOVE_PRODUCER;
+                _console->confirm( "Removing a producer" );
                 break;
+        }
+
+    }
+
+    void CLI::_remove( const char *name ) {
+        try {
+            switch( _nav->ctx ) {
+                case CTX_GROUPS:
+                    _cb->removeGroup( name );
+                    break;
+                case CTX_CHANNEL:
+                    _cb->removeChannel( _nav->group, name );
+                    break;
+                case CTX_CONSUMERS:
+                    _cb->removeConsumer( _nav->group, _nav->channel, name );
+                    break;
+                case CTX_PRODUCERS:
+                    _cb->removeProducer( _nav->group, _nav->channel, name );
+                    break;
+            }
+
+            _console->printWarning( _warningChanges );
+            _console->printPrefix();
+        } catch( ... ) {
+            _console->printDanger( "Wrong name" );
+            _console->printPrefix();
         }
     }
 
@@ -503,6 +549,16 @@ namespace simq::core::server {
         }
     }
 
+    void CLI::_rm( std::vector<std::string> &list ) {
+        if( list.size() != 2 ) {
+            _console->printDanger( "Wrong params" );
+            _console->printPrefix();
+            return;
+        }
+
+        _removeConfirm( list[1].c_str() );
+    }
+
     void CLI::_ls( std::vector<std::string> &list ) {
         try {
             std::vector<std::string> lsList;
@@ -529,7 +585,7 @@ namespace simq::core::server {
         auto it = std::find( allowedCommands.begin(), allowedCommands.end(), cmd );
 
         if( it == allowedCommands.end() ) {
-            _console->printDanger( "\nUnknown command" );
+            _console->printDanger( "Unknown command" );
             _console->printPrefix();
         } else if( cmd == _cmdLs ) {
             _ls( list );
@@ -538,20 +594,7 @@ namespace simq::core::server {
         } else if( cmd == _cmdH ) {
             _printHelp( allowedCommands );
         } else if( cmd == _cmdRemove ) {
-            if( list.size() != 2 ) {
-                _console->printDanger( "Wrong params" );
-                _console->printPrefix();
-                return;
-            }
-
-            try {
-                _remove( list[1].c_str() );
-                _console->printWarning( _warningChanges );
-                _console->printPrefix();
-            } catch( ... ) {
-                _console->printDanger( "Wrong name" );
-                _console->printPrefix();
-            }
+            _rm( list );
         }
     }
 
@@ -576,7 +619,23 @@ namespace simq::core::server {
 
     }
 
-    void CLI::prompt( bool value ) {
+    void CLI::confirm( bool value ) {
+        if( !value ) {
+            _console->printWarning( "The changes will not be applied" );
+            _console->printPrefix();
+            return;
+        }
+
+        switch( _confirmType ) {
+            case CONFIRM_REMOVE_GROUP:
+            case CONFIRM_REMOVE_CHANNEL:
+            case CONFIRM_REMOVE_CONSUMER:
+            case CONFIRM_REMOVE_PRODUCER:
+                _remove( _removeName.c_str() );
+                break;
+            default:
+                _console->printPrefix( true );
+        }
     }
 
     void CLI::_printConsolePrefix( bool isNewLine ) {

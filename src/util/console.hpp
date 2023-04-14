@@ -250,11 +250,11 @@ namespace simq::util {
         switch( ch ) {
             case 'Y': case 'y':
                 _revertToNormalMode();
-                _cb->prompt( true );
+                _cb->confirm( true );
                 break;
             case 'N': case 'n':
                 _revertToNormalMode();
-                _cb->prompt( false );
+                _cb->confirm( false );
                 break;
         }
     }
@@ -534,6 +534,7 @@ namespace simq::util {
         _currentPrefix = prefix;
         _currentPrefix += "\n\nPress Y(y)/N(n) to continue";
         _mode = MODE_CONFIRM;
+        std::cout << std::endl << "\x1b[36m" << _currentPrefix << "\x1b[0m";
     }
 
     void Console::getPassword( const char *prefix ) {
