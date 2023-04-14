@@ -54,6 +54,8 @@ namespace simq::core::server {
             std::string _removeName = "";
             ConfirmType _confirmType = CONFIRM_NONE;
 
+            bool _isAuth = false;
+
             const char *_pathGroups = "groups";
             const char *_pathSettings = "settings";
             const char *_pathConsumers = "consumers";
@@ -93,6 +95,7 @@ namespace simq::core::server {
             void _printConsolePrefix( bool isNewLine = false );
 
             void _remove( const char *name );
+            void _auth( const char *password );
 
         public:
             CLI( CLICallbacks *cb );
@@ -603,7 +606,7 @@ namespace simq::core::server {
         }
     }
 
-    void CLI::inputPassword( const char *password ) {
+    void CLI::_auth( const char *password ) {
         unsigned char hash[simq::crypto::HASH_LENGTH];
         unsigned char hashOrig[simq::crypto::HASH_LENGTH];
         simq::crypto::Hash::hash( password, hash );
@@ -622,6 +625,14 @@ namespace simq::core::server {
             _printConsolePrefix();
         }
 
+        _isAuth = true;
+    }
+
+    void CLI::inputPassword( const char *password ) {
+        if( !_isAuth ) {
+            _auth( password );
+            return;
+        }
     }
 
     void CLI::confirm( bool value ) {
