@@ -76,6 +76,7 @@ namespace simq::core::server {
             void _printHelp( std::vector<std::string> &allowedCommands );
             void _remove( const char *name );
             void _cd( std::vector<std::string> &list );
+            void _ls( std::vector<std::string> &list );
 
             void _printConsolePrefix( bool isNewLine = false );
 
@@ -502,6 +503,23 @@ namespace simq::core::server {
         }
     }
 
+    void CLI::_ls( std::vector<std::string> &list ) {
+        try {
+            std::vector<std::string> lsList;
+            _getLS( _nav, lsList );
+
+            if( list.size() > 1 ) {
+                _console->printList( lsList, list[1].c_str() );
+            } else {
+                _console->printList( lsList );
+            }
+        } catch( ... ) {
+            _console->printDanger( _errNotFoundPath );
+        }
+
+        _console->printPrefix();
+    }
+
     void CLI::input( std::vector<std::string> &list ) {
         auto cmd = list[0];
 
@@ -514,21 +532,7 @@ namespace simq::core::server {
             _console->printDanger( "\nUnknown command" );
             _console->printPrefix();
         } else if( cmd == _cmdLs ) {
-            try {
-                std::vector<std::string> lsList;
-                _getLS( _nav, lsList );
-
-                if( list.size() > 1 ) {
-                    _console->printList( lsList, list[1].c_str() );
-                } else {
-                    _console->printList( lsList );
-                }
-            } catch( ... ) {
-                _console->printDanger( _errNotFoundPath );
-                _console->printPrefix();
-            }
-
-            _console->printPrefix();
+            _ls( list );
         } else if( cmd == _cmdCd ) {
             _cd( list );
         } else if( cmd == _cmdH ) {
