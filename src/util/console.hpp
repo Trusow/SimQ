@@ -82,6 +82,12 @@ namespace simq::util {
             void _backspace( std::string &line, unsigned int &position );
             void _delete( std::string &line, unsigned int &position );
 
+            void _inputNormal( std::string &line, unsigned int &position, KeyCode code, int ch );
+            void _inputPassword( std::string &line, unsigned int &position, KeyCode code, int ch );
+            void _inputConfirm( std::string &line, unsigned int &position, KeyCode code, int ch );
+
+            void _revertToNormalMode();
+
             void _bindCode( KeyCode code, int c, ... );
             void _initCodes();
             KeyCode _getCode( int ch );
@@ -173,6 +179,86 @@ namespace simq::util {
         _navigationHistory = _history.size();
     }
 
+    void Console::_revertToNormalMode() {
+        _currentPrefix = _normalPrefix;
+        _mode = MODE_NORMAL;
+    }
+
+    void Console::_inputNormal( std::string &line, unsigned int &position, KeyCode code, int ch ) {
+        if( code == KEY_LEFT ) {
+            _prevChar( line, position );
+        } else if( code == KEY_CTRL_LEFT ) {
+            _prevWord( line, position );
+        } else if( code == KEY_RIGHT ) {
+            _nextChar( line, position );
+        } else if( code == KEY_CTRL_RIGHT ) {
+            _nextWord( line, position );
+        } else if( code == KEY_DOWN ) {
+            _clear( line, position );
+            _nextHistory( line );
+            position = line.length();
+            std::cout << line;
+        } else if( code == KEY_UP ) {
+            _clear( line, position );
+            _prevHistory( line );
+            position = line.length();
+            std::cout << line;
+        } else if( code == KEY_CTRL_UP ) {
+            std::cout << _getTerminalWidth() << std::endl;
+        } else if( code == KEY_ENTER ) {
+            _startHistory();
+            if( line != "" ) {
+                _pushHistory( line );
+            }
+
+            std::vector<std::string> list;
+            _getSplitString( line.c_str(), list, ' ', true );
+
+            line = "";
+            position = 0;
+            std::cout << std::endl;
+            std::cout << _currentPrefix;
+
+            if( !list.empty() ) {
+                _cb->input( list );
+            }
+        } else if( code == KEY_BACKSPACE ) {
+            _backspace( line, position );
+        } else if( code == KEY_DELETE ) {
+            _delete( line, position );
+        } else if( code == KEY_NONE && ch >= 32 && ch <= 126 ) {
+            _input( line, position, ch );
+        }
+    }
+
+    void Console::_inputPassword( std::string &line, unsigned int &position, KeyCode code, int ch ) {
+        if( code == KEY_ENTER ) {
+            _revertToNormalMode();
+
+            _cb->inputPassword( line.c_str() );
+            std::cout << std::endl << _currentPrefix;
+            line = "";
+            position = 0;
+        } else {
+            line += (char)ch;
+        }
+    }
+
+    void Console::_inputConfirm( std::string &line, unsigned int &position, KeyCode code, int ch ) {
+        switch( ch ) {
+            case 'Y': case 'y':
+                _revertToNormalMode();
+                std::cout << std::endl << _currentPrefix;
+                _cb->prompt( true );
+                break;
+            case 'N': case 'n':
+                _revertToNormalMode();
+                std::cout << std::endl << _currentPrefix;
+                _cb->prompt( false );
+                break;
+        }
+    }
+
     void Console::run() {
         int ch;
 
@@ -208,78 +294,16 @@ namespace simq::util {
                 break;
             }
 
-            if( _mode == MODE_NORMAL ) {
-                if( code == KEY_LEFT ) {
-                    _prevChar( line, position );
-                } else if( code == KEY_CTRL_LEFT ) {
-                    _prevWord( line, position );
-                } else if( code == KEY_RIGHT ) {
-                    _nextChar( line, position );
-                } else if( code == KEY_CTRL_RIGHT ) {
-                    _nextWord( line, position );
-                } else if( code == KEY_DOWN ) {
-                    _clear( line, position );
-                    _nextHistory( line );
-                    position = line.length();
-                    std::cout << line;
-                } else if( code == KEY_UP ) {
-                    _clear( line, position );
-                    _prevHistory( line );
-                    position = line.length();
-                    std::cout << line;
-                } else if( code == KEY_CTRL_UP ) {
-                    std::cout << _getTerminalWidth() << std::endl;
-                } else if( code == KEY_ENTER ) {
-                    _startHistory();
-                    if( line != "" ) {
-                        _pushHistory( line );
-                    }
-
-                    std::vector<std::string> list;
-                    _getSplitString( line.c_str(), list, ' ', true );
-
-                    line = "";
-                    position = 0;
-                    std::cout << std::endl;
-                    std::cout << _currentPrefix;
-
-                    if( !list.empty() ) {
-                        _cb->input( list );
-                    }
-                } else if( code == KEY_BACKSPACE ) {
-                    _backspace( line, position );
-                } else if( code == KEY_DELETE ) {
-                    _delete( line, position );
-                } else if( code == KEY_NONE && ch >= 32 && ch <= 126 ) {
-                    _input( line, position, ch );
-                }
-            } else if( _mode == MODE_PASSWORD ) {
-                if( code == KEY_ENTER ) {
-                    _currentPrefix = _normalPrefix;
-                    _mode = MODE_NORMAL;
-
-                    _cb->inputPassword( line.c_str() );
-                    std::cout << std::endl << _currentPrefix;
-                    line = "";
-                    position = 0;
-                } else {
-                    line += (char)ch;
-                }
-            } else if( _mode == MODE_CONFIRM ) {
-                switch( ch ) {
-                    case 'Y': case 'y':
-                        _mode = MODE_NORMAL;
-                        _currentPrefix = _normalPrefix;
-                        std::cout << std::endl << _currentPrefix;
-                        _cb->prompt( true );
-                        break;
-                    case 'N': case 'n':
-                        _mode = MODE_NORMAL;
-                        _currentPrefix = _normalPrefix;
-                        std::cout << std::endl << _currentPrefix;
-                        _cb->prompt( false );
-                        break;
-                }
+            switch( _mode ) {
+                case MODE_NORMAL:
+                    _inputNormal( line, position, code, ch );
+                    break;
+                case MODE_PASSWORD:
+                    _inputPassword( line, position, code, ch );
+                    break;
+                case MODE_CONFIRM:
+                    _inputConfirm( line, position, code, ch );
+                    break;
             }
         }
     }
