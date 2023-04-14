@@ -68,8 +68,6 @@ namespace simq::core::server {
             void _freeNavigation( Navigation *nav );
             void _applyNavigation( Navigation *target, Navigation *src );
 
-            void _parseCommand( const char *line );
-
         public:
             CLI( CLICallbacks *cb );
             ~CLI();
@@ -87,22 +85,6 @@ namespace simq::core::server {
         _console = new util::Console( this );
         _console->getPassword( "Input password to continue: " );
         _console->run();
-
-        /*
-        while( true ) {
-            std::string line;
-
-            std::string path = "/";
-            _getCtxPath( path, _nav->ctx );
-
-            std::cout << "simq ";
-            std::cout << path;
-            std::cout << "> ";
-            std::getline( std::cin, line, '\n' );
-            _parseCommand( line.c_str() );
-        }
-        */
-
     }
 
     CLI::~CLI() {
@@ -378,65 +360,48 @@ namespace simq::core::server {
         return localNav;
     }
 
-    void CLI::_parseCommand( const char *line ) {
-        std::string cmd;
-        std::string body;
-
-        bool isCmd = false;
-        bool isStart = false;
-        bool toBody = false;
-
-        for( unsigned int i = 0; line[i] != 0; i++ ) {
-            char ch = line[i];
-
-            if( ch == ' ' ) {
-                if( isStart ) {
-                    toBody = true;
-                }
-            } else {
-                isStart = true;
-                if( !toBody ) {
-                    cmd += ch;
-                } else {
-                    body += ch;
-                }
-            }
-        }
+    void CLI::input( std::vector<std::string> &list ) {
+        auto cmd = list[0];
 
         std::vector<std::string> allowedCommands;
         _getAllowedCommands( allowedCommands );
 
         auto it = std::find( allowedCommands.begin(), allowedCommands.end(), cmd );
 
-        if( it != allowedCommands.end() ) {
-            if( cmd == _cmdCd ) {
-                auto nav = _buildNavigation( body.c_str() );
-                _applyNavigation( _nav, nav );
-            } else if( cmd == _cmdLs ) {
-                std::vector<std::string> list;
-                _getLS( _nav, list );
-                std::cout << std::endl;
-                for( auto it = list.begin(); it != list.end(); it++ ) {
-                    std::cout << "    " << *it << std::endl;
-                }
-                std::cout << std::endl;
-            } else if( cmd == _cmdH ) {
-                std::vector<std::string> list;
-                _getAllowedCommands( list );
-                std::cout << std::endl;
-                for( auto it = list.begin(); it != list.end(); it++ ) {
-                    std::cout << "    " << *it << std::endl;
-                }
-                std::cout << std::endl;
-            }
-        } else {
-            std::cout << std::endl;
-            std::cout << "    Unknown command. Use 'h' to get allowed commands" << std::endl;
-            std::cout << std::endl;
-        }
-    }
+        if( it == allowedCommands.end() ) {
+           _console->printDanger( "\nUnknown command" );
+           _console->printPrefix();
+        } else if( cmd == _cmdLs ) {
+            std::vector<std::string> lsList;
+            _getLS( _nav, lsList );
 
-    void CLI::input( std::vector<std::string> &list ) {
+            if( list.size() > 1 ) {
+                _console->printList( lsList, list[1].c_str() );
+            } else {
+                _console->printList( lsList );
+            }
+
+            _console->printPrefix();
+       } else if( cmd == _cmdCd && list.size() > 1 ) {
+           try {
+               auto nav = _buildNavigation( list[1].c_str() );
+               _applyNavigation( _nav, nav );
+
+               std::string path = "simq: /";
+               _getCtxPath( path, _nav->ctx );
+               path += "> ";
+
+               _console->setPrefix( path.c_str() );
+               _console->printPrefix( true );
+           } catch( ... ) {
+               _console->printDanger( "\nNot found path" );
+               _console->printPrefix();
+           }
+       } else if( cmd == _cmdH ) {
+            _console->printList( allowedCommands );
+            _console->printPrefix();
+       }
+
     }
 
     void CLI::inputPassword( const char *password ) {
@@ -455,6 +420,11 @@ namespace simq::core::server {
             _console->exit();
         } else {
             _console->printSuccess( "\nWelcome to SimQ - a simple message queue.\nAuthor - Sergej Trusow, version - 1.0\nPress 'h' to help." );
+            std::string path = "simq: /";
+            _getCtxPath( path, _nav->ctx );
+            path += "> ";
+            _console->setPrefix( path.c_str() );
+            _console->printPrefix();
         }
 
     }
