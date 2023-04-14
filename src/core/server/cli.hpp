@@ -48,6 +48,8 @@ namespace simq::core::server {
             const char *_pathConsumers = "consumers";
             const char *_pathProducers = "producers";
 
+            const char *_warningChanges = "The changes will be applied by the server.";
+
             const char *_cmdLs = "ls";
             const char *_cmdH = "h";
             const char *_cmdCd = "cd";
@@ -69,6 +71,7 @@ namespace simq::core::server {
             void _applyNavigation( Navigation *target, Navigation *src );
 
             void _printHelp( std::vector<std::string> &allowedCommands );
+            void _remove( const char *name );
 
         public:
             CLI( CLICallbacks *cb );
@@ -360,6 +363,23 @@ namespace simq::core::server {
         return localNav;
     }
 
+    void CLI::_remove( const char *name ) {
+        switch( _nav->ctx ) {
+            case CTX_GROUPS:
+                _cb->removeGroup( name );
+                break;
+            case CTX_CHANNEL:
+                _cb->removeChannel( _nav->group, name );
+                break;
+            case CTX_CONSUMERS:
+                _cb->removeConsumer( _nav->group, _nav->channel, name );
+                break;
+            case CTX_PRODUCERS:
+                _cb->removeProducer( _nav->group, _nav->channel, name );
+                break;
+        }
+    }
+
     void CLI::_printHelp( std::vector<std::string> &allowedCommands ) {
         std::vector<std::string> help;
 
@@ -452,6 +472,7 @@ namespace simq::core::server {
             }
 
             help.push_back( str );
+
         }
         
         _console->printList( help );
@@ -491,12 +512,27 @@ namespace simq::core::server {
                 _console->setPrefix( path.c_str() );
                 _console->printPrefix( true );
             } catch( ... ) {
-                _console->printDanger( "\nNot found path" );
+                _console->printDanger( "Not found path" );
                 _console->printPrefix();
             }
         } else if( cmd == _cmdH ) {
             _printHelp( allowedCommands );
             _console->printPrefix();
+        } else if( cmd == _cmdRemove ) {
+            if( list.size() != 2 ) {
+                _console->printDanger( "Wrong params" );
+                _console->printPrefix();
+                return;
+            }
+
+            try {
+                _remove( list[1].c_str() );
+                _console->printWarning( _warningChanges );
+                _console->printPrefix();
+            } catch( ... ) {
+                _console->printDanger( "Wrong name" );
+                _console->printPrefix();
+            }
         }
     }
 
@@ -512,10 +548,10 @@ namespace simq::core::server {
             ( const char * )hashOrig,
             simq::crypto::HASH_LENGTH
         ) != 0 ) {
-            _console->printDanger( "\nError password" );
+            _console->printDanger( "Error password" );
             _console->exit();
         } else {
-            _console->printSuccess( "\nWelcome to SimQ - a simple message queue.\nAuthor - Sergej Trusow, version - 1.0\nPress 'h' to help." );
+            _console->printSuccess( "Welcome to SimQ - a simple message queue.\nAuthor - Sergej Trusow, version - 1.0\nPress 'h' to help." );
             std::string path = "simq: /";
             _getCtxPath( path, _nav->ctx );
             path += "> ";
