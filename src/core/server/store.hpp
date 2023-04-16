@@ -25,6 +25,7 @@ namespace simq::core::server {
             const char *pathChannels = "channels";
             const char *pathGroups = "groups";
             const char *fileSettings = "settings";
+            const char *fileChannelLimitMessages = "limit-messages";
             const char *filePassword = "password";
 
             const unsigned int DEFAULT_PORT = 4012;
@@ -237,7 +238,7 @@ namespace simq::core::server {
         _pathChannelSettings += "/";
         _pathChannelSettings += channel;
         _pathChannelSettings += "/";
-        _pathChannelSettings += pathSettings;
+        _pathChannelSettings += fileChannelLimitMessages;
 
         if( !util::FS::fileExists( _pathChannelSettings.c_str() ) ) {
             util::File file( _pathChannelSettings.c_str(), true );
@@ -517,7 +518,7 @@ namespace simq::core::server {
         p += "/";
         p += channel;
         p += "/";
-        p += fileSettings;
+        p += fileChannelLimitMessages;
 
         {
             auto file = util::File( p.c_str() );
@@ -749,7 +750,7 @@ namespace simq::core::server {
 
         auto pathSettings = path;
         pathSettings += "/";
-        pathSettings += fileSettings;
+        pathSettings += fileChannelLimitMessages;
 
         util::File fileSettings( pathSettings.c_str(), true );
         util::Types::ChannelSettings channelSettings;
@@ -830,7 +831,7 @@ namespace simq::core::server {
         path += "/";
         path += channel;
         path += "/";
-        path += fileSettings;
+        path += fileChannelLimitMessages;
 
         util::File fileSettings( path.c_str() );
         fileSettings.read( &settings, sizeof( util::Types::ChannelSettings ) );
@@ -863,7 +864,7 @@ namespace simq::core::server {
         path += "/";
         path += channel;
         path += "/";
-        path += fileSettings;
+        path += fileChannelLimitMessages;
 
         util::File fileSettings( path.c_str() );
 
