@@ -7,6 +7,7 @@
 #include "scenario_auth.hpp"
 #include "ini.h"
 #include "help.hpp"
+#include "ls.hpp"
 #include "../../../util/string.hpp"
 #include "../../../crypto/hash.hpp"
 #include "../../../util/console_callbacks.h"
@@ -39,6 +40,7 @@ namespace simq::core::server::CLI {
             Scenario *_scenRemove = nullptr;
             Scenario *_scenUpswd = nullptr;
             Help *_help = nullptr;
+            Ls *_ls = nullptr;
 
             bool _isAuth = false;
 
@@ -66,6 +68,7 @@ namespace simq::core::server::CLI {
 
         _console = new util::Console( this );
         _help = new Help( _console, _nav );
+        _ls = new Ls( _console, _nav, cb );
 
         _scenAuth = new ScenarioAuth( _console, _nav, _cb );
         _scenAuth->start();
@@ -146,6 +149,11 @@ namespace simq::core::server::CLI {
                 _console->printDanger( "Unknown command" );
                 _console->printPrefix();
             } else if( cmd == Ini::cmdLs ) {
+                if( list.size() > 1 ) {
+                    _ls->print( list[1].c_str() );
+                } else {
+                    _ls->print();
+                }
             } else if( cmd == Ini::cmdCd ) {
                 _cd( list );
             } else if( cmd == Ini::cmdH ) {
