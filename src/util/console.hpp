@@ -60,6 +60,8 @@ namespace simq::util {
 
             const char *_margin = "    ";
 
+            bool _toNextHistory = false;
+            bool _toPrevHistory = false;
             void _pushHistory( std::string &line );
             void _nextHistory( std::string &line );
             void _prevHistory( std::string &line );
@@ -159,6 +161,8 @@ namespace simq::util {
 
     void Console::_nextHistory( std::string &line ) {
         if( _navigationHistory == _history.size() ) {
+            _toPrevHistory = false;
+            _toNextHistory = false;
             return;
         }
 
@@ -169,6 +173,8 @@ namespace simq::util {
 
     void Console::_prevHistory( std::string &line ) {
         if( _history.empty() || _navigationHistory == 0 ) {
+            _toPrevHistory = false;
+            _toNextHistory = false;
             return;
         }
 
@@ -178,6 +184,8 @@ namespace simq::util {
     }
 
     void Console::_toBeginHistory() {
+        _toNextHistory = false;
+        _toPrevHistory = false;
         _navigationHistory = _history.size();
     }
 
@@ -197,12 +205,22 @@ namespace simq::util {
             _nextWord( line, position );
         } else if( code == KEY_DOWN ) {
             _clear( line, position );
+            _toNextHistory = true;
             _nextHistory( line );
+            if( _toPrevHistory ) {
+                _nextHistory( line );
+                _toPrevHistory = false;
+            }
             position = line.length();
             std::cout << line;
         } else if( code == KEY_UP ) {
             _clear( line, position );
+            _toPrevHistory = true;
             _prevHistory( line );
+            if( _toNextHistory ) {
+                _prevHistory( line );
+                _toNextHistory = false;
+            }
             position = line.length();
             std::cout << line;
         } else if( code == KEY_CTRL_UP ) {
