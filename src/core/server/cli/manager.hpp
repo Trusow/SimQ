@@ -149,7 +149,7 @@ namespace simq::core::server::CLI {
             } else if( cmd == Ini::cmdCd ) {
                 _cd( list );
             } else if( cmd == Ini::cmdH ) {
-                _help->help( allowedCommands );
+                _help->print( allowedCommands );
             } else if( cmd == Ini::cmdRemove ) {
             } else if( cmd == Ini::cmdAdd ) {
             }

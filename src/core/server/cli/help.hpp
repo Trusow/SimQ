@@ -17,10 +17,10 @@ namespace simq::core::server::CLI {
                 util::Console *console,
                 Navigation *nav
             ) : _console{console}, _nav{nav} {};
-            void help( std::vector<std::string> &list );
+            void print( std::vector<std::string> &list );
     };
 
-    void Help::help( std::vector<std::string> &list ) {
+    void Help::print( std::vector<std::string> &list ) {
         std::vector<std::string> help;
 
         for( unsigned int i = 0; i < list.size(); i++ ) {
