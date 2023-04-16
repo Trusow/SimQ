@@ -6,6 +6,7 @@
 #include "scenario.h"
 #include "scenario_auth.hpp"
 #include "ini.h"
+#include "help.hpp"
 #include "../../../util/string.hpp"
 #include "../../../crypto/hash.hpp"
 #include "../../../util/console_callbacks.h"
@@ -37,6 +38,7 @@ namespace simq::core::server::CLI {
             Scenario *_scenAdd = nullptr;
             Scenario *_scenRemove = nullptr;
             Scenario *_scenUpswd = nullptr;
+            Help *_help = nullptr;
 
             bool _isAuth = false;
 
@@ -63,6 +65,7 @@ namespace simq::core::server::CLI {
 
 
         _console = new util::Console( this );
+        _help = new Help( _console, _nav );
 
         _scenAuth = new ScenarioAuth( _console, _nav, _cb );
         _scenAuth->start();
@@ -146,6 +149,7 @@ namespace simq::core::server::CLI {
             } else if( cmd == Ini::cmdCd ) {
                 _cd( list );
             } else if( cmd == Ini::cmdH ) {
+                _help->help( allowedCommands );
             } else if( cmd == Ini::cmdRemove ) {
             } else if( cmd == Ini::cmdAdd ) {
             }
