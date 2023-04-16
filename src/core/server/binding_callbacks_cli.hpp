@@ -277,15 +277,11 @@ namespace simq::core::server {
     }
 
     void BindingCallbacksCLI::updatePort( unsigned short int port ) {
-        auto ch = _changes->updatePort( port );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _store->updatePort( port );
     }
 
     void BindingCallbacksCLI::updateCountThreads( unsigned short int count ) {
-        auto ch = _changes->updateCountThreads( count );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _store->updateCountThreads( count );
     }
 }
 

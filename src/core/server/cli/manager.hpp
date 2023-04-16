@@ -157,6 +157,15 @@ namespace simq::core::server::CLI {
                     _console->printPrefix();
                 }
             } else if( cmd == Ini::cmdSet ) {
+                if( list.size() == 3 ) {
+                    _info->set( list[1], list[2].c_str() );
+                } else if( list.size() < 3 ) {
+                    _console->printDanger( "Empty name or value" );
+                    _console->printPrefix();
+                } else {
+                    _console->printDanger( "Many params" );
+                    _console->printPrefix();
+                }
             } else if( cmd == Ini::cmdAdd ) {
             }
         } else {
