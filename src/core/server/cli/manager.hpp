@@ -8,6 +8,7 @@
 #include "ini.h"
 #include "help.hpp"
 #include "ls.hpp"
+#include "info.hpp"
 #include "../../../util/string.hpp"
 #include "../../../crypto/hash.hpp"
 #include "../../../util/console_callbacks.h"
@@ -41,6 +42,7 @@ namespace simq::core::server::CLI {
             Scenario *_scenUpswd = nullptr;
             Help *_help = nullptr;
             Ls *_ls = nullptr;
+            Info *_info = nullptr;
 
             bool _isAuth = false;
 
@@ -66,6 +68,7 @@ namespace simq::core::server::CLI {
 
         _help = new Help( _console, _nav );
         _ls = new Ls( _console, _nav, cb );
+        _info = new Info( _console, _nav, cb );
 
         _scenAuth = new ScenarioAuth( _console, _nav, _cb );
         _scenAuth->start();
@@ -147,6 +150,12 @@ namespace simq::core::server::CLI {
             } else if( cmd == Ini::cmdRemove ) {
             } else if( cmd == Ini::cmdPswd ) {
             } else if( cmd == Ini::cmdInfo ) {
+                if( list.size() == 1 ) {
+                    _info->print();
+                } else {
+                    _console->printDanger( "Many params" );
+                    _console->printPrefix();
+                }
             } else if( cmd == Ini::cmdSet ) {
             } else if( cmd == Ini::cmdAdd ) {
             }
