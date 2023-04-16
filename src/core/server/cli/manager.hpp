@@ -49,8 +49,6 @@ namespace simq::core::server::CLI {
 
             void _getAllowedCommands( std::vector<std::string> &list );
 
-            void _cd( std::vector<std::string> &list );
-
             void _auth( const char *password );
 
         public:
@@ -62,11 +60,10 @@ namespace simq::core::server::CLI {
     };
 
     Manager::Manager( Callbacks *cb ) {
-        _nav = new Navigation( cb );
+        _console = new util::Console( this );
+        _nav = new Navigation( _console, cb );
         _cb = cb;
 
-
-        _console = new util::Console( this );
         _help = new Help( _console, _nav );
         _ls = new Ls( _console, _nav, cb );
 
@@ -114,28 +111,6 @@ namespace simq::core::server::CLI {
         }
     }
 
-    void Manager::_cd( std::vector<std::string> &list ) {
-        if( list.size() != 2 ) {
-            _console->printDanger( "Wrong param" );
-            _console->printPrefix();
-            return;
-        }
-
-        try {
-            _nav->to( list[1].c_str() );
-            std::string path = Ini::defPrefix;
-            path += ": ";
-            path += _nav->getPath();
-            path += "> ";
-            _console->setPrefix( path.c_str() );
-            _console->printPrefix( true );
-        } catch( ... ) {
-            _console->printDanger( _errNotFoundPath );
-            _console->printPrefix();
-        }
-    }
-
-
     void Manager::input( std::vector<std::string> &list ) {
         if( _scen == SCENARIO_NONE ) {
             auto cmd = list[0];
@@ -149,16 +124,30 @@ namespace simq::core::server::CLI {
                 _console->printDanger( "Unknown command" );
                 _console->printPrefix();
             } else if( cmd == Ini::cmdLs ) {
-                if( list.size() > 1 ) {
+                if( list.size() == 2 ) {
                     _ls->print( list[1].c_str() );
-                } else {
+                } else if( list.size() == 1 ) {
                     _ls->print();
+                } else {
+                    _console->printDanger( "Many params" );
+                    _console->printPrefix();
                 }
             } else if( cmd == Ini::cmdCd ) {
-                _cd( list );
+                if( list.size() == 2 ) {
+                    _nav->to( list[1].c_str() );
+                } else if( list.size() == 1 ) {
+                    _console->printDanger( "Empty params" );
+                    _console->printPrefix();
+                } else {
+                    _console->printDanger( "Many params" );
+                    _console->printPrefix();
+                }
             } else if( cmd == Ini::cmdH ) {
                 _help->print( allowedCommands );
             } else if( cmd == Ini::cmdRemove ) {
+            } else if( cmd == Ini::cmdPswd ) {
+            } else if( cmd == Ini::cmdInfo ) {
+            } else if( cmd == Ini::cmdSet ) {
             } else if( cmd == Ini::cmdAdd ) {
             }
         } else {

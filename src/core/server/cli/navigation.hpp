@@ -2,6 +2,7 @@
 #define SIMQ_CORE_SERVER_CLI_NAVIGATION
 
 #include "callbacks.hpp"
+#include "../../../util/console.hpp"
 #include "ini.h"
 #include <string>
 #include <vector>
@@ -25,6 +26,7 @@ namespace simq::core::server::CLI {
             };
 
             Callbacks *_cb = nullptr;
+            util::Console *_console = nullptr;
 
             std::string _path = "";
             std::string _pathWithPrefix = "";
@@ -58,7 +60,7 @@ namespace simq::core::server::CLI {
                 std::string &login
             );
         public:
-            Navigation( Callbacks *cb ) : _cb{cb} {}
+            Navigation( util::Console *console, Callbacks *cb ) : _console{console}, _cb{cb} {}
 
             void to( const char *path );
             const char *getPath();
@@ -86,6 +88,7 @@ namespace simq::core::server::CLI {
         std::string &login
     ) {
         std::vector<std::string> list;
+        bool res;
 
         switch( ctx ) {
             case CTX_GROUP:
@@ -123,6 +126,7 @@ namespace simq::core::server::CLI {
         bool check = true;
 
         switch( ctx ) {
+            case CTX_ROOT:
             case CTX_GROUPS:
             case CTX_SETTINGS:
                 ctx = CTX_ROOT;
@@ -178,12 +182,14 @@ namespace simq::core::server::CLI {
                 if( !_isAllowedPath( ctx, group, channel, login ) ) {
                     throw -1;
                 }
+                break;
             case CTX_GROUP:
                 ctx = CTX_CHANNEL;
                 channel = path;
                 if( !_isAllowedPath( ctx, group, channel, login ) ) {
                     throw -1;
                 }
+                break;
             case CTX_CHANNEL:
                 if( path == Ini::pathConsumers ) {
                     ctx = CTX_CONSUMERS;
@@ -312,7 +318,14 @@ namespace simq::core::server::CLI {
     }
 
     void Navigation::to( const char *path ) {
-        _build( path );
+        try {
+            _build( path );
+            _console->setPrefix( getPathWithPrefix() );
+            _console->printPrefix( true );
+        } catch( ... ) {
+            _console->printDanger( "Not found path" );
+            _console->printPrefix();
+        }
     }
 
     const char *Navigation::getPath() {
