@@ -4,6 +4,7 @@
 #include "uuid.hpp"
 #include "types.h"
 #include <string.h>
+#include <thread>
 
 namespace simq::util {
     class Validation {
@@ -17,6 +18,8 @@ namespace simq::util {
             static bool isProducerName( const char *name );
             static bool isUUID( const char *name );
             static bool isPort( unsigned int port );
+            static bool isCountThread( unsigned int count );
+            static bool isUInt( const char *value );
             static bool isChannelSettings( util::Types::ChannelSettings *settings );
     };
 
@@ -141,6 +144,41 @@ namespace simq::util {
 
     bool Validation::isPort( unsigned int port ) {
         return port > 0 && port <= 0xFF'FF;
+    }
+
+    bool Validation::isUInt( const char *value ) {
+        unsigned long int v = 0;
+
+        if( value[0] == 0 ) {
+            return false;
+        }
+
+        for( unsigned int i = 0; value[i] != 0; i++ ) {
+            char ch = value[i];
+            if( ch >= '0' && ch <= '9' ) {
+                if( ch == '0' && i == 0 ) {
+                    return false;
+                }
+                v = v * 10 + ( ch - '0' );
+                if( v > 0xFF'FF'FF'FF ) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool Validation::isCountThread( unsigned int count ) {
+        if( count == 0 ) {
+            return false;
+        }
+
+        const unsigned int hc = std::thread::hardware_concurrency();
+
+        return count <= hc + hc / 2;
     }
 
     bool Validation::isChannelSettings( util::Types::ChannelSettings *settings ) {
