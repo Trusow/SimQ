@@ -61,6 +61,8 @@ namespace simq::core::server::CLI {
     void Info::set( std::string &name, const char *value ) {
 
         unsigned int num = 0;
+        bool isChannel = false;
+        util::Types::ChannelSettings settings;
 
         if( value[0] != 0 && !util::Validation::isUInt( value ) ) {
             _console->printDanger( "Wrong value" );
@@ -90,12 +92,50 @@ namespace simq::core::server::CLI {
                     _console->printPrefix();
                 }
             } else if( name == Ini::infoChMinMessageSize ) {
+                _cb->getChannelSettings(
+                    _nav->getGroup(),
+                    _nav->getChannel(),
+                    settings
+                );
+                settings.minMessageSize = num;
+                isChannel = true;
             } else if( name == Ini::infoChMaxMessageSize ) {
+                _cb->getChannelSettings(
+                    _nav->getGroup(),
+                    _nav->getChannel(),
+                    settings
+                );
+                settings.maxMessageSize = num;
+                isChannel = true;
             } else if( name == Ini::infoChMaxMessagesInMemory ) {
+                _cb->getChannelSettings(
+                    _nav->getGroup(),
+                    _nav->getChannel(),
+                    settings
+                );
+                settings.maxMessagesInMemory = num;
+                isChannel = true;
             } else if( name == Ini::infoChMaxMessagesOnDisk ) {
+                _cb->getChannelSettings(
+                    _nav->getGroup(),
+                    _nav->getChannel(),
+                    settings
+                );
+                settings.maxMessagesOnDisk = num;
+                isChannel = true;
             } else {
                 _console->printDanger( "Unknown name" );
                 _console->printPrefix();
+            }
+
+            if( isChannel ) {
+                if( !util::Validation::isChannelSettings( &settings ) ) {
+                    _console->printDanger( "Wrong value" );
+                    _console->printPrefix();
+                } else {
+                    _console->printWarning( "The changes will be applied by the server" );
+                    _console->printPrefix();
+                }
             }
         } catch( ... ) {
             _console->printDanger( "Server error" );
