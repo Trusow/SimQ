@@ -5,6 +5,7 @@
 #include "../../../util/console.hpp"
 #include "../../../util/types.h"
 #include "callbacks.hpp"
+#include "ini.h"
 #include <vector>
 #include <string>
 
@@ -35,8 +36,8 @@ namespace simq::core::server::CLI {
         std::vector<std::string> list;
 
         if( _nav->isSettings() ) {
-            _addToList( list, "port", _cb->getPort() );
-            _addToList( list, "countThreads", _cb->getCountThreads() );
+            _addToList( list, Ini::infoSettingsPort, _cb->getPort() );
+            _addToList( list, Ini::infoSettingsCountThreads, _cb->getCountThreads() );
         } else if( _nav->isChannel() ) {
             util::Types::ChannelSettings settings;
             _cb->getChannelSettings(
@@ -44,10 +45,10 @@ namespace simq::core::server::CLI {
                 _nav->getChannel(),
                 settings
             );
-            _addToList( list, "minMessageSize", settings.minMessageSize );
-            _addToList( list, "maxMessageSize", settings.maxMessageSize );
-            _addToList( list, "maxMessagesInMemory", settings.maxMessagesInMemory );
-            _addToList( list, "maxMessagesOnDisk", settings.maxMessagesOnDisk );
+            _addToList( list, Ini::infoChMinMessageSize, settings.minMessageSize );
+            _addToList( list, Ini::infoChMaxMessageSize, settings.maxMessageSize );
+            _addToList( list, Ini::infoChMaxMessagesInMemory, settings.maxMessagesInMemory );
+            _addToList( list, Ini::infoChMaxMessagesOnDisk, settings.maxMessagesOnDisk );
         }
 
         _console->printList( list );

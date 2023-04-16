@@ -78,10 +78,14 @@ namespace simq::core::server::CLI {
             } else if( cmd == Ini::cmdSet ) {
                 if( _nav->isSettings() ) {
                     str += " - save settings of server, example '";
-                    str += cmd + " nameField valueField'";
+                    str += cmd + " ";
+                    str += Ini::infoSettingsCountThreads;
+                    str += " 4'";
                 } else if( _nav->isChannel() ) {
                     str += " - save settings of server, example '";
-                    str += cmd + " nameField valueField'";
+                    str += cmd + " ";
+                    str += Ini::infoChMinMessageSize;
+                    str += " 100'";
                 }
             } else if( cmd == Ini::cmdLs ) {
                 str += " - show available paths, is set filter example '";
