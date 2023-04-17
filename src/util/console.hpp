@@ -161,26 +161,52 @@ namespace simq::util {
 
     void Console::_nextHistory( std::string &line ) {
         if( _navigationHistory == _history.size() ) {
-            _toPrevHistory = false;
             _toNextHistory = false;
             return;
         }
 
+        _toNextHistory = true;
+
+        if( _toPrevHistory ) {
+            _navigationHistory++;
+            if( _navigationHistory == _history.size() ) {
+                return;
+            }
+            _toPrevHistory = false;
+        }
+
         line = _history[_navigationHistory];
 
-        _navigationHistory++;
+        if( !_toPrevHistory ) {
+            _navigationHistory++;
+        }
+
+        _toPrevHistory = false;
     }
 
     void Console::_prevHistory( std::string &line ) {
         if( _history.empty() || _navigationHistory == 0 ) {
             _toPrevHistory = false;
-            _toNextHistory = false;
             return;
         }
 
+        if( _toNextHistory ) {
+            _navigationHistory--;
+            _toNextHistory = false;
+            if( _navigationHistory == 0 ) {
+                return;
+            }
+        }
+
+        _toPrevHistory = true;
+
         line = _history[_navigationHistory-1];
 
-        _navigationHistory--;
+        if( !_toNextHistory ) {
+            _navigationHistory--;
+        }
+
+        _toNextHistory = false;
     }
 
     void Console::_toBeginHistory() {
@@ -205,22 +231,12 @@ namespace simq::util {
             _nextWord( line, position );
         } else if( code == KEY_DOWN ) {
             _clear( line, position );
-            _toNextHistory = true;
             _nextHistory( line );
-            if( _toPrevHistory ) {
-                _nextHistory( line );
-                _toPrevHistory = false;
-            }
             position = line.length();
             std::cout << line;
         } else if( code == KEY_UP ) {
             _clear( line, position );
-            _toPrevHistory = true;
             _prevHistory( line );
-            if( _toNextHistory ) {
-                _prevHistory( line );
-                _toNextHistory = false;
-            }
             position = line.length();
             std::cout << line;
         } else if( code == KEY_CTRL_UP ) {
