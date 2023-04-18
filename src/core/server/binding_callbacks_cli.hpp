@@ -271,9 +271,7 @@ namespace simq::core::server {
     }
 
     void BindingCallbacksCLI::updateMasterPassword( unsigned char password[crypto::HASH_LENGTH] ) {
-        auto ch = _changes->updateMasterPassword( password );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _store->updateMasterPassword( password );
     }
 
     void BindingCallbacksCLI::updatePort( unsigned short int port ) {

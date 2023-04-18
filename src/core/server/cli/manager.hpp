@@ -5,6 +5,7 @@
 #include "navigation.hpp"
 #include "scenario.h"
 #include "scenario_auth.hpp"
+#include "scenario_password.hpp"
 #include "ini.h"
 #include "help.hpp"
 #include "ls.hpp"
@@ -71,6 +72,7 @@ namespace simq::core::server::CLI {
         _info = new Info( _console, _nav, cb );
 
         _scenAuth = new ScenarioAuth( _console, _nav, _cb );
+        _scenUpswd = new ScenarioPassword( _console, _nav, _cb );
         _scenAuth->start();
         _scen = SCENARIO_AUTH;
        
@@ -107,6 +109,7 @@ namespace simq::core::server::CLI {
             list.push_back( Ini::cmdRemove );
         } else if( _nav->isConsumer() || _nav->isProducer() ) {
             list.push_back( Ini::cmdInfo );
+            list.push_back( Ini::cmdPswd );
         } else if( _nav->isSettings() ) {
             list.push_back( Ini::cmdInfo );
             list.push_back( Ini::cmdSet );
@@ -149,6 +152,13 @@ namespace simq::core::server::CLI {
                 _help->print( allowedCommands );
             } else if( cmd == Ini::cmdRemove ) {
             } else if( cmd == Ini::cmdPswd ) {
+                if( list.size() > 1 ) {
+                    _console->printDanger( "Many params" );
+                    _console->printPrefix();
+                } else {
+                    _scenUpswd->start();
+                    _scen = SCENARIO_UPSWD;
+                }
             } else if( cmd == Ini::cmdInfo ) {
                 if( list.size() == 1 ) {
                     _info->print();
