@@ -117,6 +117,8 @@ namespace simq::core::server::CLI {
                     }
                 } catch( ... ) {
                     _console->printDanger( "Server error" );
+                    _console->setPrefix( _nav->getPathWithPrefix() );
+                    _console->printPrefix();
                 }
             }
             _isEnd = true;
