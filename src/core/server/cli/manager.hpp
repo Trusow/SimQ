@@ -6,6 +6,7 @@
 #include "scenario.h"
 #include "scenario_auth.hpp"
 #include "scenario_password.hpp"
+#include "scenario_remove.hpp"
 #include "ini.h"
 #include "help.hpp"
 #include "ls.hpp"
@@ -73,6 +74,7 @@ namespace simq::core::server::CLI {
 
         _scenAuth = new ScenarioAuth( _console, _nav, _cb );
         _scenUpswd = new ScenarioPassword( _console, _nav, _cb );
+        _scenRemove = new ScenarioRemove( _console, _nav, _cb );
         _scenAuth->start();
         _scen = SCENARIO_AUTH;
        
@@ -151,6 +153,22 @@ namespace simq::core::server::CLI {
             } else if( cmd == Ini::cmdH ) {
                 _help->print( allowedCommands );
             } else if( cmd == Ini::cmdRemove ) {
+                if( list.size() == 2 ) {
+                    _scenRemove->start();
+                    _scenRemove->input( list );
+
+                    _scen = SCENARIO_REMOVE;
+
+                    if( _scenRemove->isEnd() ) {
+                        _scen = SCENARIO_NONE;
+                    }
+                } else if( list.size() == 1 ) {
+                    _console->printDanger( "Empty params" );
+                    _console->printPrefix();
+                } else {
+                    _console->printDanger( "Many params" );
+                    _console->printPrefix();
+                }
             } else if( cmd == Ini::cmdPswd ) {
                 if( list.size() > 1 ) {
                     _console->printDanger( "Many params" );
