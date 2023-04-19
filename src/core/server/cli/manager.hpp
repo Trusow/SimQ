@@ -55,6 +55,7 @@ namespace simq::core::server::CLI {
             void _getAllowedCommands( std::vector<std::string> &list );
 
             void _auth( const char *password );
+            bool _validation( unsigned int realCount, unsigned int expectedCount );
 
         public:
             Manager( Callbacks *cb );
@@ -143,19 +144,13 @@ namespace simq::core::server::CLI {
                     _console->printPrefix();
                 }
             } else if( cmd == Ini::cmdCd ) {
-                if( list.size() == 2 ) {
+                if( _validation( list.size(), 2 ) ) {
                     _nav->to( list[1].c_str() );
-                } else if( list.size() == 1 ) {
-                    _console->printDanger( "Empty params" );
-                    _console->printPrefix();
-                } else {
-                    _console->printDanger( "Many params" );
-                    _console->printPrefix();
                 }
             } else if( cmd == Ini::cmdH ) {
                 _help->print( allowedCommands );
             } else if( cmd == Ini::cmdRemove ) {
-                if( list.size() == 2 ) {
+                if( _validation( list.size(), 2 ) ) {
                     _scenRemove->start();
                     _scenRemove->input( list );
 
@@ -164,40 +159,22 @@ namespace simq::core::server::CLI {
                     if( _scenRemove->isEnd() ) {
                         _scen = SCENARIO_NONE;
                     }
-                } else if( list.size() == 1 ) {
-                    _console->printDanger( "Empty params" );
-                    _console->printPrefix();
-                } else {
-                    _console->printDanger( "Many params" );
-                    _console->printPrefix();
                 }
             } else if( cmd == Ini::cmdPswd ) {
-                if( list.size() > 1 ) {
-                    _console->printDanger( "Many params" );
-                    _console->printPrefix();
-                } else {
+                if( _validation( list.size(), 1 ) ) {
                     _scenUpswd->start();
                     _scen = SCENARIO_UPSWD;
                 }
             } else if( cmd == Ini::cmdInfo ) {
-                if( list.size() == 1 ) {
+                if( _validation( list.size(), 1 ) ) {
                     _info->print();
-                } else {
-                    _console->printDanger( "Many params" );
-                    _console->printPrefix();
                 }
             } else if( cmd == Ini::cmdSet ) {
-                if( list.size() == 3 ) {
+                if( _validation( list.size(), 3 ) ) {
                     _info->set( list[1], list[2].c_str() );
-                } else if( list.size() < 3 ) {
-                    _console->printDanger( "Empty name or value" );
-                    _console->printPrefix();
-                } else {
-                    _console->printDanger( "Many params" );
-                    _console->printPrefix();
                 }
             } else if( cmd == Ini::cmdAdd ) {
-                if( list.size() == 2 ) {
+                if( _validation( list.size(), 2 ) ) {
                     _scen = SCENARIO_ADD;
                     _scenAdd->start();
                     _scenAdd->input( list );
@@ -292,6 +269,20 @@ namespace simq::core::server::CLI {
                 }
                 break;
         }
+    }
+
+    bool Manager::_validation( unsigned int realCount, unsigned int expectedCount ) {
+        if( realCount == expectedCount ) {
+            return true;
+        } else if ( realCount > expectedCount ) {
+            _console->printDanger( "Many params" );
+            _console->printPrefix();
+        } else {
+            _console->printDanger( "Empty params" );
+            _console->printPrefix();
+        }
+
+        return false;
     }
 }
 
