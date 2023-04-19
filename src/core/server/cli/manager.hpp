@@ -7,6 +7,7 @@
 #include "scenario_auth.hpp"
 #include "scenario_password.hpp"
 #include "scenario_remove.hpp"
+#include "scenario_add.hpp"
 #include "ini.h"
 #include "help.hpp"
 #include "ls.hpp"
@@ -75,6 +76,7 @@ namespace simq::core::server::CLI {
         _scenAuth = new ScenarioAuth( _console, _nav, _cb );
         _scenUpswd = new ScenarioPassword( _console, _nav, _cb );
         _scenRemove = new ScenarioRemove( _console, _nav, _cb );
+        _scenAdd = new ScenarioAdd( _console, _nav, _cb );
         _scenAuth->start();
         _scen = SCENARIO_AUTH;
        
@@ -195,6 +197,14 @@ namespace simq::core::server::CLI {
                     _console->printPrefix();
                 }
             } else if( cmd == Ini::cmdAdd ) {
+                if( list.size() == 2 ) {
+                    _scen = SCENARIO_ADD;
+                    _scenAdd->start();
+                    _scenAdd->input( list );
+                    if( _scenAdd->isEnd() ) {
+                        _scen = SCENARIO_NONE;
+                    }
+                }
             }
         } else {
             switch( _scen ) {
