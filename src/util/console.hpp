@@ -66,6 +66,7 @@ namespace simq::util {
             void _nextHistory( std::string &line );
             void _prevHistory( std::string &line );
             void _toBeginHistory();
+            bool _isAccessHistory = true;
 
             bool _isExit = false;
  
@@ -120,6 +121,9 @@ namespace simq::util {
 
             void printPrefix( bool newLine = false );
 
+            void disableHistory();
+            void enableHistory();
+
             void exit();
     };
 
@@ -151,6 +155,10 @@ namespace simq::util {
     }
 
     void Console::_pushHistory( std::string &line ) {
+        if( !_isAccessHistory ) {
+            return;
+        }
+
         if( !_history.empty() && _history[_history.size()-1] == line ) {
             return;
         }
@@ -160,6 +168,10 @@ namespace simq::util {
     }
 
     void Console::_nextHistory( std::string &line ) {
+        if( !_isAccessHistory ) {
+            return;
+        }
+
         if( _navigationHistory == _history.size() ) {
             _toNextHistory = false;
             return;
@@ -185,6 +197,10 @@ namespace simq::util {
     }
 
     void Console::_prevHistory( std::string &line ) {
+        if( !_isAccessHistory ) {
+            return;
+        }
+
         if( _history.empty() || _navigationHistory == 0 ) {
             _toPrevHistory = false;
             return;
@@ -210,6 +226,10 @@ namespace simq::util {
     }
 
     void Console::_toBeginHistory() {
+        if( !_isAccessHistory ) {
+            return;
+        }
+
         _toNextHistory = false;
         _toPrevHistory = false;
         _navigationHistory = _history.size();
@@ -699,6 +719,14 @@ namespace simq::util {
         }
 
         std::cout << _currentPrefix;
+    }
+
+    void Console::disableHistory() {
+        _isAccessHistory = false;
+    }
+
+    void Console::enableHistory() {
+        _isAccessHistory = true;
     }
 }
 
