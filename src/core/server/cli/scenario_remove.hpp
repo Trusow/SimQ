@@ -47,6 +47,8 @@ namespace simq::core::server::CLI {
 
         if( _nav->isGroups() ) {
             _cb->getGroups( _items );
+        } else if( _nav->isGroup() ) {
+            _cb->getChannels( _nav->getGroup(), _items );
         } else if( _nav->isConsumers() ) {
             _cb->getConsumers( _nav->getGroup(), _nav->getChannel(), _items );
         } else if( _nav->isProducers() ) {
@@ -57,6 +59,8 @@ namespace simq::core::server::CLI {
         if( it == _items.end() ) {
             if( _nav->isGroups() ) {
                 _console->printDanger( "Not found group" );
+            } else if( _nav->isGroup() ) {
+                _console->printDanger( "Not found channel" );
             } else if( _nav->isConsumers() ) {
                 _console->printDanger( "Not found consumer" );
             } else if( _nav->isProducers() ) {
@@ -69,6 +73,8 @@ namespace simq::core::server::CLI {
             _name = list[1];
             if( _nav->isGroups() ) {
                 _console->confirm( "Removing a group" );
+            } else if( _nav->isGroup() ) {
+                _console->confirm( "Removing a channel" );
             } else if( _nav->isConsumers() ) {
                 _console->confirm( "Removing a consumer" );
             } else if( _nav->isProducers() ) {
@@ -90,6 +96,8 @@ namespace simq::core::server::CLI {
         try {
             if( _nav->isGroups() ) {
                 _cb->removeGroup( _name.c_str() );
+            } else if( _nav->isGroup() ) {
+                _cb->removeChannel( _nav->getGroup(), _name.c_str() );
             } else if( _nav->isConsumers() ) {
                 _cb->removeConsumer( _nav->getGroup(), _nav->getChannel(), _name.c_str() );
             } else if( _nav->isProducers() ) {
