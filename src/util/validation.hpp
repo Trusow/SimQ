@@ -148,6 +148,7 @@ namespace simq::util {
 
     bool Validation::isUInt( const char *value ) {
         unsigned long int v = 0;
+        bool isStartNull = false;
 
         if( value[0] == 0 ) {
             return false;
@@ -157,8 +158,12 @@ namespace simq::util {
             char ch = value[i];
             if( ch >= '0' && ch <= '9' ) {
                 if( ch == '0' && i == 0 ) {
+                    isStartNull = true;
+                }
+                if( i != 0 && isStartNull ) {
                     return false;
                 }
+
                 v = v * 10 + ( ch - '0' );
                 if( v > 0xFF'FF'FF'FF ) {
                     return false;
