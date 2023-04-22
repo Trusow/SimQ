@@ -115,18 +115,21 @@ namespace simq::core::server::CLI {
             _getAllowedCommands( allowedCommands );
 
             auto it = std::find( allowedCommands.begin(), allowedCommands.end(), cmd );
+            auto itCmd = _listCmd.find( cmd );
+            auto itScneario = _listScenario.find( cmd );
 
             if( it == allowedCommands.end() ) {
                 _console->printDanger( "Unknown command" );
                 _console->printPrefix();
-            } else if( cmd == Ini::cmdRemove || cmd == Ini::cmdPswd || cmd == Ini::cmdAdd ) {
+            } else if( itScneario != _listScenario.end() ) {
                 _scen = cmd;
 
                 _listScenario[cmd]->start();
+                list.erase( list.begin() );
                 _listScenario[cmd]->input( list );
 
                 _isScenario = !_listScenario[cmd]->isEnd();
-            } else {
+            } else if( itCmd != _listCmd.end() ) {
                 list.erase( list.begin() );
                 _listCmd[cmd]->run( list );
             }
