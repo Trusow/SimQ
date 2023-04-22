@@ -28,21 +28,14 @@ namespace simq::core::server::CLI {
     };
 
     void CmdSet::run( std::vector<std::string> &params ) {
-        bool isErr = false;
-
         if( params.empty() ) {
-            _console->printDanger( "Not found name of param" );
-            isErr = true;
+            Ini::printDanger( _console, "Not found name of param" );
+            return;
         } else if( params.size() == 1 ) {
-            _console->printDanger( "Not found value of param" );
-            isErr = true;
+            Ini::printDanger( _console, "Not found value of param" );
+            return;
         } else if( params.size() > 2 ) {
-            _console->printDanger( "Many params" );
-            isErr = true;
-        }
-
-        if( isErr ) {
-            _console->printPrefix();
+            Ini::printDanger( _console, "ManyParams" );
             return;
         }
 
@@ -54,8 +47,7 @@ namespace simq::core::server::CLI {
         auto value = params[1].c_str();
 
         if( value[0] != 0 && !util::Validation::isUInt( value ) ) {
-            _console->printDanger( "Wrong value" );
-            _console->printPrefix();
+            Ini::printDanger( _console, "Wrong value" );
             return;
         } else {
             num = atol( value );
@@ -64,21 +56,17 @@ namespace simq::core::server::CLI {
         try {
             if( name == Ini::infoSettingsPort ) {
                 if( !util::Validation::isPort( num ) ) {
-                    _console->printDanger( "Wrong value" );
-                    _console->printPrefix();
+                    Ini::printDanger( _console, "Wrong value" );
                 } else {
                     _cb->updatePort( num );
-                    _console->printSuccess( "Restart server to apply changes" );
-                    _console->printPrefix();
+                    Ini::printSuccess( _console, "Restart server to apply changes" );
                 }
             } else if( name == Ini::infoSettingsCountThreads ) {
                 if( !util::Validation::isCountThread( num ) ) {
-                    _console->printDanger( "Wrong value" );
-                    _console->printPrefix();
+                    Ini::printDanger( _console, "Wrong value", _nav->getPathWithPrefix() );
                 } else {
                     _cb->updateCountThreads( num );
-                    _console->printSuccess( "Restart server to apply changes" );
-                    _console->printPrefix();
+                    Ini::printSuccess( _console, "Restart server to apply changes" );
                 }
             } else if( name == Ini::infoChMinMessageSize ) {
                 _cb->getChannelSettings(
@@ -113,22 +101,18 @@ namespace simq::core::server::CLI {
                 settings.maxMessagesOnDisk = num;
                 isChannel = true;
             } else {
-                _console->printDanger( "Unknown name" );
-                _console->printPrefix();
+                Ini::printDanger( _console, "Unknown name" );
             }
 
             if( isChannel ) {
                 if( !util::Validation::isChannelSettings( &settings ) ) {
-                    _console->printDanger( "Wrong value" );
-                    _console->printPrefix();
+                    Ini::printDanger( _console, "Wrong value" );
                 } else {
-                    _console->printWarning( "The changes will be applied by the server" );
-                    _console->printPrefix();
+                    Ini::printWarning( _console, Ini::msgApplyChangesDefer );
                 }
             }
         } catch( ... ) {
-            _console->printDanger( "Server error" );
-            _console->printPrefix();
+            Ini::printDanger( _console, "Server error" );
         }
     }
 }

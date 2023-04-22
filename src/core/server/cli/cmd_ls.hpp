@@ -26,8 +26,7 @@ namespace simq::core::server::CLI {
 
     void CmdLs::run( std::vector<std::string> &params ) {
         if( params.size() > 1 ) {
-            _console->printDanger( "Many params" );
-            _console->printPrefix();
+            Ini::printDanger( _console, "Many params" );
             return;
         }
 
@@ -55,11 +54,11 @@ namespace simq::core::server::CLI {
             } else {
                 _console->printList( list, params[0].c_str() );
             }
+            _console->printPrefix();
 
         } catch( ... ) {
-            _console->printDanger( "Not found path" );
+            Ini::printDanger( _console, "Not found path" );
         }
-        _console->printPrefix();
     }
 }
 

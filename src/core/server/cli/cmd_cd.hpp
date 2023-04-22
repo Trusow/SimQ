@@ -250,8 +250,7 @@ namespace simq::core::server::CLI {
             _console->printPrefix( true );
             return;
         } else if ( params.size() > 1 ) {
-            _console->printDanger( "Many params" );
-            _console->printPrefix();
+            Ini::printDanger( _console, "Many params" );
             return;
         }
 
@@ -265,8 +264,7 @@ namespace simq::core::server::CLI {
             _console->setPrefix( _nav->getPathWithPrefix() );
             _console->printPrefix( true );
         } catch( ... ) {
-            _console->printDanger( "Not found path" );
-            _console->printPrefix();
+            Ini::printDanger( _console, "Not found path" );
         }
     }
 }

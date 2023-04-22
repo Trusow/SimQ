@@ -60,9 +60,7 @@ namespace simq::core::server::CLI {
         if( _nav->isSettings() && !_isCorrectCurrentPassword ) {
             _cb->getMasterPassword( origHashPswd );
             if( strncmp( ( const char * )origHashPswd, ( const char * )hashPswd, l ) != 0 ) {
-                _console->printDanger( "Wrong password" );
-                _console->setPrefix( _nav->getPathWithPrefix() );
-                _console->printPrefix();
+                Ini::printDanger( _console, "Wrong password", _nav->getPathWithPrefix() );
                 _isEnd = true;
             } else {
                 _isCorrectCurrentPassword = true;
@@ -79,9 +77,7 @@ namespace simq::core::server::CLI {
         } else if( _confirmPassword == "" ) {
             _confirmPassword = value;
             if( _newPassword != _confirmPassword ) {
-                _console->printDanger( "Passwords don't match" );
-                _console->setPrefix( _nav->getPathWithPrefix() );
-                _console->printPrefix();
+                Ini::printDanger( _console, "Passwords don't match", _nav->getPathWithPrefix() );
                 _isEnd = true;
             } else {
                 try {
@@ -91,9 +87,7 @@ namespace simq::core::server::CLI {
                         _console->exit();
                     } else if( _nav->isGroup() ) {
                         _cb->updateGroupPassword( _nav->getGroup(), hashPswd );
-                        _console->printWarning( "The changes will be applied by the server." );
-                        _console->setPrefix( _nav->getPathWithPrefix() );
-                        _console->printPrefix();
+                        Ini::printWarning( _console, Ini::msgApplyChangesDefer, _nav->getPathWithPrefix() );
                     } else if( _nav->isConsumer() ) {
                         _cb->updateConsumerPassword(
                             _nav->getGroup(),
@@ -101,9 +95,7 @@ namespace simq::core::server::CLI {
                             _nav->getUser(),
                             hashPswd
                         );
-                        _console->printWarning( "The changes will be applied by the server." );
-                        _console->setPrefix( _nav->getPathWithPrefix() );
-                        _console->printPrefix();
+                        Ini::printWarning( _console, Ini::msgApplyChangesDefer, _nav->getPathWithPrefix() );
                     } else if( _nav->isProducer() ) {
                         _cb->updateProducerPassword(
                             _nav->getGroup(),
@@ -111,14 +103,10 @@ namespace simq::core::server::CLI {
                             _nav->getUser(),
                             hashPswd
                         );
-                        _console->printWarning( "The changes will be applied by the server." );
-                        _console->setPrefix( _nav->getPathWithPrefix() );
-                        _console->printPrefix();
+                        Ini::printWarning( _console, Ini::msgApplyChangesDefer, _nav->getPathWithPrefix() );
                     }
                 } catch( ... ) {
-                    _console->printDanger( "Server error" );
-                    _console->setPrefix( _nav->getPathWithPrefix() );
-                    _console->printPrefix();
+                    Ini::printDanger( _console, "Server error", _nav->getPathWithPrefix() );
                 }
             }
             _isEnd = true;
