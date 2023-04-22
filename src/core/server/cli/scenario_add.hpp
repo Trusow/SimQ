@@ -39,6 +39,12 @@ namespace simq::core::server::CLI {
 
             Step _step = STEP_NONE;
 
+            bool _isDuplicate( const char *name );
+            void _printDuplicateError();
+            bool _validateChannelParam( std::vector<std::string> &list );
+            bool _validateChannelMinMessageSize( unsigned int value );
+            bool _validateChannelMaxMessageSize( unsigned int value, unsigned int min );
+
 
         public:
             ScenarioAdd(
@@ -65,40 +71,83 @@ namespace simq::core::server::CLI {
         _channelSettings.maxMessagesInMemory = 1;
     }
 
+    bool ScenarioAdd::_isDuplicate( const char *name ) {
+        std::vector<std::string> _items;
+
+        if( _nav->isGroups() ) {
+            _cb->getGroups( _items );
+        } else if( _nav->isGroup() ) {
+            _cb->getChannels( _nav->getGroup(), _items );
+        } else if( _nav->isConsumers() ) {
+            _cb->getConsumers( _nav->getGroup(), _nav->getChannel(), _items );
+        } else if( _nav->isProducers() ) {
+            _cb->getProducers( _nav->getGroup(), _nav->getChannel(), _items );
+        }
+
+        auto it = std::find( _items.begin(), _items.end(), name );
+
+        return it != _items.end();
+    }
+
+    void ScenarioAdd::_printDuplicateError() {
+        if( _nav->isGroups() ) {
+            Ini::printDanger( _console, "Duplicate group", _nav->getPathWithPrefix() );
+        } else if( _nav->isGroup() ) {
+            Ini::printDanger( _console, "Duplicate channel", _nav->getPathWithPrefix() );
+        } else if( _nav->isConsumers() ) {
+            Ini::printDanger( _console, "Duplicate consumer", _nav->getPathWithPrefix() );
+        } else if( _nav->isProducers() ) {
+            Ini::printDanger( _console, "Duplicate producer", _nav->getPathWithPrefix() );
+        }
+    }
+
+    bool ScenarioAdd::_validateChannelParam( std::vector<std::string> &list ) {
+        if( list.empty() ) {
+            Ini::printDanger( _console, "Empty params" );
+            return false;
+        } else if( list.size() > 1 ) {
+            Ini::printDanger( _console, "Many params" );
+            return false;
+        } else if( !util::Validation::isUInt( list[0].c_str() ) ) {
+            Ini::printDanger( _console, "Wrong param" );
+            return false;
+        }
+
+        return true;
+    }
+
+    bool ScenarioAdd::_validateChannelMinMessageSize( unsigned int value ) {
+        if( value == 0 ) {
+            Ini::printDanger( _console, "Wrong param" );
+            return false;
+        }
+
+        return true;
+    }
+
+    bool ScenarioAdd::_validateChannelMaxMessageSize( unsigned int value, unsigned int min ) {
+        if( value == 0 || min > value ) {
+            Ini::printDanger( _console, "Wrong param" );
+            return false;
+        }
+
+        return true;
+    }
+
     void ScenarioAdd::input( std::vector<std::string> &list ) {
 
         if( _step == STEP_NONE ) {
-
-            const char *item = list[1].c_str();
-            
-            std::vector<std::string> _items;
-
-            if( _nav->isGroups() ) {
-                _cb->getGroups( _items );
-            } else if( _nav->isGroup() ) {
-                _cb->getChannels( _nav->getGroup(), _items );
-            } else if( _nav->isConsumers() ) {
-                _cb->getConsumers( _nav->getGroup(), _nav->getChannel(), _items );
-            } else if( _nav->isProducers() ) {
-                _cb->getProducers( _nav->getGroup(), _nav->getChannel(), _items );
+            if( list.empty() ) {
+                Ini::printDanger( _console, "Empty params", _nav->getPathWithPrefix() );
+                _isEnd = true;
+                return;
             }
 
-            auto it = std::find( _items.begin(), _items.end(), item );
-            if( it != _items.end() ) {
-                if( _nav->isGroups() ) {
-                    _console->printDanger( "Duplicate group" );
-                } else if( _nav->isGroup() ) {
-                    _console->printDanger( "Duplicate channel" );
-                } else if( _nav->isConsumers() ) {
-                    _console->printDanger( "Duplicate consumer" );
-                } else if( _nav->isProducers() ) {
-                    _console->printDanger( "Duplicate producer" );
-                }
-                _console->setPrefix( _nav->getPathWithPrefix() );
-                _console->printPrefix();
+            if( _isDuplicate( list[0].c_str() ) ) {
+                _printDuplicateError();
                 _isEnd = true;
             } else {
-                _name = list[1];
+                _name = list[0];
 
                 if( _nav->isGroup() ) {
                     _console->disableHistory();
@@ -115,67 +164,45 @@ namespace simq::core::server::CLI {
             _step == STEP_CH_MAX_MESSAGES_IN_MEMORY ||
             _step == STEP_CH_MAX_MESSAGES_ON_DISK
         ) {
-            if( list.empty() ) {
-                _console->printDanger( "Empty params" );
-                _console->printPrefix();
-            } else if( list.size() > 1 ) {
-                _console->printDanger( "Many params" );
-                _console->printPrefix();
-            } else {
-                unsigned int value = atol( list[0].c_str() );
-                if( !util::Validation::isUInt( list[0].c_str() ) ) {
+            if( !_validateChannelParam( list ) ) {
+                return;
+            }
+
+            unsigned int value = atol( list[0].c_str() );
+
+            if( _step == STEP_CH_MIN_MESSAGE_SIZE ) {
+                if( _validateChannelMinMessageSize( value ) ) {
+                    _channelSettings.minMessageSize = value;
+                    _step = STEP_CH_MAX_MESSAGE_SIZE;
+                    _console->setPrefix( "Max message size: " );
+                    _console->printPrefix( true );
+                }
+            } else if( _step == STEP_CH_MAX_MESSAGE_SIZE ) {
+                if( _validateChannelMaxMessageSize( value, _channelSettings.minMessageSize ) ) {
+                    _channelSettings.maxMessageSize = value;
+                    _step = STEP_CH_MAX_MESSAGES_IN_MEMORY;
+                    _console->setPrefix( "Max messages in memory: " );
+                    _console->printPrefix( true );
+                }
+            } else if( _step == STEP_CH_MAX_MESSAGES_IN_MEMORY ) {
+                _channelSettings.maxMessagesInMemory = value;
+                _step = STEP_CH_MAX_MESSAGES_ON_DISK;
+                _console->setPrefix( "Max messages on disk: " );
+                _console->printPrefix( true );
+            } else if( _step == STEP_CH_MAX_MESSAGES_ON_DISK ) {
+                _channelSettings.maxMessagesOnDisk = value;
+                if( !util::Validation::isChannelSettings( &_channelSettings ) ) {
                     _console->printDanger( "Wrong param" );
                     _console->printPrefix();
                 } else {
-                    if( _step == STEP_CH_MIN_MESSAGE_SIZE ) {
-                        if( value == 0 ) {
-                            _console->printDanger( "Wrong param" );
-                            _console->printPrefix();
-                        } else {
-                            _channelSettings.minMessageSize = value;
-                            _step = STEP_CH_MAX_MESSAGE_SIZE;
-                            _console->setPrefix( "Max message size: " );
-                            _console->printPrefix( true );
-                        }
-                    } else if( _step == STEP_CH_MAX_MESSAGE_SIZE ) {
-                        if( value == 0 ) {
-                            _console->printDanger( "Wrong param" );
-                            _console->printPrefix();
-                        } else {
-                            _channelSettings.maxMessageSize = value;
-                            if( !util::Validation::isChannelSettings( &_channelSettings ) ) {
-                                _console->printDanger( "Wrong param" );
-                                _console->printPrefix();
-                            } else {
-                                _channelSettings.maxMessageSize = value;
-                                _step = STEP_CH_MAX_MESSAGES_IN_MEMORY;
-                                _console->setPrefix( "Max messages in memory: " );
-                                _console->printPrefix( true );
-                            }
-                        }
-                    } else if( _step == STEP_CH_MAX_MESSAGES_IN_MEMORY ) {
-                        _channelSettings.maxMessagesInMemory = value;
-                        _step = STEP_CH_MAX_MESSAGES_ON_DISK;
-                        _console->setPrefix( "Max messages on disk: " );
-                        _console->printPrefix( true );
-                    } else if( _step == STEP_CH_MAX_MESSAGES_ON_DISK ) {
-                        _channelSettings.maxMessagesOnDisk = value;
-                        if( !util::Validation::isChannelSettings( &_channelSettings ) ) {
-                            _console->printDanger( "Wrong param" );
-                            _console->printPrefix();
-                        } else {
-                            _isEnd = true;
-                            try {
-                                _cb->addChannel( _nav->getGroup(), _name.c_str(), &_channelSettings );
-                                _console->printWarning( "The changes will be applied by the server." );
-                            } catch( ... ) {
-                                _console->printDanger( "Server error" );
-                            }
-                            _console->setPrefix( _nav->getPathWithPrefix() );
-                            _console->printPrefix();
-                            _console->enableHistory();
-                        }
+                    _isEnd = true;
+                    try {
+                        _cb->addChannel( _nav->getGroup(), _name.c_str(), &_channelSettings );
+                        Ini::printWarning( _console, Ini::msgApplyChangesDefer, _nav->getPathWithPrefix() );
+                    } catch( ... ) {
+                        Ini::printDanger( _console, "Server error", _nav->getPathWithPrefix() );
                     }
+                    _console->enableHistory();
                 }
             }
         }
@@ -197,18 +224,12 @@ namespace simq::core::server::CLI {
             _confirmPassword = value;
 
             if( _password != _confirmPassword ) {
-                _console->printDanger( "Passwords don't match" );
-                _console->setPrefix( _nav->getPathWithPrefix() );
-                _console->printPrefix();
+                Ini::printDanger( _console, "Passwords don't match", _nav->getPathWithPrefix() );
                 _isEnd = true;
             } else {
                 try {
                     if( _nav->isGroups() ) {
                         _cb->addGroup( _name.c_str(), hashPswd );
-                        _console->printWarning( "The changes will be applied by the server." );
-                        _console->setPrefix( _nav->getPathWithPrefix() );
-                        _console->printPrefix();
-                        _isEnd = true;
                     } else if( _nav->isProducers() ) {
                         _cb->addConsumer(
                             _nav->getGroup(),
@@ -216,10 +237,6 @@ namespace simq::core::server::CLI {
                             _name.c_str(),
                             hashPswd
                         );
-                        _console->printWarning( "The changes will be applied by the server." );
-                        _console->setPrefix( _nav->getPathWithPrefix() );
-                        _console->printPrefix();
-                        _isEnd = true;
                     } else if( _nav->isConsumers() ) {
                         _cb->addProducer(
                             _nav->getGroup(),
@@ -227,17 +244,13 @@ namespace simq::core::server::CLI {
                             _name.c_str(),
                             hashPswd
                         );
-                        _console->printWarning( "The changes will be applied by the server." );
-                        _console->setPrefix( _nav->getPathWithPrefix() );
-                        _console->printPrefix();
-                        _isEnd = true;
                     }
+                    Ini::printWarning( _console, Ini::msgApplyChangesDefer, _nav->getPathWithPrefix() );
                 } catch( ... ) {
-                    _console->printDanger( "Server error" );
-                    _console->setPrefix( _nav->getPathWithPrefix() );
-                    _console->printPrefix();
-                    _isEnd = true;
+                    Ini::printDanger( _console, "Server error", _nav->getPathWithPrefix() );
                 }
+
+                _isEnd = true;
             }
         }
     }
