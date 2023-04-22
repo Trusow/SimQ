@@ -1,29 +1,36 @@
-#ifndef SIMQ_CORE_SERVER_CLI_LS
-#define SIMQ_CORE_SERVER_CLI_LS
+#ifndef SIMQ_CORE_SERVER_CLI_CMD_LS
+#define SIMQ_CORE_SERVER_CLI_CMD_LS
 
 #include "navigation.hpp"
 #include "../../../util/console.hpp"
 #include "callbacks.hpp"
+#include "cmd.h"
 #include "ini.h"
 #include <vector>
 #include <string>
 
 namespace simq::core::server::CLI {
-    class Ls {
+    class CmdLs: public Cmd {
         private:
             Navigation *_nav = nullptr;
             util::Console *_console = nullptr;
             Callbacks *_cb = nullptr;
         public:
-            Ls(
+            CmdLs(
                 util::Console *console,
                 Navigation *nav,
                 Callbacks *cb
             ) : _console{console}, _nav{nav}, _cb{cb} {};
-            void print( const char *query = nullptr );
+            void run( std::vector<std::string> &params );
     };
 
-    void Ls::print( const char *query ) {
+    void CmdLs::run( std::vector<std::string> &params ) {
+        if( params.size() > 1 ) {
+            _console->printDanger( "Many params" );
+            _console->printPrefix();
+            return;
+        }
+
         std::vector<std::string> list;
 
         try {
@@ -43,7 +50,11 @@ namespace simq::core::server::CLI {
                 _cb->getProducers( _nav->getGroup(), _nav->getChannel(), list );
             }
 
-            _console->printList( list, query );
+            if( params.empty() ) {
+                _console->printList( list );
+            } else {
+                _console->printList( list, params[0].c_str() );
+            }
 
         } catch( ... ) {
             _console->printDanger( "Not found path" );

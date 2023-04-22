@@ -1,27 +1,37 @@
-#ifndef SIMQ_CORE_SERVER_CLI_HELP
-#define SIMQ_CORE_SERVER_CLI_HELP
+#ifndef SIMQ_CORE_SERVER_CLI_CMD_H
+#define SIMQ_CORE_SERVER_CLI_CMD_H
 
 #include "navigation.hpp"
 #include "../../../util/console.hpp"
 #include "ini.h"
+#include "cmd.h"
 #include <vector>
 #include <string>
 
 namespace simq::core::server::CLI {
-    class Help {
+    class CmdH: public Cmd {
         private:
             Navigation *_nav = nullptr;
             util::Console *_console = nullptr;
         public:
-            Help(
+            CmdH(
                 util::Console *console,
                 Navigation *nav
             ) : _console{console}, _nav{nav} {};
-            void print( std::vector<std::string> &list );
+            void run( std::vector<std::string> &params );
     };
 
-    void Help::print( std::vector<std::string> &list ) {
+    void CmdH::run( std::vector<std::string> &params ) {
         std::vector<std::string> help;
+
+        std::vector<std::string> list;
+        list.push_back( Ini::cmdLs );
+        list.push_back( Ini::cmdCd );
+        list.push_back( Ini::cmdAdd );
+        list.push_back( Ini::cmdRemove );
+        list.push_back( Ini::cmdInfo );
+        list.push_back( Ini::cmdSet );
+        list.push_back( Ini::cmdPswd );
 
         for( unsigned int i = 0; i < list.size(); i++ ) {
             std::string cmd = list[i];
@@ -88,13 +98,17 @@ namespace simq::core::server::CLI {
                     str += " 100'";
                 }
             } else if( cmd == Ini::cmdLs ) {
-                str += " - show available paths, is set filter example '";
-                str += cmd + " query'";
+                if( !_nav->isSettings() && !_nav->isConsumer() && !_nav->isProducer() ) {
+                    str += " - show available paths, is set filter example '";
+                    str += cmd + " query'";
+                }
             } else if( cmd == Ini::cmdCd ) {
                 str += " - go to path";
             }
 
-            help.push_back( str );
+            if( str != cmd ) {
+                help.push_back( str );
+            }
 
         }
 

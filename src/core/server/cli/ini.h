@@ -4,6 +4,7 @@
 namespace simq::core::server::CLI::Ini {
     inline const char *defPrefix = "simq";
 
+    inline const char *cmdAuth = "auth";
     inline const char *cmdLs = "ls";
     inline const char *cmdH = "h";
     inline const char *cmdCd = "cd";

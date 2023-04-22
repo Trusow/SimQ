@@ -9,9 +9,11 @@
 #include "scenario_remove.hpp"
 #include "scenario_add.hpp"
 #include "ini.h"
-#include "help.hpp"
-#include "ls.hpp"
-#include "info.hpp"
+#include "cmd_h.hpp"
+#include "cmd_ls.hpp"
+#include "cmd_info.hpp"
+#include "cmd_set.hpp"
+#include "cmd_cd.hpp"
 #include "../../../util/string.hpp"
 #include "../../../crypto/hash.hpp"
 #include "../../../util/console_callbacks.h"
@@ -21,6 +23,7 @@
 #include <string.h>
 #include <algorithm>
 #include <iostream>
+#include <map>
 
 namespace simq::core::server::CLI {
     class Manager: public util::ConsoleCallbacks {
@@ -29,34 +32,13 @@ namespace simq::core::server::CLI {
             util::Console *_console = nullptr;
             CLI::Navigation *_nav = nullptr;
 
-            enum Scen {
-                SCENARIO_NONE,
-                SCENARIO_AUTH,
-                SCENARIO_ADD,
-                SCENARIO_REMOVE,
-                SCENARIO_UPSWD,
-            };
+            std::string _scen = "";
+            bool _isScenario = false;
 
-            Scen _scen = SCENARIO_NONE;
-
-            Scenario *_scenAuth = nullptr;
-            Scenario *_scenAdd = nullptr;
-            Scenario *_scenRemove = nullptr;
-            Scenario *_scenUpswd = nullptr;
-            Help *_help = nullptr;
-            Ls *_ls = nullptr;
-            Info *_info = nullptr;
-
-            bool _isAuth = false;
-
-            const char *_warningChanges = "The changes will be applied by the server.";
-            const char *_errNotFoundPath = "Not found path.";
+            std::map<std::string, Scenario *> _listScenario;
+            std::map<std::string, Cmd *> _listCmd;
 
             void _getAllowedCommands( std::vector<std::string> &list );
-
-            void _auth( const char *password );
-            bool _validation( unsigned int realCount, unsigned int expectedCount );
-
         public:
             Manager( Callbacks *cb );
             ~Manager();
@@ -70,17 +52,21 @@ namespace simq::core::server::CLI {
         _nav = new Navigation( _console, cb );
         _cb = cb;
 
-        _help = new Help( _console, _nav );
-        _ls = new Ls( _console, _nav, cb );
-        _info = new Info( _console, _nav, cb );
+        _listCmd[Ini::cmdLs] = new CmdLs( _console, _nav, cb );
+        _listCmd[Ini::cmdH] = new CmdH( _console, _nav );
+        _listCmd[Ini::cmdInfo] = new CmdInfo( _console, _nav, cb );
+        _listCmd[Ini::cmdSet] = new CmdSet( _console, _nav, cb );
+        _listCmd[Ini::cmdCd] = new CmdCd( _console, _nav, cb );
 
-        _scenAuth = new ScenarioAuth( _console, _nav, _cb );
-        _scenUpswd = new ScenarioPassword( _console, _nav, _cb );
-        _scenRemove = new ScenarioRemove( _console, _nav, _cb );
-        _scenAdd = new ScenarioAdd( _console, _nav, _cb );
-        _scenAuth->start();
-        _scen = SCENARIO_AUTH;
-       
+        _listScenario[Ini::cmdAuth] = new ScenarioAuth( _console, _nav, _cb );
+        _listScenario[Ini::cmdPswd] = new ScenarioPassword( _console, _nav, _cb );
+        _listScenario[Ini::cmdRemove] = new ScenarioRemove( _console, _nav, _cb );
+        _listScenario[Ini::cmdAdd] = new ScenarioAdd( _console, _nav, _cb );
+
+        _listScenario[Ini::cmdAuth]->start();
+        _scen = Ini::cmdAuth;
+        _isScenario = !_listScenario[_scen]->isEnd();
+
         _console->run();
     }
 
@@ -123,9 +109,8 @@ namespace simq::core::server::CLI {
     }
 
     void Manager::input( std::vector<std::string> &list ) {
-        if( _scen == SCENARIO_NONE ) {
+        if( !_isScenario ) {
             auto cmd = list[0];
-
             std::vector<std::string> allowedCommands;
             _getAllowedCommands( allowedCommands );
 
@@ -134,155 +119,31 @@ namespace simq::core::server::CLI {
             if( it == allowedCommands.end() ) {
                 _console->printDanger( "Unknown command" );
                 _console->printPrefix();
-            } else if( cmd == Ini::cmdLs ) {
-                if( list.size() == 2 ) {
-                    _ls->print( list[1].c_str() );
-                } else if( list.size() == 1 ) {
-                    _ls->print();
-                } else {
-                    _console->printDanger( "Many params" );
-                    _console->printPrefix();
-                }
-            } else if( cmd == Ini::cmdCd ) {
-                if( _validation( list.size(), 2 ) ) {
-                    _nav->to( list[1].c_str() );
-                }
-            } else if( cmd == Ini::cmdH ) {
-                _help->print( allowedCommands );
-            } else if( cmd == Ini::cmdRemove ) {
-                if( _validation( list.size(), 2 ) ) {
-                    _scenRemove->start();
-                    _scenRemove->input( list );
+            } else if( cmd == Ini::cmdRemove || cmd == Ini::cmdPswd || cmd == Ini::cmdAdd ) {
+                _scen = cmd;
 
-                    _scen = SCENARIO_REMOVE;
+                _listScenario[cmd]->start();
+                _listScenario[cmd]->input( list );
 
-                    if( _scenRemove->isEnd() ) {
-                        _scen = SCENARIO_NONE;
-                    }
-                }
-            } else if( cmd == Ini::cmdPswd ) {
-                if( _validation( list.size(), 1 ) ) {
-                    _scenUpswd->start();
-                    _scen = SCENARIO_UPSWD;
-                }
-            } else if( cmd == Ini::cmdInfo ) {
-                if( _validation( list.size(), 1 ) ) {
-                    _info->print();
-                }
-            } else if( cmd == Ini::cmdSet ) {
-                if( _validation( list.size(), 3 ) ) {
-                    _info->set( list[1], list[2].c_str() );
-                }
-            } else if( cmd == Ini::cmdAdd ) {
-                if( _validation( list.size(), 2 ) ) {
-                    _scen = SCENARIO_ADD;
-                    _scenAdd->start();
-                    _scenAdd->input( list );
-                    if( _scenAdd->isEnd() ) {
-                        _scen = SCENARIO_NONE;
-                    }
-                }
+                _isScenario = !_listScenario[cmd]->isEnd();
+            } else {
+                list.erase( list.begin() );
+                _listCmd[cmd]->run( list );
             }
         } else {
-            switch( _scen ) {
-                case SCENARIO_AUTH:
-                    _scenAuth->input( list );
-                    if( _scenAuth->isEnd() ) {
-                        _scen = SCENARIO_NONE;
-                    }
-                    break;
-                case SCENARIO_ADD:
-                    _scenAdd->input( list );
-                    if( _scenAdd->isEnd() ) {
-                        _scen = SCENARIO_NONE;
-                    }
-                    break;
-                case SCENARIO_REMOVE:
-                    _scenRemove->input( list );
-                    if( _scenRemove->isEnd() ) {
-                        _scen = SCENARIO_NONE;
-                    }
-                    break;
-                case SCENARIO_UPSWD:
-                    _scenUpswd->input( list );
-                    if( _scenUpswd->isEnd() ) {
-                        _scen = SCENARIO_NONE;
-                    }
-                    break;
-            }
+            _listScenario[_scen]->input( list );
+            _isScenario = !_listScenario[_scen]->isEnd();
         }
     }
 
     void Manager::inputPassword( const char *password ) {
-        switch( _scen ) {
-            case SCENARIO_AUTH:
-                _scenAuth->password( password );
-                if( _scenAuth->isEnd() ) {
-                    _scen = SCENARIO_NONE;
-                }
-                break;
-            case SCENARIO_ADD:
-                _scenAdd->password( password );
-                if( _scenAdd->isEnd() ) {
-                    _scen = SCENARIO_NONE;
-                }
-                break;
-            case SCENARIO_REMOVE:
-                _scenRemove->password( password );
-                if( _scenRemove->isEnd() ) {
-                    _scen = SCENARIO_NONE;
-                }
-                break;
-            case SCENARIO_UPSWD:
-                _scenUpswd->password( password );
-                if( _scenUpswd->isEnd() ) {
-                    _scen = SCENARIO_NONE;
-                }
-                break;
-        }
+        _listScenario[_scen]->password( password );
+        _isScenario = !_listScenario[_scen]->isEnd();
     }
 
     void Manager::confirm( bool value ) {
-        switch( _scen ) {
-            case SCENARIO_AUTH:
-                _scenAuth->confirm( value );
-                if( _scenAuth->isEnd() ) {
-                    _scen = SCENARIO_NONE;
-                }
-                break;
-            case SCENARIO_ADD:
-                _scenAdd->confirm( value );
-                if( _scenAdd->isEnd() ) {
-                    _scen = SCENARIO_NONE;
-                }
-                break;
-            case SCENARIO_REMOVE:
-                _scenRemove->confirm( value );
-                if( _scenRemove->isEnd() ) {
-                    _scen = SCENARIO_NONE;
-                }
-                break;
-            case SCENARIO_UPSWD:
-                _scenUpswd->confirm( value );
-                if( _scenUpswd->isEnd() ) {
-                    _scen = SCENARIO_NONE;
-                }
-                break;
-        }
-    }
-
-    bool Manager::_validation( unsigned int realCount, unsigned int expectedCount ) {
-        if( realCount == expectedCount ) {
-            return true;
-        } else if ( realCount > expectedCount ) {
-            _console->printDanger( "Many params" );
-            _console->printPrefix();
-        } else {
-            _console->printDanger( "Empty params" );
-            _console->printPrefix();
-        }
-
-        return false;
+        _listScenario[_scen]->confirm( value );
+        _isScenario = !_listScenario[_scen]->isEnd();
     }
 }
 
