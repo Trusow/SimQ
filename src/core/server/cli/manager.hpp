@@ -129,8 +129,10 @@ namespace simq::core::server::CLI {
             } else if( itCmd != _listCmd.end() && it != allowedCommands.end() ) {
                 list.erase( list.begin() );
                 _listCmd[cmd]->run( list );
-            } else {
+            } else if( cmd[0] == '.' || cmd[0] == '/' ) {
                 _listCmd[Ini::cmdCd]->run( list );
+            } else {
+                Ini::printDanger( _console, "Unknown command" );
             }
         } else {
             _listScenario[_scen]->input( list );
