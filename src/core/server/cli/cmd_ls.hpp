@@ -49,11 +49,7 @@ namespace simq::core::server::CLI {
                 _cb->getProducers( _nav->getGroup(), _nav->getChannel(), list );
             }
 
-            if( params.empty() ) {
-                _console->printList( list );
-            } else {
-                _console->printList( list, params[0].c_str() );
-            }
+            _console->printList( list, params.empty() ? nullptr : params[0].c_str() );
             _console->printPrefix();
 
         } catch( ... ) {
