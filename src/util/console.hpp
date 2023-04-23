@@ -60,6 +60,7 @@ namespace simq::util {
             unsigned int _navigationHistory = 0;
 
             const char *_margin = "    ";
+            const char *_stepWordSeparators = " /";
 
             bool _toNextHistory = false;
             bool _toPrevHistory = false;
@@ -382,12 +383,12 @@ namespace simq::util {
             _prevChar( line, position );
         }
 
-        if( line[position] != ' ' ) {
+        if( strchr( _stepWordSeparators, line[position] ) == NULL ) {
             _prevChar( line, position );
         }
 
         for( unsigned int i = position; i > 0; i-- ) {
-            if( line[i] == ' ' ) {
+            if( strchr( _stepWordSeparators, line[i] ) != NULL ) {
                 if( isBreak ) {
                     _nextChar( line, position );
                     break;
@@ -405,7 +406,7 @@ namespace simq::util {
         bool isBreak = false;
 
         for( unsigned int i = position; i < line.length(); i++ ) {
-            if( line[i] == ' ' ) {
+            if( strchr( _stepWordSeparators, line[i] ) != NULL ) {
                 if( isBreak ) {
                     break;
                 }
