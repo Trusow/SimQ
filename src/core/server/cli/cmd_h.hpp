@@ -81,9 +81,11 @@ namespace simq::core::server::CLI {
                 }
             } else if( cmd == Ini::cmdInfo ) {
                 if( _nav->isSettings() ) {
-                    str += " - show settings of server";
+                    str += " - show settings of server, is set filter example '";
+                    str += cmd + " query'";
                 } else if( _nav->isChannel() ) {
-                    str += " - show settings of channel";
+                    str += " - show settings of channel, is set filter example '";
+                    str += cmd + " query'";
                 }
             } else if( cmd == Ini::cmdSet ) {
                 if( _nav->isSettings() ) {

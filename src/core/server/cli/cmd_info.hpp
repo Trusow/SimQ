@@ -36,6 +36,11 @@ namespace simq::core::server::CLI {
     }
 
     void CmdInfo::run( std::vector<std::string> &params ) {
+        if( params.size() > 1 ) {
+            Ini::printDanger( _console, "Many params" );
+            return;
+        }
+
         std::vector<std::string> list;
 
         if( _nav->isSettings() ) {
@@ -54,7 +59,7 @@ namespace simq::core::server::CLI {
             _addToList( list, Ini::infoChMaxMessagesOnDisk, settings.maxMessagesOnDisk );
         }
 
-        _console->printList( list );
+        _console->printList( list, params.empty() ? nullptr : params[0].c_str() );
         _console->printPrefix();
     }
 }
