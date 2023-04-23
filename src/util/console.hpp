@@ -264,6 +264,10 @@ namespace simq::util {
         } else if( code == KEY_CTRL_UP ) {
             std::cout << _getTerminalWidth() << std::endl;
         } else if( code == KEY_ENTER ) {
+            while( position != line.length() ) {
+                _nextChar( line, position );
+            }
+
             _toBeginHistory();
             if( line != "" ) {
                 _pushHistory( line );
@@ -362,8 +366,15 @@ namespace simq::util {
             return;
         }
 
+        auto width = _getTerminalWidth();
+        if( ( position + _currentPrefix.length() + 1 ) % width == 0 ) {
+            std::cout << "\x1b[1E";
+            std::cout << "\x1b[" << width << "D";
+        } else {
+            std::cout << "\x1b[1C";
+        }
+
         position++;
-        std::cout << (char)27 << char(91) << char(67);
     }
 
     void Console::_prevChar( std::string &line, unsigned int &position ) {
@@ -371,8 +382,16 @@ namespace simq::util {
             return;
         }
 
+
+        auto width = _getTerminalWidth();
+        if( ( position + _currentPrefix.length() ) % width == 0 ) {
+            std::cout << "\x1b[1F";
+            std::cout << "\x1b[" << width << "C";
+        } else {
+            std::cout << "\x1b[1D";
+        }
+
         position--;
-        std::cout << (char)27 << char(91) << char(68);
     }
 
     void Console::_prevWord( std::string &line, unsigned int &position ) {
@@ -477,6 +496,14 @@ namespace simq::util {
     void Console::_input( std::string &line, unsigned int &position, char ch ) {
         auto l = line.length();
         unsigned int origPosition = position;
+
+        if( position == line.length() ) {
+            line += ch;
+            position = line.length();
+            std::cout << ch;
+            return;
+        }
+
         char *str = new char[l+2]{};
         str[position] = ch;
         memcpy( &str[0], line.c_str(), position );
@@ -502,6 +529,10 @@ namespace simq::util {
         auto width = _getTerminalWidth();
         auto l = line.length() + _currentPrefix.length();
         unsigned int count = l / width;
+
+        while( position != line.length() ) {
+            _nextChar( line, position );
+        }
 
         std::cout << "\x1b[2K\x1b[0G";
         for( int i = 0; i < count; i++ ) {
