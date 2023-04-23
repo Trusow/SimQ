@@ -677,10 +677,10 @@ namespace simq::util {
     }
 
     void Console::printList( std::vector<std::string> &list, const char *text ) {
-        std::cout << std::endl;
-        std::cout << std::endl;
+        bool isFound = false;
 
         if( text == nullptr ) {
+            std::cout << std::endl << std::endl;
             for( unsigned int i = 0; i < list.size(); i++ ) {
                 std::cout << _margin << list[i] << std::endl;
             }
@@ -689,6 +689,11 @@ namespace simq::util {
                 auto offset = util::String::find( list[i].c_str(), text );
                 if( offset == -1 ) {
                     continue;
+                } else {
+                    if( !isFound ) {
+                        std::cout << std::endl << std::endl;
+                    }
+                    isFound = true;
                 }
 
                 auto l = strlen( text );
