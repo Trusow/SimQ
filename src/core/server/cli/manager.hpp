@@ -118,10 +118,7 @@ namespace simq::core::server::CLI {
             auto itCmd = _listCmd.find( cmd );
             auto itScneario = _listScenario.find( cmd );
 
-            if( it == allowedCommands.end() ) {
-                _console->printDanger( "Unknown command" );
-                _console->printPrefix();
-            } else if( itScneario != _listScenario.end() ) {
+            if( itScneario != _listScenario.end() && it != allowedCommands.end() ) {
                 _scen = cmd;
 
                 _listScenario[cmd]->start();
@@ -129,9 +126,11 @@ namespace simq::core::server::CLI {
                 _listScenario[cmd]->input( list );
 
                 _isScenario = !_listScenario[cmd]->isEnd();
-            } else if( itCmd != _listCmd.end() ) {
+            } else if( itCmd != _listCmd.end() && it != allowedCommands.end() ) {
                 list.erase( list.begin() );
                 _listCmd[cmd]->run( list );
+            } else {
+                _listCmd[Ini::cmdCd]->run( list );
             }
         } else {
             _listScenario[_scen]->input( list );
