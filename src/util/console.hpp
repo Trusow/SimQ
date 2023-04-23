@@ -518,9 +518,15 @@ namespace simq::util {
             _nextChar( line, position );
         }
 
+        if( l % width == 0 ) {
+            count--;
+        }
+
         std::cout << "\x1b[2K\x1b[0G";
-        for( int i = 0; i < count; i++ ) {
-            std::cout << "\x1b[F\x1b[2K\x1b[0G";
+        if( count ) {
+            for( int i = 0; i < count; i++ ) {
+                std::cout << "\x1b[F\x1b[2K\x1b[0G";
+            }
         }
 
         std::cout << _currentPrefix;
