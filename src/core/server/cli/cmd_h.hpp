@@ -22,6 +22,11 @@ namespace simq::core::server::CLI {
     };
 
     void CmdH::run( std::vector<std::string> &params ) {
+        if( params.size() > 1 ) {
+            Ini::printDanger( _console, "Many params" );
+            return;
+        }
+
         std::vector<std::string> help;
 
         std::vector<std::string> list;
@@ -114,7 +119,7 @@ namespace simq::core::server::CLI {
 
         }
 
-        _console->printList( help );
+        _console->printList( help, params.empty() ? nullptr : params[0].c_str() );
         _console->printPrefix();
     }
 
