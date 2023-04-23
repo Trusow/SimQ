@@ -16,6 +16,7 @@
 #include <sys/ioctl.h>
 #include <sstream>
 #include "console_callbacks.h"
+#include "string.hpp"
 
 namespace simq::util {
     class Console {
@@ -663,8 +664,8 @@ namespace simq::util {
             }
         } else {
             for( unsigned int i = 0; i < list.size(); i++ ) {
-                auto offset = list[i].find( text );
-                if( offset == std::string::npos ) {
+                auto offset = util::String::find( list[i].c_str(), text );
+                if( offset == -1 ) {
                     continue;
                 }
 
