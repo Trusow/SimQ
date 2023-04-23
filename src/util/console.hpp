@@ -443,13 +443,8 @@ namespace simq::util {
             return;
         }
 
-        auto l = line.length();
-        char *str = new char[l]{};
-        memcpy( &str[0], line.c_str(), position-1 );
-        memcpy( &str[position-1], &line.c_str()[position], l-position );
-
-        std::string dline = str;
-        delete[] str;
+        std::string dline = line;
+        dline.erase( position - 1, 1 );
 
         _clear( line, position );
         line = dline;
@@ -471,13 +466,8 @@ namespace simq::util {
             return;
         }
 
-        auto l = line.length();
-        char *str = new char[l]{};
-        memcpy( &str[0], line.c_str(), position );
-        memcpy( &str[position], &line.c_str()[position+1], l-position-1 );
-
-        std::string dline = str;
-        delete[] str;
+        std::string dline = line;
+        dline.erase( position, 1 );
 
         _clear( line, position );
         line = dline;
@@ -494,7 +484,6 @@ namespace simq::util {
     }
 
     void Console::_input( std::string &line, unsigned int &position, char ch ) {
-        auto l = line.length();
         unsigned int origPosition = position;
 
         if( position == line.length() ) {
@@ -504,13 +493,8 @@ namespace simq::util {
             return;
         }
 
-        char *str = new char[l+2]{};
-        str[position] = ch;
-        memcpy( &str[0], line.c_str(), position );
-        memcpy( &str[position+1], &line.c_str()[position], l-position );
-
-        std::string dline = str;
-        delete[] str;
+        std::string dline = line;
+        dline.insert( position, 1, ch );
 
         _clear( line, position );
         line = dline;
