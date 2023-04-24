@@ -13,24 +13,59 @@
 #include <vector>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 #include "error.h"
 
 namespace simq::util {
     class FS {
+        public:
+            enum SortDir {
+                SortAsc,
+                SortDesc,
+            };
+
+            enum SortType {
+                SortByName,
+                SortByDate,
+            };
         private:
         enum Type {
             _FILE,
             _DIR,
         };
-        static void _list( const char *path, std::vector<std::string> &v, Type t );
+
+        struct ListItem {
+            std::string name;
+            unsigned int time;
+            SortType sortType;
+            SortDir sortDir;
+
+            bool operator<(const ListItem& a) const {
+                if( sortType == SortByName ) {
+                    if( sortDir == SortAsc ) {
+                        return name < a.name;
+                    } else {
+                        return name > a.name;
+                    }
+                } else {
+                    if( sortDir == SortAsc ) {
+                        return time < a.time;
+                    } else {
+                        return time > a.time;
+                    }
+                }
+            }
+        };
+
+        static void _list( const char *path, std::vector<std::string> &v, Type t, SortDir sortDir, SortType sortType );
         public:
         static bool dirExists( const char *path );
         static bool fileExists( const char *path );
         static bool createDir( const char *path );
         static void removeDir( const char *path );
         static bool removeFile( const char *path );
-        static void dirs( const char *path, std::vector<std::string> &v );
-        static void files( const char *path, std::vector<std::string> &v );
+        static void dirs( const char *path, std::vector<std::string> &v, SortDir sortDir = SortAsc, SortType = SortByName );
+        static void files( const char *path, std::vector<std::string> &v, SortDir sortDir = SortAsc, SortType = SortByName );
     };
 
     bool FS::dirExists( const char *path ) {
@@ -69,7 +104,7 @@ namespace simq::util {
         return unlink( path ) == 0;
     }
 
-    void FS::_list( const char *path, std::vector<std::string> &v, Type t ) {
+    void FS::_list( const char *path, std::vector<std::string> &v, Type t, SortDir sortDir, SortType sortType ) {
         auto *dir = opendir( path );
 
         if( dir == nullptr ) {
@@ -78,26 +113,46 @@ namespace simq::util {
      
         dirent *pDirent;
 
+        std::vector<ListItem> list;
+
         while (( pDirent = readdir( dir ) ) != nullptr) {
             bool isFile = t == Type::_FILE && pDirent->d_type == DT_REG;
             bool isDir = t == Type::_DIR && pDirent->d_type == DT_DIR;
             if(  isFile || isDir ) {
+                std::string fPath = path;
+                fPath += "/";
+                fPath += pDirent->d_name;
 
-                v.push_back( pDirent->d_name );
+                struct stat st;
+                if( stat( fPath.c_str(), &st ) != 0 ) {
+                    closedir( dir );
+                    throw util::Error::FS_ERROR;
+                }
+
+                ListItem item;
+                item.name = pDirent->d_name;
+                item.time = st.st_ctime;
+                item.sortType = sortType;
+                item.sortDir = sortDir;
+                list.push_back( item );
             }
         }
 
         closedir( dir );
 
-        std::sort( v.begin(), v.end() );
+        std::sort( list.begin(), list.end() );
+
+        for( unsigned int i = 0; i < list.size(); i++ ) {
+            v.push_back( list[i].name );
+        }
     }
 
-    void FS::dirs( const char *path, std::vector<std::string> &v ) {
-        _list( path, v, Type::_DIR );
+    void FS::dirs( const char *path, std::vector<std::string> &v, SortDir sortDir, SortType sortType ) {
+        _list( path, v, Type::_DIR, sortDir, sortType );
     }
 
-    void FS::files( const char *path, std::vector<std::string> &v ) {
-        _list( path, v, Type::_FILE );
+    void FS::files( const char *path, std::vector<std::string> &v, SortDir sortDir, SortType sortType ) {
+        _list( path, v, Type::_FILE, sortDir, sortType );
     }
 }
 
