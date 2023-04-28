@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <string>
 #include <unistd.h>
 #include "error.h"
 
@@ -18,6 +19,7 @@ namespace simq::util {
 
         public:
             File( const char *path, bool createIfNotExists = false );
+            void atomicWrite( void *data, unsigned int length );
             void write( void *data, unsigned int length );
             void write( void *data, unsigned int length, unsigned long int offset );
             unsigned int read( void *data, unsigned int length );
@@ -87,6 +89,31 @@ namespace simq::util {
         if( fseek( file, offset, SEEK_SET ) != 0 ) {
             throw util::Error::FS_ERROR;
         }
+    }
+
+    void File::atomicWrite( void *data, unsigned int length ) {
+        std::string atomicPath = filePath;
+        atomicPath += ".atomic";
+
+        auto f = fopen( atomicPath.c_str(), "w+" );
+        if( f == NULL ) {
+            throw util::Error::FS_ERROR;
+        }
+
+        if( fwrite( data, sizeof( char ), length, f ) != length ) {
+            throw util::Error::FS_ERROR;
+        }
+
+        fsync( fileno( f ) );
+        fclose( f );
+        fclose( file );
+
+        if( ::rename( atomicPath.c_str(), filePath ) != 0 ) {
+            file = open( filePath );
+            throw util::Error::FS_ERROR;
+        }
+
+        file = open( filePath );
     }
 
     void File::write( void *data, unsigned int length ) {
