@@ -419,7 +419,7 @@ namespace simq::core::server {
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
         settings.countThreads = htons( countThreads );
-        file.write( &settings, sizeof( Settings ), 0 );
+        file.atomicWrite( &settings, sizeof( Settings ) );
     }
 
     unsigned short int Store::getPort() {
@@ -449,7 +449,7 @@ namespace simq::core::server {
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
         settings.port = htons( port );
-        file.write( &settings, sizeof( Settings ), 0 );
+        file.atomicWrite( &settings, sizeof( Settings ) );
     }
 
     void Store::getMasterPassword( unsigned char password[crypto::HASH_LENGTH] ) {
@@ -474,7 +474,7 @@ namespace simq::core::server {
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
         memcpy( settings.password, password, crypto::HASH_LENGTH );
-        file.write( &settings, sizeof( Settings ), 0 );
+        file.atomicWrite( &settings, sizeof( Settings ) );
 
     }
 
@@ -895,7 +895,7 @@ namespace simq::core::server {
         settings.maxMessagesInMemory = htonl( settings.maxMessagesInMemory );
         settings.maxMessagesOnDisk = htonl( settings.maxMessagesOnDisk );
 
-        fileSettings.write( &settings, sizeof( util::Types::ChannelSettings ) );
+        fileSettings.atomicWrite( &settings, sizeof( util::Types::ChannelSettings ) );
     }
 
     void Store::getConsumers( const char *group, const char *channel, std::vector<std::string> &consumers ) {
@@ -1068,7 +1068,7 @@ namespace simq::core::server {
         path += filePassword;
 
         util::File filePassword( path.c_str() );
-        filePassword.write( password, crypto::HASH_LENGTH );
+        filePassword.atomicWrite( password, crypto::HASH_LENGTH );
     }
 
     void Store::getProducers( const char *group, const char *channel, std::vector<std::string> &producers ) {
@@ -1241,7 +1241,7 @@ namespace simq::core::server {
         path += filePassword;
 
         util::File filePassword( path.c_str() );
-        filePassword.write( password, crypto::HASH_LENGTH );
+        filePassword.atomicWrite( password, crypto::HASH_LENGTH );
     }
 }
 
