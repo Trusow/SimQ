@@ -78,6 +78,7 @@ namespace simq::core::server {
             void getGroups( std::vector<std::string> &groups );
             void getGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] );
             void addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] );
+            void updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] );
             void removeGroup( const char *group );
 
             void getChannels( const char *group, std::vector<std::string> &channels );
@@ -685,6 +686,27 @@ namespace simq::core::server {
 
         std::map<std::string, Channel> channel;
         groups[group] = channel;
+    }
+
+    void Store::updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+        std::lock_guard<std::mutex> lock( m );
+
+        auto it = groups.find( group );
+
+        if( it == groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        std::string path = _path;
+        path += "/";
+        path += pathGroups;
+        path += "/";
+        path += group;
+        path += "/";
+        path += filePassword;
+
+        util::File file( path.c_str(), true );
+        file.atomicWrite( password, crypto::HASH_LENGTH );
     }
 
     void Store::removeGroup( const char *group ) {
