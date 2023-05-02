@@ -81,26 +81,32 @@ namespace simq::core::server::q {
             void joinProducer( const char *groupName, const char *channelName, unsigned int fd );
             void leaveProducer( const char *groupName, const char *channelName, unsigned int fd );
 
-            void generateUUID(
+            unsigned int createMessageForQ(
                 const char *groupName,
                 const char *channelName,
                 unsigned int fd,
+                unsigned int length,
+                Messages::WRData &wrData,
                 char *uuid
             );
-            void removeUUID(
-                const char *groupName,
-                const char *channelName,
-                unsigned int fd,
-                const char *uuid
-            );
 
-            unsigned int createMessage(
+            unsigned int createMessageForBroadcast(
                 const char *groupName,
                 const char *channelName,
                 unsigned int fd,
                 unsigned int length,
                 Messages::WRData &wrData
             );
+
+            unsigned int createMessageForReplication(
+                const char *groupName,
+                const char *channelName,
+                unsigned int fd,
+                unsigned int length,
+                Messages::WRData &wrData,
+                const char *uuid
+            );
+
             void removeMessage(
                 const char *groupName,
                 const char *channelName,
@@ -133,19 +139,12 @@ namespace simq::core::server::q {
                 const char *groupName,
                 const char *channelName,
                 unsigned int fd,
-                unsigned int id,
-                const char *uuid = nullptr
+                unsigned int id
             );
             unsigned int popMessage(
                 const char *groupName,
                 const char *channelName,
-                unsigned int fd
-            );
-            void getMessageUUID(
-                const char *groupName,
-                const char *channelName,
                 unsigned int fd,
-                unsigned int id,
                 char *uuid
             );
             void revertMessage(
@@ -440,10 +439,12 @@ namespace simq::core::server::q {
         }
     }
 
-    void Manager::generateUUID(
+    unsigned int Manager::createMessageForQ(
         const char *groupName,
         const char *channelName,
         unsigned int fd,
+        unsigned int length,
+        Messages::WRData &wrData,
         char *uuid
     ) {
         _wait( _countGroupsWrited );
@@ -470,41 +471,15 @@ namespace simq::core::server::q {
         _checkProducer( channel->producers, fd );
 
         channel->uuid.generate( uuid );
+
+        auto id = channel->messages->add( length, wrData );
+
+        channel->messages->setUUID( id, uuid );
+
+        return id;
     }
 
-    void Manager::removeUUID(
-        const char *groupName,
-        const char *channelName,
-        unsigned int fd,
-        const char *uuid
-    ) {
-        _wait( _countGroupsWrited );
-        std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
-
-        if( _groups.find( groupName ) == _groups.end() ) {
-            throw util::Error::NOT_FOUND_GROUP;
-        }
-
-        auto group = _groups[groupName];
-
-        _wait( group->countChannelsWrited );
-        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
-
-        if( group->channels.find( channelName ) == group->channels.end() ) {
-            throw util::Error::NOT_FOUND_CHANNEL;
-        }
-
-        auto channel = group->channels[channelName];
-
-        _wait( channel->countProducersWrited );
-        std::shared_lock<std::shared_timed_mutex> lockProducer( channel->mProducers );
-
-        _checkProducer( channel->producers, fd );
-
-        channel->uuid.free( uuid );
-    }
-
-    unsigned int Manager::createMessage(
+    unsigned int Manager::createMessageForBroadcast(
         const char *groupName,
         const char *channelName,
         unsigned int fd,
@@ -535,6 +510,46 @@ namespace simq::core::server::q {
         _checkProducer( channel->producers, fd );
 
         return channel->messages->add( length, wrData );
+    }
+
+    unsigned int Manager::createMessageForReplication(
+        const char *groupName,
+        const char *channelName,
+        unsigned int fd,
+        unsigned int length,
+        Messages::WRData &wrData,
+        const char *uuid
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
+
+        if( _groups.find( groupName ) == _groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        if( group->channels.find( channelName ) == group->channels.end() ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+
+        auto channel = group->channels[channelName];
+
+        _wait( channel->countProducersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducer( channel->mProducers );
+
+        _checkProducer( channel->producers, fd );
+
+        channel->uuid.add( uuid );
+
+        auto id = channel->messages->add( length, wrData );
+
+        channel->messages->setUUID( id, uuid );
+
+        return id;
     }
 
     void Manager::removeMessage(
@@ -709,8 +724,7 @@ namespace simq::core::server::q {
         const char *groupName,
         const char *channelName,
         unsigned int fd,
-        unsigned int id,
-        const char *uuid
+        unsigned int id
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
@@ -738,12 +752,21 @@ namespace simq::core::server::q {
 
         _checkProducer( channel->producers, fd );
 
-        if( uuid != nullptr ) {
-            channel->messages->setUUID( id, uuid );
+        char uuid[util::UUID::LENGTH+1]{};
+
+        channel->messages->getUUID( id, uuid );
+
+        if( uuid[0] != 0 ) {
             channel->QList.push_back( id );
         } else {
+            bool isAdd = false;
             for( auto itConsumer = channel->consumers.begin(); itConsumer != channel->consumers.end(); itConsumer++ ) {
                 itConsumer->second.push_back( id );
+                isAdd = true;
+            }
+
+            if( !isAdd ) {
+                channel->messages->free( id );
             }
         }
     }
@@ -751,7 +774,8 @@ namespace simq::core::server::q {
     unsigned int Manager::popMessage(
         const char *groupName,
         const char *channelName,
-        unsigned int fd
+        unsigned int fd,
+        char *uuid
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
@@ -793,43 +817,11 @@ namespace simq::core::server::q {
 
         if( !channel->QList.empty() ) {
             id = channel->QList.front();
+            channel->messages->getUUID( id, uuid );
             channel->QList.pop_front();
         }
 
         return id;
-    }
-
-    void Manager::getMessageUUID(
-        const char *groupName,
-        const char *channelName,
-        unsigned int fd,
-        unsigned int id,
-        char *uuid
-    ) {
-        _wait( _countGroupsWrited );
-        std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
-
-        if( _groups.find( groupName ) == _groups.end() ) {
-            throw util::Error::NOT_FOUND_GROUP;
-        }
-
-        auto group = _groups[groupName];
-
-        _wait( group->countChannelsWrited );
-        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
-
-        if( group->channels.find( channelName ) == group->channels.end() ) {
-            throw util::Error::NOT_FOUND_CHANNEL;
-        }
-
-        auto channel = group->channels[channelName];
-
-        _wait( channel->countConsumersWrited );
-        std::shared_lock<std::shared_timed_mutex> lockConsumer( channel->mConsumers );
-
-        _checkConsumer( channel->consumers, fd );
-
-        channel->messages->getUUID( id, uuid );
     }
 
     void Manager::revertMessage(
