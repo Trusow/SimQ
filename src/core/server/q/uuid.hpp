@@ -9,6 +9,7 @@
 #include <string.h>
 #include "../../../util/uuid.hpp"
 #include "../../../util/lock_atomic.hpp"
+#include "../../../util/error.h"
 
 namespace simq::core::server::q {
     class UUID {
@@ -21,6 +22,7 @@ namespace simq::core::server::q {
             void _wait( std::atomic_uint &atom );
         public:
             void generate( char *uuid );
+            void add( const char *uuid );
             bool check( const char *uuid );
             void free( const char *uuid );
     };
@@ -43,6 +45,18 @@ namespace simq::core::server::q {
                 return;
             }
         }
+    }
+
+    void UUID::add( const char *uuid ) {
+        util::LockAtomic lockAtomic( _countWrited );
+        std::lock_guard<std::shared_timed_mutex> lock( _m );
+
+        auto it = _map.find( uuid );
+        if( it != _map.end() ) {
+            throw util::Error::DUPLICATE_UUID;
+        }
+
+        _map[uuid] = true;
     }
 
     bool UUID::check( const char *uuid ) {
