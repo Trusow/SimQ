@@ -599,14 +599,6 @@ namespace simq::core::server::q {
             }
 
             channel->messages->free( id );
-        } else if( _isProducer( channel->producers, fd ) ) {
-            channel->messages->getUUID( id, uuid );
-
-            if( uuid[0] != 0 ) {
-                channel->uuid.free( uuid );
-            }
-
-            channel->messages->free( id );
         } else {
             throw util::Error::NOT_FOUND_SESSION;
         }
