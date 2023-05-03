@@ -24,7 +24,7 @@ namespace simq::core::server::q {
             const unsigned int MESSAGES_IN_PACKET = 10'000;
             util::Buffer *_buffer;
 
-            struct Message: WRData {
+            struct Message {
                 char uuid[util::UUID::LENGTH+1];
                 bool isMemory;
             };
@@ -173,7 +173,6 @@ namespace simq::core::server::q {
 
         auto msg = new Message{};
         msg->isMemory = isMemory;
-        msg->length = length;
 
         if( id >= _total ) {
             _expandMessages();
