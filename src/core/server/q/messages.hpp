@@ -12,6 +12,7 @@
 #include "../../../util/buffer.hpp"
 #include "../../../util/types.h"
 #include "../../../util/error.h"
+#include "../../../util/constants.h"
 
 namespace simq::core::server::q {
     class Messages {
@@ -22,6 +23,7 @@ namespace simq::core::server::q {
             };
         private:
             const unsigned int MESSAGES_IN_PACKET = 10'000;
+            const unsigned int MESSAGE_PACKET_SIZE = util::constants::MESSAGE_PACKET_SIZE;
             util::Buffer *_buffer;
 
             struct Message {
@@ -97,7 +99,7 @@ namespace simq::core::server::q {
         unsigned int id;
 
         if( _totalInMemory < _limits.maxMessagesInMemory ) {
-            id = _buffer->allocate( length < 4096 ? length : 4096 );
+            id = _buffer->allocate( length < MESSAGE_PACKET_SIZE ? length : MESSAGE_PACKET_SIZE );
             isMemory = true;
             _totalInMemory++;
         } else if( _totalOnDisk < _limits.maxMessagesOnDisk ) {
@@ -224,16 +226,16 @@ namespace simq::core::server::q {
     unsigned int Messages::_calculateWRLength( WRData &wrData ) {
         auto length = 0;
 
-        if( wrData.length < 4096 ) {
+        if( wrData.length < MESSAGE_PACKET_SIZE ) {
             length = wrData.length - wrData.wrLength;
         } else {
-            unsigned int count = wrData.wrLength / 4096;
-            unsigned int fullCount = wrData.length / 4096;
+            unsigned int count = wrData.wrLength / MESSAGE_PACKET_SIZE;
+            unsigned int fullCount = wrData.length / MESSAGE_PACKET_SIZE;
             if( fullCount == count ) {
                 length = wrData.length - wrData.wrLength;
             } else {
-                unsigned int residue = wrData.wrLength - count * 4096;
-                length = 4096 - residue;
+                unsigned int residue = wrData.wrLength - count * MESSAGE_PACKET_SIZE;
+                length = MESSAGE_PACKET_SIZE - residue;
             }
         }
 
@@ -263,7 +265,7 @@ namespace simq::core::server::q {
     }
 
     bool Messages::isFullPart( WRData &wrData ) {
-        return wrData.wrLength % 4096 == 0 || wrData.wrLength == wrData.length;
+        return wrData.wrLength % MESSAGE_PACKET_SIZE == 0 || wrData.wrLength == wrData.length;
     }
 }
 

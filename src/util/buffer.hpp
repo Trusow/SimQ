@@ -16,14 +16,15 @@
 #include <sys/sendfile.h>
 #include "file.hpp"
 #include "error.h"
+#include "constants.h"
 #include "lock_atomic.hpp"
 
 namespace simq::util {
     class Buffer {
         private:
             File *file = nullptr;
-            const unsigned int LENGTH_PACKET_ON_DISK = 4096;
-            const unsigned int MIN_FILE_SIZE = 50 * LENGTH_PACKET_ON_DISK;
+            const unsigned int MESSAGE_PACKET_SIZE = util::constants::MESSAGE_PACKET_SIZE;
+            const unsigned int MIN_FILE_SIZE = 50 * MESSAGE_PACKET_SIZE;
             const unsigned int SIZE_ITEM_PACKET = 10'000;
 
             struct WRData {
@@ -164,7 +165,7 @@ namespace simq::util {
         auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
 
         auto item = new Item{};
-        item->packetSize = LENGTH_PACKET_ON_DISK;
+        item->packetSize = MESSAGE_PACKET_SIZE;
         item->length++;
         item->fileOffsets = new unsigned long int[1]{};
 
@@ -418,11 +419,11 @@ namespace simq::util {
     unsigned int Buffer::_recvToFile( Item *item, unsigned int fd, unsigned int length ) {
         std::lock_guard<std::mutex> lockFile( mFile );
 
-        const unsigned int packetSize = LENGTH_PACKET_ON_DISK;
+        const unsigned int packetSize = MESSAGE_PACKET_SIZE;
         WRData wrData;
         unsigned int fullLength = item->length == 1 ? item->lengthEnd : item->length * packetSize + item->lengthEnd;
         _calculateWriteData( fullLength, packetSize, length, wrData );
-        char data[LENGTH_PACKET_ON_DISK];
+        char data[MESSAGE_PACKET_SIZE];
 
         if( wrData.startSize ) {
 
@@ -503,7 +504,7 @@ namespace simq::util {
         std::lock_guard<std::mutex> lockFile( mFile );
 
 
-        const unsigned int packetSize = LENGTH_PACKET_ON_DISK;
+        const unsigned int packetSize = MESSAGE_PACKET_SIZE;
         WRData wrData;
         unsigned int fullLength = item->length == 1 ? item->lengthEnd : item->length * packetSize + item->lengthEnd;
         _calculateWriteData( fullLength, packetSize, length, wrData );
@@ -833,52 +834,52 @@ namespace simq::util {
     }
 
     void Buffer::expandFile() {
-        fileOffset += MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK;
+        fileOffset += MIN_FILE_SIZE / MESSAGE_PACKET_SIZE;
         file->expand( MIN_FILE_SIZE );
-        for( unsigned int i = fileOffset; i < fileOffset + MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK; i++ ) {
+        for( unsigned int i = fileOffset; i < fileOffset + MIN_FILE_SIZE / MESSAGE_PACKET_SIZE; i++ ) {
             freeFileOffsets.push( i );
         }
     }
 
     void Buffer::initFileSize() {
         auto size = file->size();
-        fileOffset = MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK;
+        fileOffset = MIN_FILE_SIZE / MESSAGE_PACKET_SIZE;
 
         if( size == 0 ) {
             file->expand( MIN_FILE_SIZE );
 
-            for( unsigned int i = 0; i < MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK; i++ ) {
+            for( unsigned int i = 0; i < MIN_FILE_SIZE / MESSAGE_PACKET_SIZE; i++ ) {
                 freeFileOffsets.push( i );
             }
-        } else if( size % LENGTH_PACKET_ON_DISK != 0 ) {
-            auto expandSize =  LENGTH_PACKET_ON_DISK - ( size - ( size / LENGTH_PACKET_ON_DISK ) * LENGTH_PACKET_ON_DISK );
+        } else if( size % MESSAGE_PACKET_SIZE != 0 ) {
+            auto expandSize =  MESSAGE_PACKET_SIZE - ( size - ( size / MESSAGE_PACKET_SIZE ) * MESSAGE_PACKET_SIZE );
             if( size + expandSize < MIN_FILE_SIZE ) {
                 expandSize = MIN_FILE_SIZE - size;
                 file->expand( expandSize );
 
-                for( unsigned int i = 0; i < MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK; i++ ) {
+                for( unsigned int i = 0; i < MIN_FILE_SIZE / MESSAGE_PACKET_SIZE; i++ ) {
                     freeFileOffsets.push( i );
                 }
             } else {
                 file->expand( expandSize );
 
-                for( unsigned int i = 0; i < ( size + expandSize ) / LENGTH_PACKET_ON_DISK; i++ ) {
+                for( unsigned int i = 0; i < ( size + expandSize ) / MESSAGE_PACKET_SIZE; i++ ) {
                     freeFileOffsets.push( i );
                 }
-                fileOffset = ( size + expandSize ) / LENGTH_PACKET_ON_DISK;
+                fileOffset = ( size + expandSize ) / MESSAGE_PACKET_SIZE;
             }
         } else if( size < MIN_FILE_SIZE ) {
             auto expandSize = MIN_FILE_SIZE - size;
             file->expand( expandSize );
 
-            for( unsigned int i = 0; i < MIN_FILE_SIZE / LENGTH_PACKET_ON_DISK; i++ ) {
+            for( unsigned int i = 0; i < MIN_FILE_SIZE / MESSAGE_PACKET_SIZE; i++ ) {
                 freeFileOffsets.push( i );
             }
         } else {
-            for( unsigned int i = 0; i < size / LENGTH_PACKET_ON_DISK; i++ ) {
+            for( unsigned int i = 0; i < size / MESSAGE_PACKET_SIZE; i++ ) {
                 freeFileOffsets.push( i );
             }
-            fileOffset = size / LENGTH_PACKET_ON_DISK;
+            fileOffset = size / MESSAGE_PACKET_SIZE;
         }
     }
 }
