@@ -584,8 +584,11 @@ namespace simq::core::server::q {
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumer( channel->mConsumers );
 
-        if( _isConsumer( channel->consumers, fd ) ) {
-            if( _calculateTotalConsumersByMessagedID( channel->consumers, id ) != 0 ) {
+        auto isConsumer = _isConsumer( channel->consumers, fd );
+        auto isProducer = _isProducer( channel->producers, fd );
+
+        if( isConsumer || isProducer ) {
+            if( isConsumer && _calculateTotalConsumersByMessagedID( channel->consumers, id ) != 0 ) {
                 return;
             }
 
