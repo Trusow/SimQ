@@ -21,10 +21,10 @@ namespace simq::core::server::CLI {
                 const char *channel,
                 std::vector<std::string> &list
             ) = 0;
-            virtual void getChannelSettings(
+            virtual void getChannelLimitMessages(
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings &settings
+                util::types::ChannelLimitMessages &limitMessages
             ) = 0;
 
             virtual unsigned short int getPort() = 0;
@@ -48,12 +48,12 @@ namespace simq::core::server::CLI {
             virtual void addChannel(
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings *settings
+                util::types::ChannelLimitMessages *limitMessages
             ) = 0;
-            virtual void updateChannelSettings(
+            virtual void updateChannelLimitMessages(
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings *settings
+                util::types::ChannelLimitMessages *limitMessages
             ) = 0;
             virtual void removeChannel(
                 const char *group,

@@ -27,7 +27,7 @@ namespace simq::core::server::CLI {
             std::string _password = "";
             std::string _confirmPassword = "";
 
-            util::Types::ChannelSettings _channelSettings;
+            util::types::ChannelLimitMessages _channelLimitMessages;
 
             enum Step {
                 STEP_NONE,
@@ -66,9 +66,9 @@ namespace simq::core::server::CLI {
         _password = "";
         _confirmPassword = "";
         _step = STEP_NONE;
-        memset( &_channelSettings, 0, sizeof( util::Types::ChannelSettings ) );
+        memset( &_channelLimitMessages, 0, sizeof( util::types::ChannelLimitMessages ) );
         // Нужно чтобы проходило валидацию при заполнении
-        _channelSettings.maxMessagesInMemory = 1;
+        _channelLimitMessages.maxMessagesInMemory = 1;
     }
 
     bool ScenarioAdd::_isDuplicate( const char *name ) {
@@ -172,32 +172,32 @@ namespace simq::core::server::CLI {
 
             if( _step == STEP_CH_MIN_MESSAGE_SIZE ) {
                 if( _validateChannelMinMessageSize( value ) ) {
-                    _channelSettings.minMessageSize = value;
+                    _channelLimitMessages.minMessageSize = value;
                     _step = STEP_CH_MAX_MESSAGE_SIZE;
                     _console->setPrefix( "Max message size: " );
                     _console->printPrefix( true );
                 }
             } else if( _step == STEP_CH_MAX_MESSAGE_SIZE ) {
-                if( _validateChannelMaxMessageSize( value, _channelSettings.minMessageSize ) ) {
-                    _channelSettings.maxMessageSize = value;
+                if( _validateChannelMaxMessageSize( value, _channelLimitMessages.minMessageSize ) ) {
+                    _channelLimitMessages.maxMessageSize = value;
                     _step = STEP_CH_MAX_MESSAGES_IN_MEMORY;
                     _console->setPrefix( "Max messages in memory: " );
                     _console->printPrefix( true );
                 }
             } else if( _step == STEP_CH_MAX_MESSAGES_IN_MEMORY ) {
-                _channelSettings.maxMessagesInMemory = value;
+                _channelLimitMessages.maxMessagesInMemory = value;
                 _step = STEP_CH_MAX_MESSAGES_ON_DISK;
                 _console->setPrefix( "Max messages on disk: " );
                 _console->printPrefix( true );
             } else if( _step == STEP_CH_MAX_MESSAGES_ON_DISK ) {
-                _channelSettings.maxMessagesOnDisk = value;
-                if( !util::Validation::isChannelSettings( &_channelSettings ) ) {
+                _channelLimitMessages.maxMessagesOnDisk = value;
+                if( !util::Validation::isChannelLimitMessages( _channelLimitMessages ) ) {
                     _console->printDanger( "Wrong param" );
                     _console->printPrefix();
                 } else {
                     _isEnd = true;
                     try {
-                        _cb->addChannel( _nav->getGroup(), _name.c_str(), &_channelSettings );
+                        _cb->addChannel( _nav->getGroup(), _name.c_str(), &_channelLimitMessages );
                         Ini::printWarning( _console, Ini::msgApplyChangesDefer, _nav->getPathWithPrefix() );
                     } catch( ... ) {
                         Ini::printDanger( _console, "Server error", _nav->getPathWithPrefix() );

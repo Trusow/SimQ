@@ -41,7 +41,7 @@ namespace simq::core::server::q {
             unsigned int _totalInMemory = 0;
             unsigned int _totalOnDisk = 0;
             unsigned int _total = MESSAGES_IN_PACKET;
-            util::Types::ChannelSettings _limits;
+            util::types::ChannelLimitMessages _limits;
 
             Message **_messages = nullptr;
 
@@ -50,10 +50,10 @@ namespace simq::core::server::q {
             void _expandMessages();
             unsigned int _calculateWRLength( WRData &wrData );
         public:
-            Messages( const char *path, util::Types::ChannelSettings &limits );
+            Messages( const char *path, util::types::ChannelLimitMessages &limits );
             ~Messages();
 
-            void updateLimits( util::Types::ChannelSettings &limits );
+            void updateLimits( util::types::ChannelLimitMessages &limits );
 
             unsigned int add( unsigned int length, WRData &wrData );
             void free( unsigned int id );
@@ -67,7 +67,7 @@ namespace simq::core::server::q {
             bool isFullPart( WRData &wrData );
     };
 
-    Messages::Messages( const char *path, util::Types::ChannelSettings &limits ) {
+    Messages::Messages( const char *path, util::types::ChannelLimitMessages &limits ) {
         _buffer = new util::Buffer( path );
         _messages = new Message*[MESSAGES_IN_PACKET];
         _limits = limits;
@@ -89,7 +89,7 @@ namespace simq::core::server::q {
         while( atom );
     }
 
-    void Messages::updateLimits( util::Types::ChannelSettings &limits ) {
+    void Messages::updateLimits( util::types::ChannelLimitMessages &limits ) {
         _limits = limits;
     }
 

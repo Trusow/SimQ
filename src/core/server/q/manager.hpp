@@ -66,12 +66,12 @@ namespace simq::core::server::q {
                 const char *groupName,
                 const char *channelName,
                 const char *path,
-                util::Types::ChannelSettings &settings
+                util::types::ChannelLimitMessages &limitMessages
             );
-            void updateChannelSettings(
+            void updateChannelLimitMessages(
                 const char *groupName,
                 const char *channelName,
-                util::Types::ChannelSettings &settings
+                util::types::ChannelLimitMessages &limitMessages
             );
             void removeGroup( const char *groupName );
             void removeChannel( const char *groupName, const char *channelName );
@@ -196,7 +196,7 @@ namespace simq::core::server::q {
         const char *groupName,
         const char *channelName,
         const char *path,
-        util::Types::ChannelSettings &settings
+        util::types::ChannelLimitMessages &limitMessages
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
@@ -215,15 +215,15 @@ namespace simq::core::server::q {
         }
 
         auto channel = new Channel{};
-        channel->messages = new Messages( path, settings );
+        channel->messages = new Messages( path, limitMessages );
 
         group->channels[channelName] = channel;
     }
 
-    void Manager::updateChannelSettings(
+    void Manager::updateChannelLimitMessages(
         const char *groupName,
         const char *channelName,
-        util::Types::ChannelSettings &settings
+        util::types::ChannelLimitMessages &limitMessages
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
@@ -241,7 +241,7 @@ namespace simq::core::server::q {
             throw -1;
         }
 
-        group->channels[channelName]->messages->updateLimits( settings );
+        group->channels[channelName]->messages->updateLimits( limitMessages );
     }
 
     void Manager::removeChannel(

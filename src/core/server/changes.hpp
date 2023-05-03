@@ -83,7 +83,7 @@ namespace simq::core::server {
                 unsigned int type,
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings *settings
+                util::types::ChannelLimitMessages *limitMessages
             );
 
             Change *_buildUserChange(
@@ -94,8 +94,8 @@ namespace simq::core::server {
                 unsigned char password[crypto::HASH_LENGTH]
             );
 
-            char *_convertChannelSettingsDataToFile( Change *change );
-            char *_convertChannelSettingsDataFromFile( Change *change );
+            char *_convertChannelLimitMessagesDataToFile( Change *change );
+            char *_convertChannelLimitMessagesDataFromFile( Change *change );
             char *_convertPortDataToFile( Change *change );
             char *_convertPortDataFromFile( Change *change );
             char *_convertCountThreadsDataToFile( Change *change );
@@ -128,12 +128,12 @@ namespace simq::core::server {
             Change *addChannel(
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings *settings
+                util::types::ChannelLimitMessages *limitMessages
             );
-            Change *updateChannelSettings(
+            Change *updateChannelLimitMessages(
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings *settings
+                util::types::ChannelLimitMessages *limitMessages
             );
             Change *removeChannel( const char *group, const char *channel );
 
@@ -184,7 +184,7 @@ namespace simq::core::server {
             bool isRemoveGroup( Change *change );
 
             bool isAddChannel( Change *change );
-            bool isUpdateChannelSettings( Change *change );
+            bool isUpdateChannelLimitMessages( Change *change );
             bool isRemoveChannel( Change *change );
 
             bool isAddConsumer( Change *change );
@@ -202,7 +202,7 @@ namespace simq::core::server {
             const char *getGroup( Change *change );
             const char *getChannel( Change *change );
             const char *getLogin( Change *change );
-            const util::Types::ChannelSettings *getChannelSettings( Change *change );
+            const util::types::ChannelLimitMessages *getChannelLimitMessages( Change *change );
             unsigned short int getPort( Change *change );
             unsigned short int getCountThreads( Change *change );
             void getPassword( Change *change, unsigned char password[crypto::HASH_LENGTH] );
@@ -284,7 +284,7 @@ namespace simq::core::server {
         unsigned int type,
         const char *group,
         const char *channel,
-        util::Types::ChannelSettings *settings
+        util::types::ChannelLimitMessages *limitMessages
     ) {
         if( !util::Validation::isGroupName( group ) ) {
             throw util::Error::WRONG_GROUP;
@@ -294,20 +294,20 @@ namespace simq::core::server {
             throw util::Error::WRONG_CHANNEL;
         }
 
-        if( settings != nullptr ) {
-            if( !util::Validation::isChannelSettings( settings ) ) {
+        if( limitMessages != nullptr ) {
+            if( !util::Validation::isChannelLimitMessages( *limitMessages ) ) {
                 throw util::Error::WRONG_SETTINGS;
             }
         }
 
         auto groupLength = strlen( group );
         auto channelLength = strlen( channel );
-        auto settingsLength = sizeof( util::Types::ChannelSettings );
+        auto limitMessagesLength = sizeof( util::types::ChannelLimitMessages );
 
         auto change = new Change{};
         change->type = type;
 
-        if( settings == nullptr ) {
+        if( limitMessages == nullptr ) {
             change->data = new char[groupLength+1+channelLength+1]{};
 
             change->values[0] = groupLength;
@@ -315,14 +315,14 @@ namespace simq::core::server {
             change->values[1] = channelLength;
             memcpy( &change->data[groupLength+1], channel, channelLength );
         } else {
-            change->data = new char[groupLength+1+channelLength+1+settingsLength+1]{};
+            change->data = new char[groupLength+1+channelLength+1+limitMessagesLength+1]{};
 
             change->values[0] = groupLength;
             memcpy( change->data, group, groupLength );
             change->values[1] = channelLength;
             memcpy( &change->data[groupLength+1], channel, channelLength );
-            change->values[2] = settingsLength;
-            memcpy( &change->data[groupLength+1+channelLength+1], settings, settingsLength );
+            change->values[2] = limitMessagesLength;
+            memcpy( &change->data[groupLength+1+channelLength+1], limitMessages, limitMessagesLength );
         }
 
         return change;
@@ -416,17 +416,17 @@ namespace simq::core::server {
     Changes::Change *Changes::addChannel(
         const char *group,
         const char *channel,
-        util::Types::ChannelSettings *settings
+        util::types::ChannelLimitMessages *limitMessages
     ) {
-        return _buildChannelChange( CH_CREATE_CHANNEL, group, channel, settings );
+        return _buildChannelChange( CH_CREATE_CHANNEL, group, channel, limitMessages );
     }
 
-    Changes::Change *Changes::updateChannelSettings(
+    Changes::Change *Changes::updateChannelLimitMessages(
         const char *group,
         const char *channel,
-        util::Types::ChannelSettings *settings
+        util::types::ChannelLimitMessages *limitMessages
     ) {
-        return _buildChannelChange( CH_UPDATE_CHANNEL_SETTINGS, group, channel, settings );
+        return _buildChannelChange( CH_UPDATE_CHANNEL_SETTINGS, group, channel, limitMessages );
     }
 
     Changes::Change *Changes::removeChannel( const char *group, const char *channel ) {
@@ -544,9 +544,9 @@ namespace simq::core::server {
         return &change->data[offset];
     }
 
-    const util::Types::ChannelSettings *Changes::getChannelSettings( Change *change ) {
+    const util::types::ChannelLimitMessages *Changes::getChannelLimitMessages( Change *change ) {
         auto offset = change->values[0] + change->values[1] + 2;
-        return (util::Types::ChannelSettings *)&change->data[offset];
+        return (util::types::ChannelLimitMessages *)&change->data[offset];
     }
 
     unsigned short int Changes::getPort( Change *change ) {
@@ -603,7 +603,7 @@ namespace simq::core::server {
         return change->type == CH_CREATE_CHANNEL;
     }
 
-    bool Changes::isUpdateChannelSettings( Change *change ) {
+    bool Changes::isUpdateChannelLimitMessages( Change *change ) {
         return change->type == CH_UPDATE_CHANNEL_SETTINGS;
     }
 
@@ -673,7 +673,7 @@ namespace simq::core::server {
         listMemory.push_back( ch );
     }
 
-    char *Changes::_convertChannelSettingsDataToFile( Change *change ) {
+    char *Changes::_convertChannelLimitMessagesDataToFile( Change *change ) {
         unsigned int length = 0;
         length += change->values[0] + 1;
         length += change->values[1] + 1;
@@ -686,18 +686,18 @@ namespace simq::core::server {
         offset += change->values[1] + 1;
 
 
-        util::Types::ChannelSettings _settings;
-        memcpy( &_settings, &data[offset], sizeof( util::Types::ChannelSettings ) );
-        _settings.minMessageSize = htonl( _settings.minMessageSize );
-        _settings.maxMessageSize = htonl( _settings.maxMessageSize );
-        _settings.maxMessagesOnDisk = htonl( _settings.maxMessagesOnDisk );
-        _settings.maxMessagesInMemory = htonl( _settings.maxMessagesInMemory );
-        memcpy( &data[offset], &_settings, sizeof( util::Types::ChannelSettings ) );
+        util::types::ChannelLimitMessages _limitMessages;
+        memcpy( &_limitMessages, &data[offset], sizeof( util::types::ChannelLimitMessages ) );
+        _limitMessages.minMessageSize = htonl( _limitMessages.minMessageSize );
+        _limitMessages.maxMessageSize = htonl( _limitMessages.maxMessageSize );
+        _limitMessages.maxMessagesOnDisk = htonl( _limitMessages.maxMessagesOnDisk );
+        _limitMessages.maxMessagesInMemory = htonl( _limitMessages.maxMessagesInMemory );
+        memcpy( &data[offset], &_limitMessages, sizeof( util::types::ChannelLimitMessages ) );
 
         return data;
     }
 
-    char *Changes::_convertChannelSettingsDataFromFile( Change *change ) {
+    char *Changes::_convertChannelLimitMessagesDataFromFile( Change *change ) {
         unsigned int length = 0;
         length += change->values[0] + 1;
         length += change->values[1] + 1;
@@ -709,13 +709,13 @@ namespace simq::core::server {
         auto offset = change->values[0] + 1;
         offset += change->values[1] + 1;
 
-        util::Types::ChannelSettings _settings;
-        memcpy( &_settings, &data[offset], sizeof( util::Types::ChannelSettings ) );
-        _settings.minMessageSize = ntohl( _settings.minMessageSize );
-        _settings.maxMessageSize = ntohl( _settings.maxMessageSize );
-        _settings.maxMessagesOnDisk = ntohl( _settings.maxMessagesOnDisk );
-        _settings.maxMessagesInMemory = ntohl( _settings.maxMessagesInMemory );
-        memcpy( &data[offset], &_settings, sizeof( util::Types::ChannelSettings ) );
+        util::types::ChannelLimitMessages _limitMessages;
+        memcpy( &_limitMessages, &data[offset], sizeof( util::types::ChannelLimitMessages ) );
+        _limitMessages.minMessageSize = ntohl( _limitMessages.minMessageSize );
+        _limitMessages.maxMessageSize = ntohl( _limitMessages.maxMessageSize );
+        _limitMessages.maxMessagesOnDisk = ntohl( _limitMessages.maxMessagesOnDisk );
+        _limitMessages.maxMessagesInMemory = ntohl( _limitMessages.maxMessagesInMemory );
+        memcpy( &data[offset], &_limitMessages, sizeof( util::types::ChannelLimitMessages ) );
 
         return data;
     }
@@ -808,19 +808,23 @@ namespace simq::core::server {
 
         auto l = change->values[0] + 1;
         l += change->values[1] + 1;
-        auto lengthSettings = sizeof( util::Types::ChannelSettings );
+        auto lengthLimitMessages = sizeof( util::types::ChannelLimitMessages );
 
         if( change->type != CH_REMOVE_CHANNEL ) {
             l += change->values[2] + 1;
 
-            if( change->values[2] != lengthSettings ) {
+            if( change->values[2] != lengthLimitMessages ) {
                 return false;
             }
 
-            util::Types::ChannelSettings settings;
-            memcpy( &settings, &change->data[change->values[0]+1+change->values[1]+1], lengthSettings );
+            util::types::ChannelLimitMessages limitMessages;
+            memcpy(
+                &limitMessages,
+                &change->data[change->values[0]+1+change->values[1]+1],
+                lengthLimitMessages
+            );
 
-            if( !util::Validation::isChannelSettings( &settings ) ) {
+            if( !util::Validation::isChannelLimitMessages( limitMessages ) ) {
                 return false;
             }
         }
@@ -947,8 +951,8 @@ namespace simq::core::server {
         auto file = util::File( tmpPath.c_str(), true );
         file.write( &ch, sizeof( ChangeFile ) );
 
-        if( isUpdateChannelSettings( change ) || isAddChannel( change ) ) {
-            auto data = _convertChannelSettingsDataToFile( change );
+        if( isUpdateChannelLimitMessages( change ) || isAddChannel( change ) ) {
+            auto data = _convertChannelLimitMessagesDataToFile( change );
             file.write( data, length );
             delete[] data;
         } else if( isUpdatePort( change ) ) {
@@ -1052,9 +1056,9 @@ namespace simq::core::server {
             return;
         }
 
-        if( isUpdateChannelSettings( ch ) || isAddChannel( ch ) ) {
+        if( isUpdateChannelLimitMessages( ch ) || isAddChannel( ch ) ) {
             auto _tmpData = ch->data;
-            ch->data = _convertChannelSettingsDataFromFile( ch );
+            ch->data = _convertChannelLimitMessagesDataFromFile( ch );
             delete[] _tmpData;
         } else if( isUpdatePort( ch ) ) {
             auto _tmpData = ch->data;

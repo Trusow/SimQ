@@ -41,7 +41,7 @@ namespace simq::core::server::CLI {
 
         unsigned int num = 0;
         bool isChannel = false;
-        util::Types::ChannelSettings settings;
+        util::types::ChannelLimitMessages limitMessages;
 
         auto name = params[0];
         auto value = params[1].c_str();
@@ -69,43 +69,43 @@ namespace simq::core::server::CLI {
                     Ini::printSuccess( _console, "Restart server to apply changes" );
                 }
             } else if( name == Ini::infoChMinMessageSize ) {
-                _cb->getChannelSettings(
+                _cb->getChannelLimitMessages(
                     _nav->getGroup(),
                     _nav->getChannel(),
-                    settings
+                    limitMessages
                 );
-                settings.minMessageSize = num;
+                limitMessages.minMessageSize = num;
                 isChannel = true;
             } else if( name == Ini::infoChMaxMessageSize ) {
-                _cb->getChannelSettings(
+                _cb->getChannelLimitMessages(
                     _nav->getGroup(),
                     _nav->getChannel(),
-                    settings
+                    limitMessages
                 );
-                settings.maxMessageSize = num;
+                limitMessages.maxMessageSize = num;
                 isChannel = true;
             } else if( name == Ini::infoChMaxMessagesInMemory ) {
-                _cb->getChannelSettings(
+                _cb->getChannelLimitMessages(
                     _nav->getGroup(),
                     _nav->getChannel(),
-                    settings
+                    limitMessages
                 );
-                settings.maxMessagesInMemory = num;
+                limitMessages.maxMessagesInMemory = num;
                 isChannel = true;
             } else if( name == Ini::infoChMaxMessagesOnDisk ) {
-                _cb->getChannelSettings(
+                _cb->getChannelLimitMessages(
                     _nav->getGroup(),
                     _nav->getChannel(),
-                    settings
+                    limitMessages
                 );
-                settings.maxMessagesOnDisk = num;
+                limitMessages.maxMessagesOnDisk = num;
                 isChannel = true;
             } else {
                 Ini::printDanger( _console, "Unknown name" );
             }
 
             if( isChannel ) {
-                if( !util::Validation::isChannelSettings( &settings ) ) {
+                if( !util::Validation::isChannelLimitMessages( limitMessages ) ) {
                     Ini::printDanger( _console, "Wrong value" );
                 } else {
                     Ini::printWarning( _console, Ini::msgApplyChangesDefer );

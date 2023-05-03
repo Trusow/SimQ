@@ -20,7 +20,7 @@ namespace simq::util {
             static bool isPort( unsigned int port );
             static bool isCountThread( unsigned int count );
             static bool isUInt( const char *value );
-            static bool isChannelSettings( util::Types::ChannelSettings *settings );
+            static bool isChannelLimitMessages( util::types::ChannelLimitMessages &limitMessages );
     };
 
     bool Validation::isIPv4( const char *ip ) {
@@ -186,19 +186,19 @@ namespace simq::util {
         return count <= hc + hc / 2;
     }
 
-    bool Validation::isChannelSettings( util::Types::ChannelSettings *settings ) {
-        unsigned long int _size = settings->maxMessagesOnDisk + settings->maxMessagesInMemory;
+    bool Validation::isChannelLimitMessages( util::types::ChannelLimitMessages &limitMessages ) {
+        unsigned long int _size = limitMessages.maxMessagesOnDisk + limitMessages.maxMessagesInMemory;
 
         if( _size > 0xFF'FF'FF'FF || _size == 0 ) {
             return false;
         }
 
 
-        if( settings->minMessageSize == 0 || settings->maxMessageSize == 0 ) {
+        if( limitMessages.minMessageSize == 0 || limitMessages.maxMessageSize == 0 ) {
             return false;
         }
 
-        if( settings->minMessageSize > settings->maxMessageSize ) {
+        if( limitMessages.minMessageSize > limitMessages.maxMessageSize ) {
             return false;
         }
 

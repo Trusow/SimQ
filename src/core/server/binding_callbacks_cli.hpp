@@ -24,10 +24,10 @@ namespace simq::core::server {
                 const char *channel,
                 std::vector<std::string> &list
             );
-            void getChannelSettings(
+            void getChannelLimitMessages(
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings &settings
+                util::types::ChannelLimitMessages &limitMessages
             );
 
             unsigned short int getPort();
@@ -49,12 +49,12 @@ namespace simq::core::server {
             void addChannel(
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings *settings
+                util::types::ChannelLimitMessages *limitMessages
             );
-            void updateChannelSettings(
+            void updateChannelLimitMessages(
                 const char *group,
                 const char *channel,
-                util::Types::ChannelSettings *settings
+                util::types::ChannelLimitMessages *limitMessages
             );
             void removeChannel(
                 const char *group,
@@ -131,12 +131,12 @@ namespace simq::core::server {
         _store->getDirectProducers( group, channel, list );
     }
 
-    void BindingCallbacksCLI::getChannelSettings(
+    void BindingCallbacksCLI::getChannelLimitMessages(
         const char *group,
         const char *channel,
-        util::Types::ChannelSettings &settings
+        util::types::ChannelLimitMessages &limitMessages
     ) {
-        _store->getDirectChannelSettings( group, channel, settings );
+        _store->getDirectChannelLimitMessages( group, channel, limitMessages );
     }
 
     unsigned short int BindingCallbacksCLI::getPort() {
@@ -180,19 +180,19 @@ namespace simq::core::server {
     void BindingCallbacksCLI::addChannel(
         const char *group,
         const char *channel,
-        util::Types::ChannelSettings *settings
+        util::types::ChannelLimitMessages *limitMessages
     ) {
-        auto ch = _changes->addChannel( group, channel, settings );
+        auto ch = _changes->addChannel( group, channel, limitMessages );
         _changes->pushDefered( ch );
         _changes->free( ch );
     }
 
-    void BindingCallbacksCLI::updateChannelSettings(
+    void BindingCallbacksCLI::updateChannelLimitMessages(
         const char *group,
         const char *channel,
-        util::Types::ChannelSettings *settings
+        util::types::ChannelLimitMessages *limitMessages
     ) {
-        auto ch = _changes->updateChannelSettings( group, channel, settings );
+        auto ch = _changes->updateChannelLimitMessages( group, channel, limitMessages );
         _changes->pushDefered( ch );
         _changes->free( ch );
     }

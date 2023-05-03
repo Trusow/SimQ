@@ -47,16 +47,16 @@ namespace simq::core::server::CLI {
             _addToList( list, Ini::infoSettingsPort, _cb->getPort() );
             _addToList( list, Ini::infoSettingsCountThreads, _cb->getCountThreads() );
         } else if( _nav->isChannel() ) {
-            util::Types::ChannelSettings settings;
-            _cb->getChannelSettings(
+            util::types::ChannelLimitMessages limitMessages;
+            _cb->getChannelLimitMessages(
                 _nav->getGroup(),
                 _nav->getChannel(),
-                settings
+                limitMessages
             );
-            _addToList( list, Ini::infoChMinMessageSize, settings.minMessageSize );
-            _addToList( list, Ini::infoChMaxMessageSize, settings.maxMessageSize );
-            _addToList( list, Ini::infoChMaxMessagesInMemory, settings.maxMessagesInMemory );
-            _addToList( list, Ini::infoChMaxMessagesOnDisk, settings.maxMessagesOnDisk );
+            _addToList( list, Ini::infoChMinMessageSize, limitMessages.minMessageSize );
+            _addToList( list, Ini::infoChMaxMessageSize, limitMessages.maxMessageSize );
+            _addToList( list, Ini::infoChMaxMessagesInMemory, limitMessages.maxMessagesInMemory );
+            _addToList( list, Ini::infoChMaxMessagesOnDisk, limitMessages.maxMessagesOnDisk );
         }
 
         _console->printList( list, params.empty() ? nullptr : params[0].c_str() );

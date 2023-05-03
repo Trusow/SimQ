@@ -54,7 +54,7 @@ namespace simq::core::server {
 
             void _initSettings( const char *path );
             void _initChannels( const char *group, const char *path );
-            void _initChannelSettings( const char *path, const char *channel );
+            void _initChannelLimitMessages( const char *path, const char *channel );
             void _initUsers( const char *group, const char *channel, TypeUser type, const char *path );
             void _initGroups( const char *path );
             bool _issetCorrectPasswordFile( const char *path );
@@ -66,7 +66,11 @@ namespace simq::core::server {
 
             void getDirectGroups( std::vector<std::string> &list );
             void getDirectChannels( const char *group, std::vector<std::string> &list );
-            void getDirectChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings );
+            void getDirectChannelLimitMessages(
+                const char *group,
+                const char *channel,
+                util::types::ChannelLimitMessages &limitMessages
+            );
             void getDirectConsumers( const char *group, const char *channel, std::vector<std::string> &list );
             void getDirectProducers( const char *group, const char *channel, std::vector<std::string> &list );
             unsigned short int getDirectPort();
@@ -82,9 +86,21 @@ namespace simq::core::server {
             void removeGroup( const char *group );
 
             void getChannels( const char *group, std::vector<std::string> &channels );
-            void getChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings );
-            void addChannel( const char *group, const char *channel, util::Types::ChannelSettings &settings );
-            void updateChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings );
+            void getChannelLimitMessages(
+                const char *group,
+                const char *channel,
+                util::types::ChannelLimitMessages &limitMessages
+            );
+            void addChannel(
+                const char *group,
+                const char *channel,
+                util::types::ChannelLimitMessages &limitMessages
+            );
+            void updateChannelLimitMessages(
+                const char *group,
+                const char *channel,
+                util::types::ChannelLimitMessages &limitMessages
+            );
             void removeChannel( const char *group, const char *channel );
 
             void getConsumers( const char *group, const char *channel, std::vector<std::string> &consumers );
@@ -234,59 +250,59 @@ namespace simq::core::server {
 
     }
 
-    void Store::_initChannelSettings( const char *path, const char *channel ) {
-        std::string _pathChannelSettings = path;
-        _pathChannelSettings += "/";
-        _pathChannelSettings += channel;
-        _pathChannelSettings += "/";
-        _pathChannelSettings += fileChannelLimitMessages;
+    void Store::_initChannelLimitMessages( const char *path, const char *channel ) {
+        std::string _pathChannelLimitMessages = path;
+        _pathChannelLimitMessages += "/";
+        _pathChannelLimitMessages += channel;
+        _pathChannelLimitMessages += "/";
+        _pathChannelLimitMessages += fileChannelLimitMessages;
 
-        if( !util::FS::fileExists( _pathChannelSettings.c_str() ) ) {
-            util::File file( _pathChannelSettings.c_str(), true );
+        if( !util::FS::fileExists( _pathChannelLimitMessages.c_str() ) ) {
+            util::File file( _pathChannelLimitMessages.c_str(), true );
         }
 
-        util::File file( _pathChannelSettings.c_str() );
-        util::Types::ChannelSettings settings;
+        util::File file( _pathChannelLimitMessages.c_str() );
+        util::types::ChannelLimitMessages limitMessages;
 
-        auto size = sizeof( util::Types::ChannelSettings );
+        auto size = sizeof( util::types::ChannelLimitMessages );
         if( file.size() < size ) {
             file.expand( size - file.size() );
         }
 
 
-        file.read( &settings, sizeof( util::Types::ChannelSettings ) );
-        settings.minMessageSize = ntohl( settings.minMessageSize );
-        settings.maxMessageSize = ntohl( settings.maxMessageSize );
-        settings.maxMessagesInMemory = ntohl( settings.maxMessagesInMemory );
-        settings.maxMessagesOnDisk = ntohl( settings.maxMessagesOnDisk );
+        file.read( &limitMessages, sizeof( util::types::ChannelLimitMessages ) );
+        limitMessages.minMessageSize = ntohl( limitMessages.minMessageSize );
+        limitMessages.maxMessageSize = ntohl( limitMessages.maxMessageSize );
+        limitMessages.maxMessagesInMemory = ntohl( limitMessages.maxMessagesInMemory );
+        limitMessages.maxMessagesOnDisk = ntohl( limitMessages.maxMessagesOnDisk );
 
 
-        if( settings.minMessageSize == 0 ) {
-            settings.minMessageSize = 1;
+        if( limitMessages.minMessageSize == 0 ) {
+            limitMessages.minMessageSize = 1;
         }
 
-        if( settings.minMessageSize > settings.maxMessageSize ) {
-            auto tmpSize = settings.maxMessageSize;
-            settings.maxMessageSize = settings.minMessageSize;
-            settings.minMessageSize = tmpSize;
+        if( limitMessages.minMessageSize > limitMessages.maxMessageSize ) {
+            auto tmpSize = limitMessages.maxMessageSize;
+            limitMessages.maxMessageSize = limitMessages.minMessageSize;
+            limitMessages.minMessageSize = tmpSize;
         }
 
-        if( settings.maxMessagesInMemory == 0 && settings.maxMessagesOnDisk == 0 ) {
-            settings.maxMessagesInMemory = 100;
+        if( limitMessages.maxMessagesInMemory == 0 && limitMessages.maxMessagesOnDisk == 0 ) {
+            limitMessages.maxMessagesInMemory = 100;
         }
 
-        unsigned long int maxMessages = settings.maxMessagesOnDisk + settings.maxMessagesInMemory;
+        unsigned long int maxMessages = limitMessages.maxMessagesOnDisk + limitMessages.maxMessagesInMemory;
         if( maxMessages > 0xFF'FF'FF'FF ) {
-            settings.maxMessagesInMemory = 100;
-            settings.maxMessagesOnDisk = 0;
+            limitMessages.maxMessagesInMemory = 100;
+            limitMessages.maxMessagesOnDisk = 0;
         }
 
-        settings.minMessageSize = htonl( settings.minMessageSize );
-        settings.maxMessageSize = htonl( settings.maxMessageSize );
-        settings.maxMessagesInMemory = htonl( settings.maxMessagesInMemory );
-        settings.maxMessagesOnDisk = htonl( settings.maxMessagesOnDisk );
+        limitMessages.minMessageSize = htonl( limitMessages.minMessageSize );
+        limitMessages.maxMessageSize = htonl( limitMessages.maxMessageSize );
+        limitMessages.maxMessagesInMemory = htonl( limitMessages.maxMessagesInMemory );
+        limitMessages.maxMessagesOnDisk = htonl( limitMessages.maxMessagesOnDisk );
 
-        file.write( &settings, size, 0 );
+        file.write( &limitMessages, size, 0 );
     }
 
     void Store::_initChannels( const char *group, const char *path ) {
@@ -301,7 +317,7 @@ namespace simq::core::server {
                 continue;
             }
 
-            _initChannelSettings( path, (*it).c_str() );
+            _initChannelLimitMessages( path, (*it).c_str() );
 
             Channel channel;
             groups[group][*it] = channel;
@@ -510,7 +526,11 @@ namespace simq::core::server {
         }
     }
 
-    void Store::getDirectChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings ) {
+    void Store::getDirectChannelLimitMessages(
+        const char *group,
+        const char *channel,
+        util::types::ChannelLimitMessages &limitMessages
+    ) {
         std::string p = _path;
         p += "/";
         p += pathGroups;
@@ -523,13 +543,13 @@ namespace simq::core::server {
 
         {
             auto file = util::File( p.c_str() );
-            file.read( &settings, sizeof( util::Types::ChannelSettings ) );
+            file.read( &limitMessages, sizeof( util::types::ChannelLimitMessages ) );
         }
 
-        settings.minMessageSize = ntohl( settings.minMessageSize );
-        settings.maxMessageSize = ntohl( settings.maxMessageSize );
-        settings.maxMessagesInMemory = ntohl( settings.maxMessagesInMemory );
-        settings.maxMessagesOnDisk = ntohl( settings.maxMessagesOnDisk );
+        limitMessages.minMessageSize = ntohl( limitMessages.minMessageSize );
+        limitMessages.maxMessageSize = ntohl( limitMessages.maxMessageSize );
+        limitMessages.maxMessagesInMemory = ntohl( limitMessages.maxMessagesInMemory );
+        limitMessages.maxMessagesOnDisk = ntohl( limitMessages.maxMessagesOnDisk );
     }
 
     void Store::getDirectConsumers( const char *group, const char *channel, std::vector<std::string> &list ) {
@@ -744,7 +764,11 @@ namespace simq::core::server {
         }
     }
 
-    void Store::addChannel( const char *group, const char *channel, util::Types::ChannelSettings &settings ) {
+    void Store::addChannel(
+        const char *group,
+        const char *channel,
+        util::types::ChannelLimitMessages &limitMessages
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -775,14 +799,14 @@ namespace simq::core::server {
         pathSettings += fileChannelLimitMessages;
 
         util::File fileSettings( pathSettings.c_str(), true );
-        util::Types::ChannelSettings channelSettings;
+        util::types::ChannelLimitMessages channelLimitMessages;
 
-        channelSettings.minMessageSize = htonl( settings.minMessageSize );
-        channelSettings.maxMessageSize = htonl( settings.maxMessageSize );
-        channelSettings.maxMessagesInMemory = htonl( settings.maxMessagesInMemory );
-        channelSettings.maxMessagesOnDisk = htonl( settings.maxMessagesOnDisk );
+        channelLimitMessages.minMessageSize = htonl( limitMessages.minMessageSize );
+        channelLimitMessages.maxMessageSize = htonl( limitMessages.maxMessageSize );
+        channelLimitMessages.maxMessagesInMemory = htonl( limitMessages.maxMessagesInMemory );
+        channelLimitMessages.maxMessagesOnDisk = htonl( limitMessages.maxMessagesOnDisk );
 
-        fileSettings.write( &channelSettings, sizeof( util::Types::ChannelSettings ) );
+        fileSettings.write( &channelLimitMessages, sizeof( util::types::ChannelLimitMessages ) );
 
 
         auto _pathConsumers = path;
@@ -831,7 +855,11 @@ namespace simq::core::server {
         groups[group].erase( itChannel );
     }
 
-    void Store::getChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings ) {
+    void Store::getChannelLimitMessages(
+        const char *group,
+        const char *channel,
+        util::types::ChannelLimitMessages &limitMessages
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -856,15 +884,19 @@ namespace simq::core::server {
         path += fileChannelLimitMessages;
 
         util::File fileSettings( path.c_str() );
-        fileSettings.read( &settings, sizeof( util::Types::ChannelSettings ) );
+        fileSettings.read( &limitMessages, sizeof( util::types::ChannelLimitMessages ) );
 
-        settings.minMessageSize = ntohl( settings.minMessageSize );
-        settings.maxMessageSize = ntohl( settings.maxMessageSize );
-        settings.maxMessagesInMemory = ntohl( settings.maxMessagesInMemory );
-        settings.maxMessagesOnDisk = ntohl( settings.maxMessagesOnDisk );
+        limitMessages.minMessageSize = ntohl( limitMessages.minMessageSize );
+        limitMessages.maxMessageSize = ntohl( limitMessages.maxMessageSize );
+        limitMessages.maxMessagesInMemory = ntohl( limitMessages.maxMessagesInMemory );
+        limitMessages.maxMessagesOnDisk = ntohl( limitMessages.maxMessagesOnDisk );
     }
 
-    void Store::updateChannelSettings( const char *group, const char *channel, util::Types::ChannelSettings &settings ) {
+    void Store::updateChannelLimitMessages(
+        const char *group,
+        const char *channel,
+        util::types::ChannelLimitMessages &limitMessages
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -890,12 +922,12 @@ namespace simq::core::server {
 
         util::File fileSettings( path.c_str() );
 
-        settings.minMessageSize = htonl( settings.minMessageSize );
-        settings.maxMessageSize = htonl( settings.maxMessageSize );
-        settings.maxMessagesInMemory = htonl( settings.maxMessagesInMemory );
-        settings.maxMessagesOnDisk = htonl( settings.maxMessagesOnDisk );
+        limitMessages.minMessageSize = htonl( limitMessages.minMessageSize );
+        limitMessages.maxMessageSize = htonl( limitMessages.maxMessageSize );
+        limitMessages.maxMessagesInMemory = htonl( limitMessages.maxMessagesInMemory );
+        limitMessages.maxMessagesOnDisk = htonl( limitMessages.maxMessagesOnDisk );
 
-        fileSettings.atomicWrite( &settings, sizeof( util::Types::ChannelSettings ) );
+        fileSettings.atomicWrite( &limitMessages, sizeof( util::types::ChannelLimitMessages ) );
     }
 
     void Store::getConsumers( const char *group, const char *channel, std::vector<std::string> &consumers ) {
