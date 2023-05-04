@@ -4,7 +4,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <atomic>
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <string.h>
 #include "../../../util/uuid.hpp"
@@ -34,7 +34,7 @@ namespace simq::core::server::q {
             std::shared_timed_mutex _mUUID;
             std::atomic_uint _countUUIDWrited{0};
 
-            std::map<std::string, unsigned int> _uuid;
+            std::unordered_map<std::string, unsigned int> _uuid;
 
 
             std::shared_timed_mutex _m;
