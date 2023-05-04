@@ -15,7 +15,6 @@
 #include "../../../util/types.h"
 #include "../../../util/uuid.hpp"
 #include "../../../util/buffer.hpp"
-#include "uuid.hpp"
 #include "messages.hpp"
 
 namespace simq::core::server::q {
@@ -30,7 +29,6 @@ namespace simq::core::server::q {
                 std::map<unsigned int, std::list<unsigned int>> consumers;
                 std::map<unsigned int, bool> producers;
 
-                UUID uuid;
                 Messages *messages;
 
                 std::shared_timed_mutex mQList;
@@ -470,11 +468,7 @@ namespace simq::core::server::q {
 
         _checkProducer( channel->producers, fd );
 
-        channel->uuid.generate( uuid );
-
-        auto id = channel->messages->add( length, wrData );
-
-        channel->messages->setUUID( id, uuid );
+        auto id = channel->messages->addForQ( length, uuid, wrData );
 
         return id;
     }
@@ -509,7 +503,7 @@ namespace simq::core::server::q {
 
         _checkProducer( channel->producers, fd );
 
-        return channel->messages->add( length, wrData );
+        return channel->messages->addForBroadcast( length, wrData );
     }
 
     unsigned int Manager::createMessageForReplication(
@@ -543,11 +537,7 @@ namespace simq::core::server::q {
 
         _checkProducer( channel->producers, fd );
 
-        channel->uuid.add( uuid );
-
-        auto id = channel->messages->add( length, wrData );
-
-        channel->messages->setUUID( id, uuid );
+        auto id = channel->messages->addForReplication( length, uuid, wrData );
 
         return id;
     }
@@ -576,8 +566,6 @@ namespace simq::core::server::q {
 
         auto channel = group->channels[channelName];
 
-        char uuid[util::UUID::LENGTH+1]{};
-
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducer( channel->mProducers );
 
@@ -590,12 +578,6 @@ namespace simq::core::server::q {
         if( isConsumer || isProducer ) {
             if( isConsumer && _calculateTotalConsumersByMessagedID( channel->consumers, id ) != 0 ) {
                 return;
-            }
-
-            channel->messages->getUUID( id, uuid );
-
-            if( uuid[0] != 0 ) {
-                channel->uuid.free( uuid );
             }
 
             channel->messages->free( id );
@@ -645,7 +627,6 @@ namespace simq::core::server::q {
             channel->QList.erase( itMsg );
         }
 
-        channel->uuid.free( uuid );
         channel->messages->free( uuid );
     }
 

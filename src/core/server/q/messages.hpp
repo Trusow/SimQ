@@ -57,10 +57,11 @@ namespace simq::core::server::q {
 
             void updateLimits( util::types::ChannelLimitMessages &limits );
 
-            unsigned int add( unsigned int length, WRData &wrData );
+            unsigned int addForQ( unsigned int length, char *uuid, WRData &wrData );
+            unsigned int addForReplication( unsigned int length, const char *uuid, WRData &wrData );
+            unsigned int addForBroadcast( unsigned int length, WRData &wrData );
             void free( unsigned int id );
             void free( const char *uuid );
-            void setUUID( unsigned int id, const char *uuid );
             void getUUID( unsigned int id, char *uuid );
             unsigned int getID( const char *uuid );
 
@@ -113,22 +114,6 @@ namespace simq::core::server::q {
         return id;
     }
 
-    void Messages::setUUID( unsigned int id, const char *uuid ) {
-        _wait( _countWrited );
-        std::shared_lock<std::shared_timed_mutex> lock( _m );
-
-        if( id >= _total ) {
-            throw util::Error::UNKNOWN;
-        }
-
-        util::LockAtomic lockAtomicUUID( _countUUIDWrited );
-        std::lock_guard<std::shared_timed_mutex> lockUUID( _mUUID );
-
-        _uuid[uuid] = id;
-
-        memcpy( _messages[id]->uuid, uuid, util::UUID::LENGTH );
-    }
-
     unsigned int Messages::getID( const char *uuid ) {
         _wait( _countUUIDWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mUUID );
@@ -162,7 +147,83 @@ namespace simq::core::server::q {
         _total += MESSAGES_IN_PACKET;
     }
 
-    unsigned int Messages::add( unsigned int length, WRData &wrData ) {
+    unsigned int Messages::addForQ( unsigned int length, char *uuid, WRData &wrData ) {
+        if( length < _limits.minMessageSize || length > _limits.maxMessageSize ) {
+            throw util::Error::WRONG_MESSAGE_SIZE;
+        }
+
+        util::LockAtomic lockAtomic( _countWrited );
+        std::lock_guard<std::shared_timed_mutex> lock( _m );
+
+        util::LockAtomic lockAtomicUUID( _countUUIDWrited );
+        std::lock_guard<std::shared_timed_mutex> lockUUID( _mUUID );
+
+        bool isMemory = false;
+        auto id = _allocateMessage( length, isMemory );
+
+        auto msg = new Message{};
+        msg->isMemory = isMemory;
+
+        if( id >= _total ) {
+            _expandMessages();
+        }
+
+        _messages[id] = msg;
+
+        wrData.length = length;
+        wrData.wrLength = 0;
+
+        while( true ) {
+            util::UUID::generate( uuid );
+            auto it = _uuid.find( uuid );
+            if( it == _uuid.end() ) {
+                _uuid[uuid] = true;
+                break;
+            }
+        }
+
+        memcpy( _messages[id]->uuid, uuid, util::UUID::LENGTH );
+
+        return id;
+    }
+
+    unsigned int Messages::addForReplication( unsigned int length, const char *uuid, WRData &wrData ) {
+        if( length < _limits.minMessageSize || length > _limits.maxMessageSize ) {
+            throw util::Error::WRONG_MESSAGE_SIZE;
+        }
+
+        util::LockAtomic lockAtomic( _countWrited );
+        std::lock_guard<std::shared_timed_mutex> lock( _m );
+
+        _wait( _countUUIDWrited );
+        std::shared_lock<std::shared_timed_mutex> lockUUID( _mUUID );
+
+        bool isMemory = false;
+        auto id = _allocateMessage( length, isMemory );
+
+        auto itUUID = _uuid.find( uuid );
+        if( itUUID != _uuid.end() ) {
+            throw util::Error::DUPLICATE_UUID;
+        }
+
+        auto msg = new Message{};
+        msg->isMemory = isMemory;
+
+        if( id >= _total ) {
+            _expandMessages();
+        }
+
+        _messages[id] = msg;
+
+        wrData.length = length;
+        wrData.wrLength = 0;
+
+        memcpy( _messages[id]->uuid, uuid, util::UUID::LENGTH );
+
+        return id;
+    }
+
+    unsigned int Messages::addForBroadcast( unsigned int length, WRData &wrData ) {
         if( length < _limits.minMessageSize || length > _limits.maxMessageSize ) {
             throw util::Error::WRONG_MESSAGE_SIZE;
         }
@@ -197,6 +258,13 @@ namespace simq::core::server::q {
         }
 
         _buffer->free( id );
+
+        if( _messages[id]->uuid[0] != 0 ) {
+            auto itUUID = _uuid.find( _messages[id]->uuid );
+            if( itUUID != _uuid.end() ) {
+                _uuid.erase( itUUID );
+            }
+        }
 
         delete _messages[id];
         _messages[id] = nullptr;
