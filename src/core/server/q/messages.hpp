@@ -51,6 +51,7 @@ namespace simq::core::server::q {
             unsigned int _allocateMessage( unsigned int length, bool &isMemory );
             void _expandMessages();
             unsigned int _calculateWRLength( WRData &wrData );
+            void _validateAdd( unsigned int length );
         public:
             Messages( const char *path, util::types::ChannelLimitMessages &limits );
             ~Messages();
@@ -147,10 +148,14 @@ namespace simq::core::server::q {
         _total += MESSAGES_IN_PACKET;
     }
 
-    unsigned int Messages::addForQ( unsigned int length, char *uuid, WRData &wrData ) {
+    void Messages::_validateAdd( unsigned int length ) {
         if( length < _limits.minMessageSize || length > _limits.maxMessageSize ) {
             throw util::Error::WRONG_MESSAGE_SIZE;
         }
+    }
+
+    unsigned int Messages::addForQ( unsigned int length, char *uuid, WRData &wrData ) {
+        _validateAdd( length );
 
         util::LockAtomic lockAtomic( _countWrited );
         std::lock_guard<std::shared_timed_mutex> lock( _m );
@@ -188,9 +193,7 @@ namespace simq::core::server::q {
     }
 
     unsigned int Messages::addForReplication( unsigned int length, const char *uuid, WRData &wrData ) {
-        if( length < _limits.minMessageSize || length > _limits.maxMessageSize ) {
-            throw util::Error::WRONG_MESSAGE_SIZE;
-        }
+        _validateAdd( length );
 
         util::LockAtomic lockAtomic( _countWrited );
         std::lock_guard<std::shared_timed_mutex> lock( _m );
@@ -224,9 +227,7 @@ namespace simq::core::server::q {
     }
 
     unsigned int Messages::addForBroadcast( unsigned int length, WRData &wrData ) {
-        if( length < _limits.minMessageSize || length > _limits.maxMessageSize ) {
-            throw util::Error::WRONG_MESSAGE_SIZE;
-        }
+        _validateAdd( length );
 
         util::LockAtomic lockAtomic( _countWrited );
         std::lock_guard<std::shared_timed_mutex> lock( _m );
