@@ -31,6 +31,59 @@ namespace simq::util {
                 DUPLICATE_UUID,
                 SOCKET,
             };
+
+            static const char *getDescription( Err err ) {
+                switch( err ) {
+                    case DUPLICATE_UUID:
+                        return "Duplicate UUID";
+                    case NOT_FOUND:
+                        return "Not found";
+                    case WRONG_PASSWORD:
+                        return "Wrong password";
+                    case WRONG_PARAM:
+                        return "Wrong params";
+                    case WRONG_GROUP:
+                        return "Wrong group";
+                    case WRONG_CHANNEL:
+                        return "Wrong channel";
+                    case WRONG_LOGIN:
+                        return "Wrong login";
+                    case WRONG_MESSAGE_SIZE:
+                        return "Wrong message size";
+                    case WRONG_SETTINGS:
+                        return "Wrong settings";
+                    case EXCEED_LIMIT:
+                        return "Exceed limit";
+                    case IS_EXISTS:
+                        return "Is exists";
+                    case ACCESS_DENY:
+                        return "Access deny";
+                    case util::Error::FS_ERROR:
+                        return "FS error";
+                    case DUPLICATE_GROUP:
+                        return "Duplicate group";
+                    case NOT_FOUND_GROUP:
+                        return "Not found group";
+                    case NOT_FOUND_SESSION:
+                        return "Not found session";
+                    case NOT_FOUND_CHANNEL:
+                        return "Not found channel";
+                    case NOT_FOUND_CONSUMER:
+                        return "Not found consumer";
+                    case NOT_FOUND_PRODUCER:
+                        return "Not found producer";
+                    case DUPLICATE_SESSION:
+                        return "Duplicate session";
+                    case DUPLICATE_CHANNEL:
+                        return "Duplicate channel";
+                    case DUPLICATE_CONSUMER:
+                        return "Duplicate consumer";
+                    case DUPLICATE_PRODUCER:
+                        return "Duplicate producer";
+                    default:
+                        return "Unknown";
+                }
+            }
     };
 }
 
