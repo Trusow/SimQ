@@ -22,9 +22,9 @@ namespace simq::util {
                 bool isRaw = false
             );
         public:
-            static void printDanger( std::list<std::string> &list, char separator = '\t' );
-            static void print( std::list<std::string> &list, char separator = '\t' );
-            static void printRaw( std::list<std::string> &list, char separator = '\t' );
+            static void danger( std::list<std::string> &list, char separator = '\t' );
+            static void info( std::list<std::string> &list, char separator = '\t' );
+            static void raw( std::list<std::string> &list, char separator = '\t' );
     };
 
     void Logger::_printTime() {
@@ -67,15 +67,15 @@ namespace simq::util {
 
     }
 
-    void Logger::printDanger( std::list<std::string> &list, char separator ) {
+    void Logger::danger( std::list<std::string> &list, char separator ) {
         _print( list, separator, "91m" );
     }
 
-    void Logger::print( std::list<std::string> &list, char separator ) {
+    void Logger::info( std::list<std::string> &list, char separator ) {
         _print( list, separator );
     }
 
-    void Logger::printRaw( std::list<std::string> &list, char separator ) {
+    void Logger::raw( std::list<std::string> &list, char separator ) {
         _print( list, separator, nullptr, true );
     }
 }
