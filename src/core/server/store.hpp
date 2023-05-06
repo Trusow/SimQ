@@ -387,13 +387,14 @@ namespace simq::core::server {
                 continue;
             }
 
+            std::map<std::string, Channel> channels;
+            groups[*it] = channels;
+
             std::string _path = _pathGroups;
             _path += "/";
             _path += *it;
             _initChannels( (*it).c_str(), _path.c_str() );
 
-            std::map<std::string, Channel> channels;
-            groups[*it] = channels;
         }
     }
 
@@ -668,6 +669,8 @@ namespace simq::core::server {
 
         std::string path = _path;
         path += "/";
+        path += pathGroups;
+        path += "/";
         path += group;
         path += "/";
         path += filePassword;
@@ -939,12 +942,16 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto itChannel = itGroup->second.find( channel );
-        if( itChannel == itGroup->second.end() ) {
+        auto _group = groups[group];
+
+        auto itChannel = _group.find( channel );
+        if( itChannel == _group.end() ) {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        for( auto it = itChannel->second.consumers.begin(); it != itChannel->second.consumers.end(); it++ ) {
+        auto _channel = _group[channel];
+
+        for( auto it = _channel.consumers.begin(); it != _channel.consumers.end(); it++ ) {
             consumers.push_back( it->first );
         }
     }
@@ -1112,12 +1119,16 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto itChannel = itGroup->second.find( channel );
-        if( itChannel == itGroup->second.end() ) {
+        auto _group = groups[group];
+
+        auto itChannel = _group.find( channel );
+        if( itChannel == _group.end() ) {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        for( auto it = itChannel->second.producers.begin(); it != itChannel->second.consumers.end(); it++ ) {
+        auto _channel = _group[channel];
+
+        for( auto it = _channel.producers.begin(); it != _channel.producers.end(); it++ ) {
             producers.push_back( it->first );
         }
     }
