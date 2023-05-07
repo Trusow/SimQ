@@ -10,6 +10,7 @@ namespace simq::core::server {
     class Logger {
         public:
             enum Operation {
+                OP_INITIALIZATION_SETTINGS,
                 OP_INITIALIZATION_GROUP,
                 OP_INITIALIZATION_CHANNEL,
                 OP_INITIALIZATION_CONSUMER,
@@ -86,6 +87,9 @@ namespace simq::core::server {
 
     void Logger::_getOperation( Operation operation, std::string &str ) {
         switch( operation ) {
+            case OP_INITIALIZATION_SETTINGS:
+                str = "Initialization settings";
+                break;
             case OP_INITIALIZATION_GROUP:
                 str = "Initialization group";
                 break;
