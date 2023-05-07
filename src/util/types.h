@@ -8,6 +8,13 @@ namespace simq::util::types {
         unsigned int maxMessagesInMemory;
         unsigned int maxMessagesOnDisk;
     };
+
+    enum Initiator {
+        I_ROOT,
+        I_GROUP,
+        I_CONSUMER,
+        I_PRODUCER,
+    };
 }
 
 #endif
