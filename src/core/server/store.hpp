@@ -14,19 +14,20 @@
 #include "../../util/fs.hpp"
 #include "../../util/file.hpp"
 #include "../../util/error.h"
+#include "../../util/constants.h"
 
 
 namespace simq::core::server {
     class Store {
         private:
-            const char *pathConsumers = "consumers";
-            const char *pathProducers = "producers";
-            const char *pathSettings = "settings";
-            const char *pathChannels = "channels";
-            const char *pathGroups = "groups";
-            const char *fileSettings = "settings";
-            const char *fileChannelLimitMessages = "limit-messages";
-            const char *filePassword = "password";
+            const char *pathConsumers = util::constants::PATH_DIR_CONSUMERS;
+            const char *pathProducers = util::constants::PATH_DIR_PRODUCERS;
+            const char *pathSettings = util::constants::PATH_DIR_SETTINGS;
+            const char *pathChannels = util::constants::PATH_DIR_CHANNELS;
+            const char *pathGroups = util::constants::PATH_DIR_GROUPS;
+            const char *fileSettings = util::constants::PATH_FILE_SETTINGS;
+            const char *fileChannelLimitMessages = util::constants::PATH_FILE_CHANNEL_LIMIT_MESSAGES;
+            const char *filePassword = util::constants::PATH_FILE_PASSWORD;
 
             const unsigned int DEFAULT_PORT = 4012;
 
