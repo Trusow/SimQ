@@ -19,7 +19,21 @@ namespace simq::core::server {
 
                 OP_START_SERVER,
      
-                OP_CREATE_GROUP,
+                OP_ADD_GROUP,
+                OP_UPDATE_GROUP_PASSWORD,
+                OP_REMOVE_GROUP,
+
+                OP_ADD_CHANNEL,
+                OP_UPDATE_CHANNEL_LIMIT_MESSAGES,
+                OP_REMOVE_CHANNEL,
+
+                OP_ADD_CONSUMER,
+                OP_UPDATE_CONSUMER_PASSWORD,
+                OP_REMOVE_CONSUMER,
+
+                OP_ADD_PRODUCER,
+                OP_UPDATE_PRODUCER_PASSWORD,
+                OP_REMOVE_PRODUCER,
             };
 
             struct Detail {
@@ -99,6 +113,40 @@ namespace simq::core::server {
             case OP_START_SERVER:
                 str = "Start server";
                 break;
+            case OP_ADD_GROUP:
+                str = "Add group";
+                break;
+            case OP_UPDATE_GROUP_PASSWORD:
+                str = "Update group password";
+                break;
+            case OP_REMOVE_GROUP:
+                str = "Remove group";
+                break;
+            case OP_ADD_CHANNEL:
+                str = "Add channel";
+                break;
+            case OP_UPDATE_CHANNEL_LIMIT_MESSAGES:
+                str = "Update channel limit messages";
+                break;
+            case OP_REMOVE_CHANNEL:
+                str = "Remove channel";
+                break;
+            case OP_ADD_CONSUMER:
+                str = "Add consumer";
+                break;
+            case OP_UPDATE_CONSUMER_PASSWORD:
+                str = "Update consumer password";
+                break;
+            case OP_REMOVE_CONSUMER:
+                str = "Remove consumer";
+            case OP_ADD_PRODUCER:
+                str = "Add producer";
+                break;
+            case OP_UPDATE_PRODUCER_PASSWORD:
+                str = "Update producer password";
+                break;
+            case OP_REMOVE_PRODUCER:
+                str = "Remove producer";
         }
     }
 
