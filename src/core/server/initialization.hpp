@@ -7,6 +7,7 @@
 #include "q/manager.hpp"
 #include "logger.hpp"
 #include "../../util/string.hpp"
+#include "../../util/types.h"
 
 namespace simq::core::server {
     class Initialization {
@@ -49,7 +50,7 @@ namespace simq::core::server {
                     Logger::OP_INITIALIZATION_CONSUMER,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             } catch( util::Error::Err err ) {
                 Logger::fail(
@@ -57,7 +58,7 @@ namespace simq::core::server {
                     err,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             } catch( ... ) {
                 Logger::fail(
@@ -65,7 +66,7 @@ namespace simq::core::server {
                     util::Error::UNKNOWN,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             }
         }
@@ -91,7 +92,7 @@ namespace simq::core::server {
                     Logger::OP_INITIALIZATION_PRODUCER,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             } catch( util::Error::Err err ) {
                 Logger::fail(
@@ -99,7 +100,7 @@ namespace simq::core::server {
                     err,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             } catch( ... ) {
                 Logger::fail(
@@ -107,7 +108,7 @@ namespace simq::core::server {
                     util::Error::UNKNOWN,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             }
         }
@@ -164,7 +165,7 @@ namespace simq::core::server {
                     Logger::OP_INITIALIZATION_CHANNEL,
                     0,
                     details,
-                    simq::core::server::Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
 
                 _initConsumers( group, channel );
@@ -175,7 +176,7 @@ namespace simq::core::server {
                     err,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             } catch( ... ) {
                 Logger::fail(
@@ -183,7 +184,7 @@ namespace simq::core::server {
                     util::Error::UNKNOWN,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             }
         }
@@ -211,7 +212,7 @@ namespace simq::core::server {
                     Logger::OP_INITIALIZATION_GROUP,
                     0,
                     details,
-                    simq::core::server::Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
 
                 _initChannels( group );
@@ -221,7 +222,7 @@ namespace simq::core::server {
                     err,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             } catch( ... ) {
                 Logger::fail(
@@ -229,7 +230,7 @@ namespace simq::core::server {
                     util::Error::UNKNOWN,
                     0,
                     details,
-                    Logger::I_ROOT
+                    util::types::Initiator::I_ROOT
                 );
             }
         }
@@ -250,7 +251,7 @@ namespace simq::core::server {
                 Logger::OP_INITIALIZATION_SETTINGS,
                 0,
                 details,
-                simq::core::server::Logger::I_ROOT
+                util::types::Initiator::I_ROOT
             );
 
             _initGroups();
@@ -259,8 +260,8 @@ namespace simq::core::server {
                 Logger::OP_INITIALIZATION_SETTINGS,
                 err,
                 0,
-               details,
-                Logger::I_ROOT
+                details,
+                util::types::Initiator::I_ROOT
             );
         } catch( ... ) {
             Logger::fail(
@@ -268,7 +269,7 @@ namespace simq::core::server {
                 util::Error::UNKNOWN,
                 0,
                 details,
-                Logger::I_ROOT
+                util::types::Initiator::I_ROOT
             );
         }
 
