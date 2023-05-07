@@ -7,6 +7,7 @@
 #include "../../util/fs.hpp"
 #include "../../util/validation.hpp"
 #include "../../util/uuid.hpp"
+#include "../../util/string.hpp"
 #include "../../util/constants.h"
 #include <list>
 #include <map>
@@ -51,6 +52,10 @@ namespace simq::core::server {
 
             struct Change: ChangeFile {
                 char *data;
+                util::types::Initiator initiator;
+                char *group;
+                char *channel;
+                char *login;
             };
 
         private:
@@ -208,9 +213,20 @@ namespace simq::core::server {
             unsigned short int getCountThreads( Change *change );
             void getPassword( Change *change, unsigned char password[crypto::HASH_LENGTH] );
 
-            void push( Change *change );
+            void push(
+                Change *change,
+                util::types::Initiator initiator = util::types::Initiator::I_ROOT,
+                const char *group = nullptr,
+                const char *channel = nullptr,
+                const char *login = nullptr
+            );
             void pushDefered( Change *change );
             Change *pop();
+
+            util::types::Initiator getInitiator( Change *change );
+            const char *getInitiatorGroup( Change *change );
+            const char *getInitiatorChannel( Change *change );
+            const char *getInitiatorLogin( Change *change );
 
             void free( Change *change );
     };
@@ -240,6 +256,17 @@ namespace simq::core::server {
 
         for( auto it = listMemory.begin(); it != listMemory.end(); it++ ) {
             delete[] (*it)->data;
+            switch( (*it)->initiator ) {
+                case util::types::Initiator::I_GROUP:
+                    delete[] (*it)->group;
+                    break;
+                case util::types::Initiator::I_CONSUMER:
+                case util::types::Initiator::I_PRODUCER:
+                    delete[] (*it)->group;
+                    delete[] (*it)->channel;
+                    delete[] (*it)->login;
+                    break;
+            }
             delete *it;
         }
 
@@ -651,14 +678,46 @@ namespace simq::core::server {
         if( change->data != nullptr ) {
             delete[] change->data;
         }
+
+        switch( change->initiator ) {
+            case util::types::Initiator::I_GROUP:
+                delete[] change->group;
+                break;
+            case util::types::Initiator::I_CONSUMER:
+            case util::types::Initiator::I_PRODUCER:
+                delete[] change->group;
+                delete[] change->channel;
+                delete[] change->login;
+                break;
+        }
+
         delete change;
     }
 
-    void Changes::push( Change *change ) {
+    void Changes::push(
+        Change *change,
+        util::types::Initiator initiator,
+        const char *group,
+        const char *channel,
+        const char *login
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto ch = new Change{};
         memcpy( ch, change, sizeof( Change ) );
+        ch->initiator = initiator;
+
+        switch( ch->initiator ) {
+            case util::types::Initiator::I_GROUP:
+                ch->group = util::String::copy( group );
+                break;
+            case util::types::Initiator::I_CONSUMER:
+            case util::types::Initiator::I_PRODUCER:
+                ch->group = util::String::copy( group );
+                ch->channel = util::String::copy( channel );
+                ch->login = util::String::copy( login );
+                break;
+        }
 
         auto length = 0;
         for( int i = 0; i < LENGTH_VALUES; i++ ) {
@@ -1035,12 +1094,11 @@ namespace simq::core::server {
             return;
         }
 
-        // TODO валидация значений из файлов
-        // TODO конверт настроек для канала
-
         Change *ch = new Change{};
 
         ch->type = cf.type;
+        ch->initiator = util::types::Initiator::I_ROOT;
+
         for( int i = 0; i < LENGTH_VALUES; i++ ) {
             ch->values[i] = ntohl( cf.values[i] );
         }
@@ -1084,8 +1142,7 @@ namespace simq::core::server {
     void Changes::_addChangesFromFiles() {
         std::vector<std::string> files;
 
-        // TODO: получать файлы отсортированные по дате
-        util::FS::files( _path, files );
+        util::FS::files( _path, files, util::FS::SortAsc, util::FS::SortByDate );
 
         for( auto it = files.begin(); it != files.end(); it++ ) {
             if( !util::Validation::isUUID( (*it).c_str() ) ) {
@@ -1148,6 +1205,22 @@ namespace simq::core::server {
         listMemory.pop_front();
 
         return change;
+    }
+
+    util::types::Initiator Changes::getInitiator( Change *change ) {
+        return change->initiator;
+    }
+
+    const char *Changes::getInitiatorGroup( Change *change ) {
+        return change->group;
+    }
+
+    const char *Changes::getInitiatorChannel( Change *change ) {
+        return change->channel;
+    }
+
+    const char *Changes::getInitiatorLogin( Change *change ) {
+        return change->login;
     }
 }
 
