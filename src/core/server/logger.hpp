@@ -52,6 +52,9 @@ namespace simq::core::server {
                 std::string &str
             );
         public:
+
+            static void addItemToDetails( std::list<Detail> &list, const char *name, const char *value );
+
             static void fail(
                 Operation operation,
                 util::Error::Err error,
@@ -73,6 +76,13 @@ namespace simq::core::server {
                 const char *login = nullptr
             );
     };
+
+    void Logger::addItemToDetails( std::list<Detail> &list, const char *name, const char *value ) {
+        Detail item; 
+        item.name = name;
+        item.value = value;
+        list.push_back( item );
+    }
 
     void Logger::_getOperation( Operation operation, std::string &str ) {
         switch( operation ) {
