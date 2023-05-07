@@ -5,6 +5,7 @@
 #include <string>
 #include "../../util/logger.hpp"
 #include "../../util/error.h"
+#include "../../util/types.h"
 
 namespace simq::core::server {
     class Logger {
@@ -25,13 +26,6 @@ namespace simq::core::server {
                 std::string name;
                 std::string value;
             };
-
-            enum Initiator {
-                I_ROOT,
-                I_GROUP,
-                I_CONSUMER,
-                I_PRODUCER,
-            };
         private:
             struct Row {
                 std::string type;
@@ -42,7 +36,7 @@ namespace simq::core::server {
 
             static void _getOperation( Operation operation, std::string &str );
             static void _getInitiator(
-                Initiator initiator,
+                util::types::Initiator initiator,
                 const char *group,
                 const char *channel,
                 const char *login,
@@ -61,7 +55,7 @@ namespace simq::core::server {
                 util::Error::Err error,
                 unsigned int ip,
                 std::list<Detail> &details,
-                Initiator initiator = Initiator::I_ROOT,
+                util::types::Initiator initiator = util::types::Initiator::I_ROOT,
                 const char *group = nullptr,
                 const char *channel = nullptr,
                 const char *login = nullptr
@@ -71,7 +65,7 @@ namespace simq::core::server {
                 Operation operation,
                 unsigned int ip,
                 std::list<Detail> &details,
-                Initiator initiator = Initiator::I_ROOT,
+                util::types::Initiator initiator = util::types::Initiator::I_ROOT,
                 const char *group = nullptr,
                 const char *channel = nullptr,
                 const char *login = nullptr
@@ -109,20 +103,20 @@ namespace simq::core::server {
     }
 
     void Logger::_getInitiator(
-        Initiator initiator,
+        util::types::Initiator initiator,
         const char *group,
         const char *channel,
         const char *login,
         std::string &str
     ) {
-        if( initiator == I_GROUP ) {
+        if( initiator == util::types::Initiator::I_GROUP ) {
             str = group;
-        } else if( initiator == I_CONSUMER || initiator == I_PRODUCER ) {
+        } else if( initiator == util::types::Initiator::I_CONSUMER || initiator == util::types::Initiator::I_PRODUCER ) {
             str = group;
             str += " / ";
             str = channel;
             str += " / ";
-            str += initiator == I_CONSUMER ? "consumer" : "producer";
+            str += initiator == util::types::Initiator::I_CONSUMER ? "consumer" : "producer";
             str += " / ";
             str = login;
         }
@@ -147,7 +141,7 @@ namespace simq::core::server {
         util::Error::Err error,
         unsigned int ip,
         std::list<Detail> &details,
-        Initiator initiator,
+        util::types::Initiator initiator,
         const char *group,
         const char *channel,
         const char *login
@@ -183,7 +177,7 @@ namespace simq::core::server {
         Operation operation,
         unsigned int ip,
         std::list<Detail> &details,
-        Initiator initiator,
+        util::types::Initiator initiator,
         const char *group,
         const char *channel,
         const char *login
