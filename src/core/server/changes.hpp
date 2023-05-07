@@ -7,6 +7,7 @@
 #include "../../util/fs.hpp"
 #include "../../util/validation.hpp"
 #include "../../util/uuid.hpp"
+#include "../../util/constants.h"
 #include <list>
 #include <map>
 #include <string>
@@ -38,7 +39,7 @@ namespace simq::core::server {
                 CH_UPDATE_PORT,
                 CH_UPDATE_COUNT_THREADS,
             };
-            const char *defPath = "changes";
+            const char *defPath = util::constants::PATH_DIR_CHANGES;
             const unsigned int LENGTH_VALUES = 16;
 
             struct ChangeFile {
