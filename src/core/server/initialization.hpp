@@ -253,6 +253,7 @@ namespace simq::core::server {
                 simq::core::server::Logger::I_ROOT
             );
 
+            _initGroups();
         } catch( util::Error::Err err ) {
             Logger::fail(
                 Logger::OP_INITIALIZATION_SETTINGS,
@@ -271,7 +272,6 @@ namespace simq::core::server {
             );
         }
 
-        _initGroups();
     }
 
     Changes *Initialization::getChanges() {
