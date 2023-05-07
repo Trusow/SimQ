@@ -6,6 +6,7 @@
 #include "changes.hpp"
 #include "q/manager.hpp"
 #include "logger.hpp"
+#include "../../util/string.hpp"
 
 namespace simq::core::server {
     class Initialization {
@@ -14,6 +15,7 @@ namespace simq::core::server {
             Access *_access = nullptr;
             Changes *_changes = nullptr;
             q::Manager *_q = nullptr;
+            char *_path = nullptr;
 
             void _initGroups();
             void _initChannels( const char *group );
@@ -21,8 +23,9 @@ namespace simq::core::server {
             void _initProducers( const char *group, const char *channel );
 
         public:
-            Initialization( Store &store, Access &access, Changes &changes, q::Manager &q );
+            Initialization( const char *path, Access &access, q::Manager &q );
 
+            Changes *getChanges();
             void pollChanges();
     };
 
@@ -146,7 +149,16 @@ namespace simq::core::server {
                 );
 
                 _access->addChannel( group, channel );
-                //_q.addChannel( group, channel, ".", limitMessages );
+
+                std::string pathToLimitMessages;
+                util::constants::buildPathToChannelLimitMessages(
+                    pathToLimitMessages,
+                    _path,
+                    group,
+                    channel
+                );
+
+                _q->addChannel( group, channel, pathToLimitMessages.c_str(), limitMessages );
 
                 Logger::success(
                     Logger::OP_INITIALIZATION_CHANNEL,
@@ -223,13 +235,47 @@ namespace simq::core::server {
         }
     }
 
-    Initialization::Initialization( Store &store, Access &access, Changes &changes, q::Manager &q ) {
-        _store = &store;
+    Initialization::Initialization( const char *path, Access &access, q::Manager &q ) {
+        _path = util::String::copy( path );
         _access = &access;
-        _changes = &changes;
         _q = &q;
 
+        std::list<Logger::Detail> details;
+
+        try {
+            _store = new Store( _path );
+            _changes = new Changes( _path );
+
+            Logger::success(
+                Logger::OP_INITIALIZATION_SETTINGS,
+                0,
+                details,
+                simq::core::server::Logger::I_ROOT
+            );
+
+        } catch( util::Error::Err err ) {
+            Logger::fail(
+                Logger::OP_INITIALIZATION_SETTINGS,
+                err,
+                0,
+               details,
+                Logger::I_ROOT
+            );
+        } catch( ... ) {
+            Logger::fail(
+                Logger::OP_INITIALIZATION_SETTINGS,
+                util::Error::UNKNOWN,
+                0,
+                details,
+                Logger::I_ROOT
+            );
+        }
+
         _initGroups();
+    }
+
+    Changes *Initialization::getChanges() {
+        return _changes;
     }
 
     void Initialization::pollChanges() {
