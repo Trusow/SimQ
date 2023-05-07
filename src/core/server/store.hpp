@@ -20,16 +20,7 @@
 namespace simq::core::server {
     class Store {
         private:
-            const char *pathConsumers = util::constants::PATH_DIR_CONSUMERS;
-            const char *pathProducers = util::constants::PATH_DIR_PRODUCERS;
-            const char *pathSettings = util::constants::PATH_DIR_SETTINGS;
-            const char *pathChannels = util::constants::PATH_DIR_CHANNELS;
-            const char *pathGroups = util::constants::PATH_DIR_GROUPS;
-            const char *fileSettings = util::constants::PATH_FILE_SETTINGS;
-            const char *fileChannelLimitMessages = util::constants::PATH_FILE_CHANNEL_LIMIT_MESSAGES;
-            const char *filePassword = util::constants::PATH_FILE_PASSWORD;
-
-            const unsigned int DEFAULT_PORT = 4012;
+            const unsigned int DEFAULT_PORT = util::constants::DEFAULT_PORT;
 
             struct Settings {
                 unsigned short int countThreads;
@@ -53,15 +44,13 @@ namespace simq::core::server {
 
             char *_path = nullptr;
 
-            void _initSettings( const char *path );
-            void _initChannels( const char *group, const char *path );
-            void _initChannelLimitMessages( const char *path, const char *channel );
-            void _initUsers( const char *group, const char *channel, TypeUser type, const char *path );
-            void _initGroups( const char *path );
+            void _initSettings();
+            void _initChannels( const char *group );
+            void _initChannelLimitMessages( const char *group, const char *channel );
+            void _initUsers( const char *group, const char *channel, TypeUser type );
+            void _initGroups();
             bool _issetCorrectPasswordFile( const char *path );
             void _getPassword( const char *path, unsigned char password[crypto::HASH_LENGTH] );
-
-            void _getFileSettings( std::string &path );
         public:
             Store( const char *path );
 
@@ -131,26 +120,23 @@ namespace simq::core::server {
         _path = new char[length + 1]{};
         memcpy( _path, path, length );
 
-        _initSettings( path );
-        _initGroups( path );
+        _initSettings();
+        _initGroups();
     }
 
-    void Store::_initSettings( const char *path ) {
+    void Store::_initSettings() {
         Settings settings;
 
         bool isNewSettings = false;
         const unsigned int hc = std::thread::hardware_concurrency();
 
-        std::string pathToDir = path;
-        pathToDir += "/";
-        pathToDir += pathSettings;
+        std::string pathToDir;
+        util::constants::buildPathToDirSettings( pathToDir, _path );
         const char *_pathToDir = pathToDir.c_str();
 
         std::string pathToFile;
-        _getFileSettings( pathToFile );
+        util::constants::buildPathToSettings( pathToFile, _path );
         const char *_pathToFile = pathToFile.c_str();
-
-        
 
         if( !util::FS::dirExists( _pathToDir ) ) {
             if( !util::FS::createDir( _pathToDir ) ) {
@@ -210,53 +196,58 @@ namespace simq::core::server {
         }
 
         util::File file( path );
-        if( file.size() < crypto::HASH_LENGTH ) {
+        if( file.size() != crypto::HASH_LENGTH ) {
             return false;
         }
         
         return true;
     }
 
-    void Store::_initUsers( const char *group, const char *channel, TypeUser type, const char *path ) {
+    void Store::_initUsers( const char *group, const char *channel, TypeUser type ) {
         std::vector<std::string> dirs;
 
-        std::string _path = path;
+        std::string path;
 
-        util::FS::dirs( _path.c_str(), dirs );
+        if( type == TypeUser::CONSUMER ) {
+            util::constants::buildPathToConsumers( path, _path, group, channel );
+        } else if( type == TypeUser::PRODUCER ) {
+            util::constants::buildPathToProducers( path, _path, group, channel );
+        }
+
+        util::FS::dirs( path.c_str(), dirs );
 
         for( auto it = dirs.begin(); it != dirs.end(); it++ ) {
-            std::string _path = path;
-            _path += "/";
-            _path += *it;
-            _path += "/";
-            _path += filePassword;
+            auto login = (*it).c_str();
+            std::string pathPassword;
 
-            if( !_issetCorrectPasswordFile( _path.c_str() ) ) {
+            if( type == TypeUser::CONSUMER ) {
+                util::constants::buildPathToConsumerPassword( pathPassword, _path, group, channel, login );
+            } else if( type == TypeUser::PRODUCER ) {
+                util::constants::buildPathToProducerPassword( pathPassword, _path, group, channel, login );
+            }
+
+            if( !_issetCorrectPasswordFile( pathPassword.c_str() ) ) {
                 continue;
             }
 
-
             if( type == TypeUser::CONSUMER ) {
-                if( !util::Validation::isConsumerName( (*it).c_str() ) ) {
+                if( !util::Validation::isConsumerName( login ) ) {
                     continue;
                 }
-                groups[group][channel].consumers[*it] = true;
+                groups[group][channel].consumers[login] = true;
             } else if( type == TypeUser::PRODUCER ) {
-                if( !util::Validation::isProducerName( (*it).c_str() ) ) {
+                if( !util::Validation::isProducerName( login ) ) {
                     continue;
                 }
-                groups[group][channel].producers[*it] = true;
+                groups[group][channel].producers[login] = true;
             }
         }
 
     }
 
-    void Store::_initChannelLimitMessages( const char *path, const char *channel ) {
-        std::string _pathChannelLimitMessages = path;
-        _pathChannelLimitMessages += "/";
-        _pathChannelLimitMessages += channel;
-        _pathChannelLimitMessages += "/";
-        _pathChannelLimitMessages += fileChannelLimitMessages;
+    void Store::_initChannelLimitMessages( const char *group, const char *channel ) {
+        std::string _pathChannelLimitMessages;
+        util::constants::buildPathToChannelLimitMessages( _pathChannelLimitMessages, _path, group, channel );
 
         if( !util::FS::fileExists( _pathChannelLimitMessages.c_str() ) ) {
             util::File file( _pathChannelLimitMessages.c_str(), true );
@@ -306,11 +297,12 @@ namespace simq::core::server {
         file.write( &limitMessages, size, 0 );
     }
 
-    void Store::_initChannels( const char *group, const char *path ) {
+    void Store::_initChannels( const char *group ) {
         std::vector<std::string> dirs;
-        std::string _path = path;
+        std::string pathToGroup;
+        util::constants::buildPathToGroup( pathToGroup, _path, group );
 
-        util::FS::dirs( _path.c_str(), dirs );
+        util::FS::dirs( pathToGroup.c_str(), dirs );
 
         for( auto it = dirs.begin(); it != dirs.end(); it++ ) {
 
@@ -318,18 +310,14 @@ namespace simq::core::server {
                 continue;
             }
 
-            _initChannelLimitMessages( path, (*it).c_str() );
+            _initChannelLimitMessages( group, (*it).c_str() );
+            auto _channel = (*it).c_str();
 
             Channel channel;
-            groups[group][*it] = channel;
+            groups[group][_channel] = channel;
 
-
-            auto _pathConsumers = _path;
-            _pathConsumers += "/";
-            _pathConsumers += *it;
-            _pathConsumers += "/";
-            _pathConsumers += pathConsumers;
-
+            std::string _pathConsumers;
+            util::constants::buildPathToConsumers( _pathConsumers, _path, group, _channel );
 
             if( !util::FS::dirExists( _pathConsumers.c_str() ) ) {
                 if( !util::FS::createDir( _pathConsumers.c_str() ) ) {
@@ -337,14 +325,10 @@ namespace simq::core::server {
                 }
             }
 
-            _initUsers( group, (*it).c_str(), TypeUser::CONSUMER, _pathConsumers.c_str() );
+            _initUsers( group, _channel, TypeUser::CONSUMER );
 
-
-            auto _pathProducers = _path;
-            _pathProducers += "/";
-            _pathProducers += *it;
-            _pathProducers += "/";
-            _pathProducers += pathProducers;
+            std::string _pathProducers;
+            util::constants::buildPathToProducers( _pathProducers, _path, group, _channel );
 
             if( !util::FS::dirExists( _pathProducers.c_str() ) ) {
                 if( !util::FS::createDir( _pathProducers.c_str() ) ) {
@@ -352,14 +336,14 @@ namespace simq::core::server {
                 }
             }
 
-            _initUsers( group, (*it).c_str(), TypeUser::PRODUCER, _pathProducers.c_str() );
+            _initUsers( group, _channel, TypeUser::PRODUCER );
         }
     }
 
-    void Store::_initGroups( const char *path ) {
-        std::string strPathGroups = path;
-        strPathGroups += "/";
-        strPathGroups += pathGroups;
+    void Store::_initGroups() {
+        std::string strPathGroups;
+        util::constants::buildPathToGroups( strPathGroups, _path );
+
         const char *_pathGroups = strPathGroups.c_str();
 
         if( !util::FS::dirExists( _pathGroups ) ) {
@@ -378,11 +362,10 @@ namespace simq::core::server {
                 continue;
             }
 
-            std::string _pathPassword = _pathGroups;
-            _pathPassword += "/";
-            _pathPassword += *it;
-            _pathPassword += "/";
-            _pathPassword += filePassword;
+            auto group = (*it).c_str();
+
+            std::string _pathPassword;
+            util::constants::buildPathToGroupPassword( _pathPassword, _path, group );
 
             if( !_issetCorrectPasswordFile( _pathPassword.c_str() ) ) {
                 continue;
@@ -391,20 +374,9 @@ namespace simq::core::server {
             std::map<std::string, Channel> channels;
             groups[*it] = channels;
 
-            std::string _path = _pathGroups;
-            _path += "/";
-            _path += *it;
-            _initChannels( (*it).c_str(), _path.c_str() );
+            _initChannels( group );
 
         }
-    }
-
-    void Store::_getFileSettings( std::string &path ) {
-        path = _path;
-        path += "/";
-        path += pathSettings;
-        path += "/";
-        path += fileSettings;
     }
 
     unsigned short int Store::getCountThreads() {
@@ -412,7 +384,7 @@ namespace simq::core::server {
         Settings settings;
 
         std::string path;
-        _getFileSettings( path );
+        util::constants::buildPathToSettings( path, _path );
 
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
@@ -432,7 +404,7 @@ namespace simq::core::server {
         }
 
         std::string path;
-        _getFileSettings( path );
+        util::constants::buildPathToSettings( path, _path );
 
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
@@ -445,7 +417,7 @@ namespace simq::core::server {
         Settings settings;
 
         std::string path;
-        _getFileSettings( path );
+        util::constants::buildPathToSettings( path, _path );
 
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
@@ -462,7 +434,7 @@ namespace simq::core::server {
         }
 
         std::string path;
-        _getFileSettings( path );
+        util::constants::buildPathToSettings( path, _path );
 
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
@@ -475,7 +447,7 @@ namespace simq::core::server {
         Settings settings;
 
         std::string path;
-        _getFileSettings( path );
+        util::constants::buildPathToSettings( path, _path );
 
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
@@ -487,7 +459,7 @@ namespace simq::core::server {
         Settings settings;
 
         std::string path;
-        _getFileSettings( path );
+        util::constants::buildPathToSettings( path, _path );
 
         auto file = util::File( path.c_str() );
         file.read( &settings, sizeof( Settings ) );
@@ -497,12 +469,11 @@ namespace simq::core::server {
     }
 
     void Store::getDirectGroups( std::vector<std::string> &list ) {
-        std::string p = _path;
-        p += "/";
-        p += pathGroups;
+        std::string path;
+        util::constants::buildPathToGroups( path, _path );
 
         std::vector<std::string> _groups;
-        util::FS::dirs( p.c_str(), _groups );
+        util::FS::dirs( path.c_str(), _groups );
 
         for( auto it = _groups.begin(); it != _groups.end(); it++ ) {
             if( util::Validation::isGroupName( (*it).c_str() ) ) {
@@ -512,14 +483,11 @@ namespace simq::core::server {
     }
 
     void Store::getDirectChannels( const char *group, std::vector<std::string> &list ) {
-        std::string p = _path;
-        p += "/";
-        p += pathGroups;
-        p += "/";
-        p += group;
+        std::string path;
+        util::constants::buildPathToGroup( path, _path, group );
 
         std::vector<std::string> _groups;
-        util::FS::dirs( p.c_str(), _groups );
+        util::FS::dirs( path.c_str(), _groups );
 
         for( auto it = _groups.begin(); it != _groups.end(); it++ ) {
             if( util::Validation::isChannelName( (*it).c_str() ) ) {
@@ -533,18 +501,11 @@ namespace simq::core::server {
         const char *channel,
         util::types::ChannelLimitMessages &limitMessages
     ) {
-        std::string p = _path;
-        p += "/";
-        p += pathGroups;
-        p += "/";
-        p += group;
-        p += "/";
-        p += channel;
-        p += "/";
-        p += fileChannelLimitMessages;
+        std::string path;
+        util::constants::buildPathToChannelLimitMessages( path, _path, group, channel );
 
         {
-            auto file = util::File( p.c_str() );
+            auto file = util::File( path.c_str() );
             file.read( &limitMessages, sizeof( util::types::ChannelLimitMessages ) );
         }
 
@@ -555,18 +516,11 @@ namespace simq::core::server {
     }
 
     void Store::getDirectConsumers( const char *group, const char *channel, std::vector<std::string> &list ) {
-        std::string p = _path;
-        p += "/";
-        p += pathGroups;
-        p += "/";
-        p += group;
-        p += "/";
-        p += channel;
-        p += "/";
-        p += pathConsumers;
+        std::string path;
+        util::constants::buildPathToConsumers( path, _path, group, channel );
 
         std::vector<std::string> _groups;
-        util::FS::dirs( p.c_str(), _groups );
+        util::FS::dirs( path.c_str(), _groups );
 
         for( auto it = _groups.begin(); it != _groups.end(); it++ ) {
             if( util::Validation::isConsumerName( (*it).c_str() ) ) {
@@ -576,18 +530,11 @@ namespace simq::core::server {
     }
 
     void Store::getDirectProducers( const char *group, const char *channel, std::vector<std::string> &list ) {
-        std::string p = _path;
-        p += "/";
-        p += pathGroups;
-        p += "/";
-        p += group;
-        p += "/";
-        p += channel;
-        p += "/";
-        p += pathProducers;
+        std::string path;
+        util::constants::buildPathToProducers( path, _path, group, channel );
 
         std::vector<std::string> _groups;
-        util::FS::dirs( p.c_str(), _groups );
+        util::FS::dirs( path.c_str(), _groups );
 
         for( auto it = _groups.begin(); it != _groups.end(); it++ ) {
             if( util::Validation::isProducerName( (*it).c_str() ) ) {
@@ -597,15 +544,12 @@ namespace simq::core::server {
     }
 
     unsigned short int Store::getDirectPort() {
-        std::string p = _path;
-        p += "/";
-        p += pathSettings;
-        p += "/";
-        p += fileSettings;
+        std::string path;
+        util::constants::buildPathToSettings( path, _path );
 
         Settings settings;
         {
-            auto file = util::File( p.c_str() );
+            auto file = util::File( path.c_str() );
             file.read( &settings, sizeof( settings ) );
         }
 
@@ -613,15 +557,12 @@ namespace simq::core::server {
     }
 
     unsigned short int Store::getDirectCountThreads() {
-        std::string p = _path;
-        p += "/";
-        p += pathSettings;
-        p += "/";
-        p += fileSettings;
+        std::string path;
+        util::constants::buildPathToSettings( path, _path );
 
         Settings settings;
         {
-            auto file = util::File( p.c_str() );
+            auto file = util::File( path.c_str() );
             file.read( &settings, sizeof( settings ) );
         }
 
@@ -631,15 +572,12 @@ namespace simq::core::server {
     void Store::getDirectMasterPassword(
         unsigned char password[crypto::HASH_LENGTH]
     ) {
-        std::string p = _path;
-        p += "/";
-        p += pathSettings;
-        p += "/";
-        p += fileSettings;
+        std::string path;
+        util::constants::buildPathToSettings( path, _path );
 
         Settings settings;
         {
-            auto file = util::File( p.c_str() );
+            auto file = util::File( path.c_str() );
             file.read( &settings, sizeof( settings ) );
         }
 
@@ -668,13 +606,8 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += filePassword;
+        std::string path;
+        util::constants::buildPathToGroupPassword( path, _path, group );
 
         _getPassword( path.c_str(), password );
     }
@@ -692,18 +625,14 @@ namespace simq::core::server {
             throw util::Error::DUPLICATE_GROUP;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
+        std::string path;
+        util::constants::buildPathToGroup( path, _path, group );
 
         if( !util::FS::createDir( path.c_str() ) ) {
             throw util::Error::FS_ERROR;
         }
 
-        path += "/";
-        path += filePassword;
+        util::constants::buildPathToGroupPassword( path, _path, group );
 
         util::File file( path.c_str(), true );
         file.write( password, crypto::HASH_LENGTH );
@@ -721,13 +650,8 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += filePassword;
+        std::string path;
+        util::constants::buildPathToGroupPassword( path, _path, group );
 
         util::File file( path.c_str(), true );
         file.atomicWrite( password, crypto::HASH_LENGTH );
@@ -742,11 +666,8 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
+        std::string path;
+        util::constants::buildPathToGroup( path, _path, group );
 
         util::FS::removeDir( path.c_str() );
 
@@ -786,23 +707,17 @@ namespace simq::core::server {
             throw util::Error::DUPLICATE_CHANNEL;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
+        std::string path;
+        util::constants::buildPathToChannel( path, _path, group, channel );
 
         if( !util::FS::createDir( path.c_str() ) ) {
             throw util::Error::FS_ERROR;
         }
 
-        auto pathSettings = path;
-        pathSettings += "/";
-        pathSettings += fileChannelLimitMessages;
+        std::string pathLimitMessages;
+        util::constants::buildPathToChannelLimitMessages( pathLimitMessages, _path, group, channel );
 
-        util::File fileSettings( pathSettings.c_str(), true );
+        util::File fileSettings( pathLimitMessages.c_str(), true );
         util::types::ChannelLimitMessages channelLimitMessages;
 
         channelLimitMessages.minMessageSize = htonl( limitMessages.minMessageSize );
@@ -813,16 +728,16 @@ namespace simq::core::server {
         fileSettings.write( &channelLimitMessages, sizeof( util::types::ChannelLimitMessages ) );
 
 
-        auto _pathConsumers = path;
-        _pathConsumers += "/";
-        _pathConsumers += pathConsumers;
+        std::string _pathConsumers;
+        util::constants::buildPathToConsumers( path, _path, group, channel );
+
         if( !util::FS::createDir( _pathConsumers.c_str() ) ) {
             throw util::Error::FS_ERROR;
         }
 
-        auto _pathProducers = path;
-        _pathProducers += "/";
-        _pathProducers += pathProducers;
+        std::string _pathProducers;
+        util::constants::buildPathToProducers( path, _path, group, channel );
+
         if( !util::FS::createDir( _pathProducers.c_str() ) ) {
             throw util::Error::FS_ERROR;
         }
@@ -846,13 +761,8 @@ namespace simq::core::server {
             return;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
+        std::string path;
+        util::constants::buildPathToChannel( path, _path, group, channel );
 
         util::FS::removeDir( path.c_str() );
 
@@ -878,14 +788,7 @@ namespace simq::core::server {
         }
 
         std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += fileChannelLimitMessages;
+        util::constants::buildPathToChannelLimitMessages( path, _path, group, channel );
 
         util::File fileSettings( path.c_str() );
         fileSettings.read( &limitMessages, sizeof( util::types::ChannelLimitMessages ) );
@@ -914,15 +817,8 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += fileChannelLimitMessages;
+        std::string path;
+        util::constants::buildPathToChannelLimitMessages( path, _path, group, channel );
 
         util::File fileSettings( path.c_str() );
 
@@ -976,24 +872,14 @@ namespace simq::core::server {
             throw util::Error::DUPLICATE_CONSUMER;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += pathConsumers;
-        path += "/";
-        path += login;
+        std::string path;
+        util::constants::buildPathToConsumer( path, _path, group, channel, login );
 
         if( !util::FS::createDir( path.c_str() ) ) {
             throw util::Error::FS_ERROR;
         }
 
-        path += "/";
-        path += filePassword;
+        util::constants::buildPathToConsumerPassword( path, _path, group, channel, login );
 
         util::File file( path.c_str(), true );
         file.write( password, crypto::HASH_LENGTH );
@@ -1020,17 +906,8 @@ namespace simq::core::server {
             return;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += pathConsumers;
-        path += "/";
-        path += login;
+        std::string path;
+        util::constants::buildPathToConsumer( path, _path, group, channel, login );
 
         util::FS::removeDir( path.c_str() );
 
@@ -1056,19 +933,8 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_CONSUMER;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += pathConsumers;
-        path += "/";
-        path += login;
-        path += "/";
-        path += filePassword;
+        std::string path;
+        util::constants::buildPathToConsumerPassword( path, _path, group, channel, login );
 
         util::File filePassword( path.c_str() );
         filePassword.read( password, crypto::HASH_LENGTH );
@@ -1093,19 +959,8 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_CONSUMER;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += pathConsumers;
-        path += "/";
-        path += login;
-        path += "/";
-        path += filePassword;
+        std::string path;
+        util::constants::buildPathToConsumerPassword( path, _path, group, channel, login );
 
         util::File filePassword( path.c_str() );
         filePassword.atomicWrite( password, crypto::HASH_LENGTH );
@@ -1153,24 +1008,14 @@ namespace simq::core::server {
             throw util::Error::DUPLICATE_PRODUCER;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += pathProducers;
-        path += "/";
-        path += login;
+        std::string path;
+        util::constants::buildPathToProducer( path, _path, group, channel, login );
 
         if( !util::FS::createDir( path.c_str() ) ) {
             throw util::Error::FS_ERROR;
         }
 
-        path += "/";
-        path += filePassword;
+        util::constants::buildPathToProducerPassword( path, _path, group, channel, login );
 
         util::File file( path.c_str(), true );
         file.write( password, crypto::HASH_LENGTH );
@@ -1197,17 +1042,8 @@ namespace simq::core::server {
             return;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += pathProducers;
-        path += "/";
-        path += login;
+        std::string path;
+        util::constants::buildPathToProducer( path, _path, group, channel, login );
 
         util::FS::removeDir( path.c_str() );
 
@@ -1233,19 +1069,8 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_PRODUCER;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += pathProducers;
-        path += "/";
-        path += login;
-        path += "/";
-        path += filePassword;
+        std::string path;
+        util::constants::buildPathToProducerPassword( path, _path, group, channel, login );
 
         util::File filePassword( path.c_str() );
         filePassword.read( password, crypto::HASH_LENGTH );
@@ -1270,19 +1095,8 @@ namespace simq::core::server {
             throw util::Error::NOT_FOUND_PRODUCER;
         }
 
-        std::string path = _path;
-        path += "/";
-        path += pathGroups;
-        path += "/";
-        path += group;
-        path += "/";
-        path += channel;
-        path += "/";
-        path += pathProducers;
-        path += "/";
-        path += login;
-        path += "/";
-        path += filePassword;
+        std::string path;
+        util::constants::buildPathToProducerPassword( path, _path, group, channel, login );
 
         util::File filePassword( path.c_str() );
         filePassword.atomicWrite( password, crypto::HASH_LENGTH );
