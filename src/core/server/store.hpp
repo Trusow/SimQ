@@ -729,14 +729,14 @@ namespace simq::core::server {
 
 
         std::string _pathConsumers;
-        util::constants::buildPathToConsumers( path, _path, group, channel );
+        util::constants::buildPathToConsumers( _pathConsumers, _path, group, channel );
 
         if( !util::FS::createDir( _pathConsumers.c_str() ) ) {
             throw util::Error::FS_ERROR;
         }
 
         std::string _pathProducers;
-        util::constants::buildPathToProducers( path, _path, group, channel );
+        util::constants::buildPathToProducers( _pathProducers, _path, group, channel );
 
         if( !util::FS::createDir( _pathProducers.c_str() ) ) {
             throw util::Error::FS_ERROR;
