@@ -297,8 +297,14 @@ namespace simq::core::server {
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
         _checkIssetGroup( groupName );
+        auto group = _groups[groupName];
 
-        memcpy( _groups[groupName]->password, password, crypto::HASH_LENGTH );
+        util::LockAtomic lockAtomicGroupSessions( group->countSessionsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
+
+        memcpy( group->password, password, crypto::HASH_LENGTH );
+
+        group->sessions.clear();
     }
 
     void Access::removeGroup( const char *groupName ) {
