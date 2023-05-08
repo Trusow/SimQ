@@ -40,6 +40,7 @@ namespace simq::core::server::CLI {
             Step _step = STEP_NONE;
 
             bool _isDuplicate( const char *name );
+            bool _isWrongName( const char *name );
             void _printDuplicateError();
             bool _validateChannelParam( std::vector<std::string> &list );
             bool _validateChannelMinMessageSize( unsigned int value );
@@ -87,6 +88,20 @@ namespace simq::core::server::CLI {
         auto it = std::find( _items.begin(), _items.end(), name );
 
         return it != _items.end();
+    }
+
+    bool ScenarioAdd::_isWrongName( const char *name ) {
+        if( _nav->isGroups() ) {
+            return !util::Validation::isGroupName( name );
+        } else if( _nav->isGroup() ) {
+            return !util::Validation::isChannelName( name );
+        } else if( _nav->isConsumers() ) {
+            return !util::Validation::isConsumerName( name );
+        } else if( _nav->isProducers() ) {
+            return !util::Validation::isProducerName( name );
+        }
+
+        return false;
     }
 
     void ScenarioAdd::_printDuplicateError() {
@@ -145,6 +160,9 @@ namespace simq::core::server::CLI {
 
             if( _isDuplicate( list[0].c_str() ) ) {
                 _printDuplicateError();
+                _isEnd = true;
+            } else if( _isWrongName( list[0].c_str() ) ) {
+                Ini::printDanger( _console, "Wrong name", _nav->getPathWithPrefix() );
                 _isEnd = true;
             } else {
                 _name = list[0];
