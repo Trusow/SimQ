@@ -205,7 +205,7 @@ namespace simq::core::server {
             unsigned int fd
         );
 
-        void checkCreateChannel(
+        void checkAddChannel(
             const char *groupName,
             unsigned int fd,
             const char *channelName
@@ -221,7 +221,7 @@ namespace simq::core::server {
             const char *channelName
         );
 
-        void checkCreateConsumer(
+        void checkAddConsumer(
             const char *groupName,
             unsigned int fd,
             const char *channelName,
@@ -246,7 +246,7 @@ namespace simq::core::server {
             const char *login
         );
 
-        void checkCreateProducer(
+        void checkAddProducer(
             const char *groupName,
             unsigned int fd,
             const char *channelName,
@@ -990,7 +990,7 @@ namespace simq::core::server {
         }
     }
 
-    void Access::checkCreateChannel(
+    void Access::checkAddChannel(
         const char *groupName,
         unsigned int fd,
         const char *channelName
@@ -1059,7 +1059,7 @@ namespace simq::core::server {
         _checkIssetChannel( group->channels, channelName );
     }
 
-    void Access::checkCreateConsumer(
+    void Access::checkAddConsumer(
         const char *groupName,
         unsigned int fd,
         const char *channelName,
@@ -1147,7 +1147,7 @@ namespace simq::core::server {
         _checkIssetConsumer( channel->consumers, login );
     }
 
-    void Access::checkCreateProducer(
+    void Access::checkAddProducer(
         const char *groupName,
         unsigned int fd,
         const char *channelName,
