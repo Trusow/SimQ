@@ -116,7 +116,7 @@ namespace simq::util {
     };
 
     Buffer::Buffer( const char *path ) {
-        file = new File( path );
+        file = new File( path, true );
 
         fileFD = file->fd();
 
