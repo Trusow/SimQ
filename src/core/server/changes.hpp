@@ -20,19 +20,19 @@ namespace simq::core::server {
     class Changes {
         private:
             enum Type {
-                CH_CREATE_GROUP = 1000,
+                CH_ADD_GROUP = 1000,
                 CH_UPDATE_GROUP_PASSWORD,
                 CH_REMOVE_GROUP,
 
-                CH_CREATE_CHANNEL = 2000,
+                CH_ADD_CHANNEL = 2000,
                 CH_UPDATE_CHANNEL_SETTINGS,
                 CH_REMOVE_CHANNEL,
 
-                CH_CREATE_CONSUMER = 3000,
+                CH_ADD_CONSUMER = 3000,
                 CH_UPDATE_CONSUMER_PASSWORD,
                 CH_REMOVE_CONSUMER,
 
-                CH_CREATE_PRODUCER = 4000,
+                CH_ADD_PRODUCER = 4000,
                 CH_UPDATE_PRODUCER_PASSWORD,
                 CH_REMOVE_PRODUCER,
             };
@@ -362,7 +362,7 @@ namespace simq::core::server {
         }
 
         switch( type ) {
-            case CH_CREATE_CONSUMER:
+            case CH_ADD_CONSUMER:
             case CH_UPDATE_CONSUMER_PASSWORD:
             case CH_REMOVE_CONSUMER:
                 if( !util::Validation::isConsumerName( login ) ) {
@@ -409,7 +409,7 @@ namespace simq::core::server {
     }
 
     Changes::Change *Changes::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
-        return _buildGroupChange( CH_CREATE_GROUP, group, password );
+        return _buildGroupChange( CH_ADD_GROUP, group, password );
     }
 
     Changes::Change *Changes::updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
@@ -425,7 +425,7 @@ namespace simq::core::server {
         const char *channel,
         util::types::ChannelLimitMessages *limitMessages
     ) {
-        return _buildChannelChange( CH_CREATE_CHANNEL, group, channel, limitMessages );
+        return _buildChannelChange( CH_ADD_CHANNEL, group, channel, limitMessages );
     }
 
     Changes::Change *Changes::updateChannelLimitMessages(
@@ -446,7 +446,7 @@ namespace simq::core::server {
         const char *login,
         unsigned char password[crypto::HASH_LENGTH]
     ) {
-        return _buildUserChange( CH_CREATE_CONSUMER, group, channel, login, password );
+        return _buildUserChange( CH_ADD_CONSUMER, group, channel, login, password );
     }
 
     Changes::Change *Changes::updateConsumerPassword(
@@ -472,7 +472,7 @@ namespace simq::core::server {
         const char *login,
         unsigned char password[crypto::HASH_LENGTH]
     ) {
-        return _buildUserChange( CH_CREATE_PRODUCER, group, channel, login, password );
+        return _buildUserChange( CH_ADD_PRODUCER, group, channel, login, password );
     }
 
     Changes::Change *Changes::updateProducerPassword(
@@ -527,13 +527,13 @@ namespace simq::core::server {
         unsigned int offset = 0;
 
         switch( change->type ) {
-            case CH_CREATE_GROUP:
+            case CH_ADD_GROUP:
             case CH_UPDATE_GROUP_PASSWORD:
                 offset = change->values[0]+1;
                 break;
-            case CH_CREATE_CONSUMER:
+            case CH_ADD_CONSUMER:
             case CH_UPDATE_CONSUMER_PASSWORD:
-            case CH_CREATE_PRODUCER:
+            case CH_ADD_PRODUCER:
             case CH_UPDATE_PRODUCER_PASSWORD:
                 offset = change->values[0]+1;
                 offset += change->values[1]+1;
@@ -547,7 +547,7 @@ namespace simq::core::server {
     }
 
     bool Changes::isAddGroup( Change *change ) {
-        return change->type == CH_CREATE_GROUP;
+        return change->type == CH_ADD_GROUP;
     }
 
     bool Changes::isUpdateGroupPassword( Change *change ) {
@@ -559,7 +559,7 @@ namespace simq::core::server {
     }
 
     bool Changes::isAddChannel( Change *change ) {
-        return change->type == CH_CREATE_CHANNEL;
+        return change->type == CH_ADD_CHANNEL;
     }
 
     bool Changes::isUpdateChannelLimitMessages( Change *change ) {
@@ -571,7 +571,7 @@ namespace simq::core::server {
     }
 
     bool Changes::isAddConsumer( Change *change ) {
-        return change->type == CH_CREATE_CONSUMER;
+        return change->type == CH_ADD_CONSUMER;
     }
 
     bool Changes::isUpdateConsumerPassword( Change *change ) {
@@ -583,7 +583,7 @@ namespace simq::core::server {
     }
 
     bool Changes::isAddProducer( Change *change ) {
-        return change->type == CH_CREATE_PRODUCER;
+        return change->type == CH_ADD_PRODUCER;
     }
 
     bool Changes::isUpdateProducerPassword( Change *change ) {
@@ -789,7 +789,7 @@ namespace simq::core::server {
         }
 
         switch( change->type ) {
-            case CH_CREATE_CONSUMER:
+            case CH_ADD_CONSUMER:
             case CH_UPDATE_CONSUMER_PASSWORD:
             case CH_REMOVE_CONSUMER:
                 return util::Validation::isConsumerName(
@@ -804,18 +804,18 @@ namespace simq::core::server {
 
     bool Changes::_isValidChangeFromFile( Change *change, unsigned int length ) {
         switch( change->type ) {
-            case CH_CREATE_GROUP:
+            case CH_ADD_GROUP:
             case CH_UPDATE_GROUP_PASSWORD:
             case CH_REMOVE_GROUP:
                 return _isValidGroup( change, length );
-            case CH_CREATE_CHANNEL:
+            case CH_ADD_CHANNEL:
             case CH_UPDATE_CHANNEL_SETTINGS:
             case CH_REMOVE_CHANNEL:
                 return _isValidChannel( change, length );
-            case CH_CREATE_CONSUMER:
+            case CH_ADD_CONSUMER:
             case CH_UPDATE_CONSUMER_PASSWORD:
             case CH_REMOVE_CONSUMER:
-            case CH_CREATE_PRODUCER:
+            case CH_ADD_PRODUCER:
             case CH_UPDATE_PRODUCER_PASSWORD:
             case CH_REMOVE_PRODUCER:
                 return _isValidUser( change, length );
@@ -865,16 +865,16 @@ namespace simq::core::server {
 
     bool Changes::_isAllowedType( unsigned int type ) {
         switch( type ) {
-            case CH_CREATE_GROUP:
+            case CH_ADD_GROUP:
             case CH_UPDATE_GROUP_PASSWORD:
             case CH_REMOVE_GROUP:
-            case CH_CREATE_CHANNEL:
+            case CH_ADD_CHANNEL:
             case CH_UPDATE_CHANNEL_SETTINGS:
             case CH_REMOVE_CHANNEL:
-            case CH_CREATE_CONSUMER:
+            case CH_ADD_CONSUMER:
             case CH_UPDATE_CONSUMER_PASSWORD:
             case CH_REMOVE_CONSUMER:
-            case CH_CREATE_PRODUCER:
+            case CH_ADD_PRODUCER:
             case CH_UPDATE_PRODUCER_PASSWORD:
             case CH_REMOVE_PRODUCER:
                 return true;
