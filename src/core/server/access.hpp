@@ -19,829 +19,1218 @@
 namespace simq::core::server {
     class Access {
         private:
-        std::atomic_uint countGroupWrited {0};
-        std::atomic<unsigned int> countSessWrited {0};
-        std::atomic<unsigned int> countChannelWrited {0};
-        std::atomic<unsigned int> countConsumerWrited {0};
-        std::atomic<unsigned int> countProducerWrited {0};
-        std::shared_timed_mutex mGroup;
-        std::shared_timed_mutex mSess;
-        std::shared_timed_mutex mChannel;
-        std::shared_timed_mutex mConsumer;
-        std::shared_timed_mutex mProducer;
-
-        enum SessionType {
-            GROUP,
-            CONSUMER,
-            PRODUCER,
-            NONE,
-        };
-
-        struct Session {
-            char *data;
-            unsigned int offsetChannel;
-            unsigned int offsetLogin;
-            SessionType type;
-        };
+        std::atomic_uint _countGroupsWrited {0};
+        std::shared_timed_mutex _mGroups;
 
         struct Entity {
+            std::shared_timed_mutex mSessions;
+            std::atomic_uint countSessionsWrited;
+            std::map<unsigned int, bool> sessions;
+
             unsigned char password[crypto::HASH_LENGTH];
-            std::list<unsigned int> sessions;
         };
 
-        struct Group: Entity {};
         struct Consumer: Entity {};
         struct Producer: Entity {};
 
-        std::map<unsigned int, Session> sessions;
-        std::map<std::string, Group> groups;
-        std::map<std::string, std::map<std::string, bool>> channels;
-        std::map<std::string, std::map<std::string, std::map<std::string, Consumer>>> consumers;
-        std::map<std::string, std::map<std::string, std::map<std::string, Producer>>> producers;
+        struct Channel {
+            std::shared_timed_mutex mConsumers;
+            std::atomic_uint countConsumersWrited;
+            std::map<std::string, Consumer *> consumers;
 
-        void _clearGroupSession( const char *name, unsigned int fd );
-        void _clearConsumerSession( const char *group, const char *channel, const char *name, unsigned int fd );
-        void _clearProducerSession( const char *group, const char *channel, const char *name, unsigned int fd );
-        void _validateConsumer( const char *group, const char *channel, const char *name );
-        void _validateProducer( const char *group, const char *channel, const char *name );
-        bool _validateSessGroup( unsigned int fd, std::string &groupName );
-        bool _validateIssetGroup( unsigned int fd, const char *group );
-        bool _validateIssetChannel( unsigned int fd, const char *group, const char *channel );
-        void wait( std::atomic_uint &atom );
+            std::shared_timed_mutex mProducers;
+            std::atomic_uint countProducersWrited;
+            std::map<std::string, Producer *> producers;
+        };
+
+        struct Group: Entity {
+            std::shared_timed_mutex mChannels;
+            std::atomic_uint countChannelsWrited;
+            std::map<std::string, Channel *> channels;
+        };
+
+        std::map<std::string, Group*> _groups;
+
+        void _wait( std::atomic_uint &atom );
+        void _checkGroupSession( const char *groupName, unsigned int fd );
+        void _checkConsumerSession(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            unsigned int fd
+        );
+        void _checkProducerSession(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            unsigned int fd
+        );
+
+        void _checkIssetGroup( const char *name );
+        void _checkNoIssetGroup( const char *name );
+        void _checkIssetSessions( std::map<unsigned int, bool> &map, unsigned int fd );
+        void _checkNoIssetSessions( std::map<unsigned int, bool> &map, unsigned int fd );
+
+        void _checkIssetChannel(
+            std::map<std::string, Channel*> &map,
+            const char *name
+        );
+
+        void _checkNoIssetChannel(
+            std::map<std::string, Channel*> &map,
+            const char *name
+        );
+
+        void _checkIssetConsumer(
+            std::map<std::string, Consumer*> &map,
+            const char *name
+        );
+
+        void _checkNoIssetConsumer(
+            std::map<std::string, Consumer*> &map,
+            const char *name
+        );
+
+        void _checkIssetProducer(
+            std::map<std::string, Producer*> &map,
+            const char *name
+        );
+
+        void _checkNoIssetProducer(
+            std::map<std::string, Producer*> &map,
+            const char *name
+        );
      
         public:
-        void addGroup( const char *name, const unsigned char password[crypto::HASH_LENGTH] );
-        void authGroup( const char *name, const unsigned char password[crypto::HASH_LENGTH], unsigned int fd );
-        void removeGroup( const char *name );
-     
-        void addChannel( const char *group, const char *name );
-        void removeChannel( const char *group, const char *name );
-     
-        void addConsumer( const char *group, const char *channel, const char *name, const unsigned char password[crypto::HASH_LENGTH] );
-        void authConsumer( const char *group, const char *channel, const char *name, const unsigned char password[crypto::HASH_LENGTH], unsigned int fd );
-        void removeConsumer( const char *group, const char *channel, const char *name );
-     
-        void addProducer( const char *group, const char *channel, const char *name, const unsigned char password[crypto::HASH_LENGTH] );
-        void authProducer( const char *group, const char *channel, const char *name, const unsigned char password[crypto::HASH_LENGTH], unsigned int fd );
-        void removeProducer( const char *group, const char *channel, const char *name );
+        void addGroup(
+            const char *groupName,
+            const unsigned char password[crypto::HASH_LENGTH]
+        );
+        void updateGroupPassword(
+            const char *groupName,
+            const unsigned char newPassword[crypto::HASH_LENGTH]
+        );
+        void removeGroup( const char *groupName );
 
-        void updateGroupPassword( const char *group, const unsigned char newPassword[crypto::HASH_LENGTH] );
-        void updateConsumerPassword( const char *group, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] );
-        void updateProducerPassword( const char *group, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] );
      
-        void logout( unsigned int fd );
+        void addChannel( const char *groupName, const char *channelName );
+        void removeChannel( const char *groupName, const char *channelName );
      
-        bool canSendMessage( unsigned int fd );
-        bool canRecvMessage( unsigned int fd );
+        void addConsumer(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            const unsigned char password[crypto::HASH_LENGTH]
+        );
+        void updateConsumerPassword(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            const unsigned char newPassword[crypto::HASH_LENGTH]
+        );
+        void removeConsumer(
+            const char *groupName,
+            const char *channelName,
+            const char *login
+        );
 
-        bool canCreateChannel( unsigned int fd, const char *channel );
-        bool canRemoveChannel( unsigned int fd, const char *channel );
+        void addProducer(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            const unsigned char password[crypto::HASH_LENGTH]
+        );
+        void updateProducerPassword(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            const unsigned char newPassword[crypto::HASH_LENGTH]
+        );
+        void removeProducer(
+            const char *groupName,
+            const char *channelName,
+            const char *login
+        );
+     
+        void authGroup(
+            const char *groupName,
+            const unsigned char password[crypto::HASH_LENGTH],
+            unsigned int fd
+        );
+        void authConsumer(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            const unsigned char password[crypto::HASH_LENGTH],
+            unsigned int fd
+        );
+        void authProducer(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            const unsigned char password[crypto::HASH_LENGTH],
+            unsigned int fd
+        );
 
-        bool canCreateConsumer( unsigned int fd, const char *channel, const char *name );
-        bool canUpdateConsumerPassword( unsigned int fd, const char *channel, const char *name );
-        bool canRemoveConsumer( unsigned int fd, const char *channel, const char *name );
+     
+        void logoutGroup( const char *groupName, unsigned int fd );
+        void logoutConsumer(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            unsigned int fd
+        );
+        void logoutProducer(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            unsigned int fd
+        );
+     
+        void checkPushMessage(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            unsigned int fd
+        );
+        void checkPopMessage(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            unsigned int fd
+        );
 
-        bool canCreateProducer( unsigned int fd, const char *channel, const char *name );
-        bool canUpdateProducerPassword( unsigned int fd, const char *channel, const char *name );
-        bool canRemoveProducer( unsigned int fd, const char *channel, const char *name );
+        void checkUpdateMyGroupPassword(
+            const char *groupName,
+            unsigned int fd
+        );
+
+        void checkCreateChannel(
+            const char *groupName,
+            unsigned int fd,
+            const char *channelName
+        );
+        void checkUpdateChannelLimitMessages(
+            const char *groupName,
+            unsigned int fd,
+            const char *channelName
+        );
+        void checkRemoveChannel(
+            const char *groupName,
+            unsigned int fd,
+            const char *channelName
+        );
+
+        void checkCreateConsumer(
+            const char *groupName,
+            unsigned int fd,
+            const char *channelName,
+            const char *login
+        );
+        void checkUpdateMyConsumerPassword(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            unsigned int fd
+        );
+        void checkUpdateConsumerPassword(
+            const char *groupName,
+            unsigned int fd,
+            const char *channelName,
+            const char *login
+        );
+        void checkRemoveConsumer(
+            const char *groupName,
+            unsigned int fd,
+            const char *channelName,
+            const char *login
+        );
+
+        void checkCreateProducer(
+            const char *groupName,
+            unsigned int fd,
+            const char *channelName,
+            const char *login
+        );
+        void checkUpdateMyProducerPassword(
+            const char *groupName,
+            const char *channelName,
+            const char *login,
+            unsigned int fd
+        );
+        void checkUpdateProducerPassword(
+            const char *groupName,
+            unsigned int fd,
+            const char *channelName,
+            const char *login
+        );
+        void checkRemoveProducer(
+            const char *groupName,
+            unsigned int fd,
+            const char *channelName,
+            const char *login
+        );
+
     };
 
-    void Access::wait( std::atomic_uint &atom ) {
-        while( atom ) {
-            std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-        }
+    void Access::_wait( std::atomic_uint &atom ) {
+        while( atom );
     }
- 
-    void Access::addGroup( const char *name, const unsigned char password[crypto::HASH_LENGTH] ) {
-        util::LockAtomic lockAtomicGroup( countGroupWrited );
-        std::lock_guard<std::shared_timed_mutex> lockGroup( mGroup );
 
+    void Access::addGroup(
+        const char *groupName,
+        const unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        util::LockAtomic lockAtomicGroup( _countGroupsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        if( groups.count( name ) ) {
-            throw util::Error::DUPLICATE_GROUP;
-        }
+        _checkNoIssetGroup( groupName );
 
-        auto group = Group();
-        memcpy( group.password, password, crypto::HASH_LENGTH );
-        groups[name] = group;
+        _groups[groupName] = new Group{};
     }
-     
-    void Access::removeGroup( const char *name ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
 
-        {
-            util::LockAtomic lockAtomicGroup( countGroupWrited );
-            std::lock_guard<std::shared_timed_mutex> lockGroup( mGroup );
+    void Access::updateGroupPassword(
+        const char *groupName,
+        const unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-            auto iter = groups.find( name );
-            if( iter == groups.end() ) {
-                throw util::Error::NOT_FOUND_GROUP;
-            }
+        _checkIssetGroup( groupName );
 
-            for( auto iterSess: groups[name].sessions ) {
-                sessions[iterSess].type = SessionType::NONE;
-            }
-
-            groups.erase( iter );
-        }
-
-        {
-            util::LockAtomic lockAtomicChannel( countChannelWrited );
-            std::lock_guard<std::shared_timed_mutex> lockChannel( mChannel );
-
-            auto iterChannel = channels.find( name );
-            if( iterChannel != channels.end() ) {
-                channels.erase( iterChannel );
-            }
-        }
-
-        {
-            util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-            std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
-
-            auto iterConsumer = consumers.find( name );
-            if( iterConsumer != consumers.end() ) {
-                for( auto itChannel = consumers[name].begin(); itChannel != consumers[name].end(); itChannel++ ) {
-                    for( auto itConsumer = consumers[name][itChannel->first].begin(); itConsumer != consumers[name][itChannel->first].end(); itConsumer++ ) {
-                        for( auto itSess: itConsumer->second.sessions ) {
-                            sessions[itSess].type = SessionType::NONE;
-                        }
-                    }
-                }
-                consumers.erase( iterConsumer );
-            }
-        }
-        
-        {
-            util::LockAtomic lockAtomicProducer( countProducerWrited );
-            std::lock_guard<std::shared_timed_mutex> lockProducer( mProducer );
-
-            auto iterProducer = producers.find( name );
-            if( iterProducer != producers.end() ) {
-                for( auto itChannel = producers[name].begin(); itChannel != producers[name].end(); itChannel++ ) {
-                    for( auto itProducer = producers[name][itChannel->first].begin(); itProducer != producers[name][itChannel->first].end(); itProducer++ ) {
-                        for( auto itSess: itProducer->second.sessions ) {
-                            sessions[itSess].type = SessionType::NONE;
-                        }
-                    }
-                }
-                producers.erase( iterProducer );
-            }
-
-        }
-     
-
+        memcpy( _groups[groupName]->password, password, crypto::HASH_LENGTH );
     }
-     
-    void Access::authGroup( const char *name, const unsigned char password[crypto::HASH_LENGTH], unsigned int fd ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
 
-        util::LockAtomic lockAtomicGroup( countGroupWrited );
-        std::lock_guard<std::shared_timed_mutex> lockGroup( mGroup );
+    void Access::removeGroup( const char *groupName ) {
+        util::LockAtomic lockAtomicGroup( _countGroupsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        auto iter = groups.find( name );
-        if( iter == groups.end() ) {
-            throw util::Error::NOT_FOUND_GROUP;
-        } else if( strncmp( ( const char * )groups[name].password, ( const char * )password, crypto::HASH_LENGTH ) != 0 ) {
+        auto it = _groups.find( groupName );
+        if( it == _groups.end() ) {
+            return;
+        }
+
+        auto group = _groups[groupName];
+
+
+        for( auto itCh = group->channels.begin(); itCh != group->channels.end(); itCh++ ) {
+            auto channel = group->channels[itCh->first];
+
+            for( auto _it = channel->consumers.begin(); _it != channel->consumers.end(); _it++ ) {
+                delete _it->second;
+            }
+
+            for( auto _it = channel->producers.begin(); _it != channel->producers.end(); _it++ ) {
+                delete _it->second;
+            }
+
+            delete itCh->second;
+        }
+
+        delete group;
+
+        _groups.erase( it );
+    }
+
+    void Access::addChannel( const char *groupName, const char *channelName ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        util::LockAtomic lockAtomicChannels( group->countChannelsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkNoIssetChannel( group->channels, channelName );
+
+        group->channels[channelName] = new Channel{};
+    }
+
+    void Access::removeChannel( const char *groupName, const char *channelName ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        util::LockAtomic lockAtomicChannels( group->countChannelsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        auto itCh = group->channels.find( channelName );
+        if( itCh == group->channels.end() ) {
+            return;
+        }
+
+        auto channel = group->channels[channelName];
+
+        for( auto it = channel->consumers.begin(); it != channel->consumers.end(); it++ ) {
+            delete it->second;
+        }
+
+        for( auto it = channel->producers.begin(); it != channel->producers.end(); it++ ) {
+            delete it->second;
+        }
+
+        delete group->channels[channelName];
+        group->channels.erase( itCh );
+    }
+
+    void Access::addConsumer(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        const unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        util::LockAtomic lockAtomicConsumers( channel->countConsumersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
+
+        _checkNoIssetConsumer( channel->consumers, login );
+
+        auto item = new Consumer{};
+        memcpy( item->password, password, crypto::HASH_LENGTH );
+
+        channel->consumers[login] = item;
+    }
+
+    void Access::updateConsumerPassword(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        const unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        util::LockAtomic lockAtomicConsumers( channel->countConsumersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
+
+        _checkIssetConsumer( channel->consumers, login );
+
+        auto consumer = channel->consumers[login];
+
+        util::LockAtomic lockAtomicConsumerSessions( consumer->countSessionsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
+
+        memcpy( channel->consumers[login]->password, password, crypto::HASH_LENGTH );
+        channel->consumers[login]->sessions.clear();
+    }
+
+    void Access::removeConsumer(
+        const char *groupName,
+        const char *channelName,
+        const char *login
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        util::LockAtomic lockAtomicConsumers( channel->countConsumersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
+
+        auto itConsumer = channel->consumers.find( login );
+        if( itConsumer == channel->consumers.end() ) {
+            return;
+        }
+
+        delete itConsumer->second;
+
+        channel->consumers.erase( itConsumer );
+    }
+
+    void Access::addProducer(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        const unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        util::LockAtomic lockAtomicProducers( channel->countProducersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockProducers( channel->mProducers );
+
+        _checkNoIssetProducer( channel->producers, login );
+
+        auto item = new Producer{};
+        memcpy( item->password, password, crypto::HASH_LENGTH );
+
+        channel->producers[login] = item;
+    }
+
+    void Access::updateProducerPassword(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        const unsigned char password[crypto::HASH_LENGTH]
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        util::LockAtomic lockAtomicProducers( channel->countProducersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockProducers( channel->mProducers );
+
+        _checkIssetProducer( channel->producers, login );
+
+        auto producer = channel->producers[login];
+
+        util::LockAtomic lockAtomicProducerSessions( producer->countSessionsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
+
+        memcpy( channel->producers[login]->password, password, crypto::HASH_LENGTH );
+
+        channel->producers[login]->sessions.clear();
+    }
+
+    void Access::removeProducer(
+        const char *groupName,
+        const char *channelName,
+        const char *login
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        util::LockAtomic lockAtomicProducers( channel->countProducersWrited );
+        std::lock_guard<std::shared_timed_mutex> lockProducers( channel->mProducers );
+
+        auto itProducer = channel->producers.find( login );
+        if( itProducer == channel->producers.end() ) {
+            return;
+        }
+
+        channel->producers.erase( itProducer );
+    }
+
+    void Access::authGroup(
+        const char *groupName,
+        const unsigned char password[crypto::HASH_LENGTH],
+        unsigned int fd
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        util::LockAtomic lockAtomicGroupSessions( group->countSessionsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
+
+        if( strncmp(
+            ( const char * )group->password,
+            (const char *)password,
+            crypto::HASH_LENGTH
+        ) != 0 ) {
             throw util::Error::WRONG_PASSWORD;
         }
 
-        auto sess = Session();
-        sess.type = SessionType::GROUP;
+        _checkNoIssetSessions( group->sessions, fd );
 
-        auto length = strlen( name );
-        sess.data = new char[length+1]{};
-        memcpy( sess.data, name, length );
-
-        auto iterSess = sessions.find( fd );
-
-        if( iterSess != sessions.end() ) {
-            throw util::Error::DUPLICATE_SESSION;
-        }
-
-        sessions[fd] = sess;
-
-        groups[name].sessions.push_back( fd );
+        group->sessions[fd] = true;
     }
 
-    void Access::addChannel( const char *group, const char *name ) {
-        {
-            wait( countGroupWrited );
-            std::shared_lock<std::shared_timed_mutex> lockGroup( mGroup );
+    void Access::authConsumer(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        const unsigned char password[crypto::HASH_LENGTH],
+        unsigned int fd
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-            if( !groups.count( group ) ) {
-                throw util::Error::NOT_FOUND_GROUP;
-            }
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        _wait( channel->countConsumersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
+
+        _checkIssetConsumer( channel->consumers, login );
+
+        auto consumer = channel->consumers[login];
+
+        util::LockAtomic lockAtomicConsumerSessions( consumer->countSessionsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
+
+        _checkNoIssetSessions( consumer->sessions, fd );
+
+        consumer->sessions[fd] = true;
+    }
+
+    void Access::authProducer(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        const unsigned char password[crypto::HASH_LENGTH],
+        unsigned int fd
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        _wait( channel->countProducersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
+
+        _checkIssetProducer( channel->producers, login );
+
+        auto producer = channel->producers[login];
+
+        util::LockAtomic lockAtomicProducerSessions( producer->countSessionsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
+
+        _checkNoIssetSessions( producer->sessions, fd );
+
+        producer->sessions[fd] = true;
+    }
+
+    void Access::logoutGroup( const char *groupName, unsigned int fd ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        if( _groups.find( groupName ) == _groups.end() ) {
+            return;
         }
 
-        util::LockAtomic lockAtomicChannel( countChannelWrited );
-        std::lock_guard<std::shared_timed_mutex> lockChannel( mChannel );
+        auto group = _groups[groupName];
 
-        auto iterGroup = channels.find( std::string( group ) );
+        util::LockAtomic lockAtomicGroupSessions( group->countSessionsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
 
-        if( iterGroup == channels.end() ) {
-            channels[group][name] = true;
-        } else if( !iterGroup->second.count( name ) ) {
-            iterGroup->second[name] = true;
-        } else {
+        auto it = group->sessions.find( fd );
+
+        if( it == group->sessions.end() ) {
+            return;
+        }
+
+        group->sessions.erase( it );
+    }
+
+    void Access::logoutConsumer(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        unsigned int fd
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        if( _groups.find( groupName ) == _groups.end() ) {
+            return;
+        }
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        if( group->channels.find( channelName ) == group->channels.end() ) {
+            return;
+        }
+
+        auto channel = group->channels[channelName];
+
+        _wait( channel->countConsumersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
+
+        if( channel->consumers.find( login ) == channel->consumers.end() ) {
+            return;
+        }
+
+        auto consumer = channel->consumers[login];
+
+        util::LockAtomic lockAtomicConsumerSessions( consumer->countSessionsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
+
+        auto it = consumer->sessions.find( fd );
+
+        if( it == consumer->sessions.end() ) {
+            return;
+        }
+
+        consumer->sessions.erase( it );
+    }
+
+    void Access::logoutProducer(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        unsigned int fd
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        if( _groups.find( groupName ) == _groups.end() ) {
+            return;
+        }
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        if( group->channels.find( channelName ) == group->channels.end() ) {
+            return;
+        }
+
+        auto channel = group->channels[channelName];
+
+        _wait( channel->countProducersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
+
+        if( channel->producers.find( login ) == channel->producers.end() ) {
+            return;
+        }
+
+        auto producer = channel->producers[login];
+
+        util::LockAtomic lockAtomicProducerSessions( producer->countSessionsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
+
+        auto it = producer->sessions.find( fd );
+
+        if( it == producer->sessions.end() ) {
+            return;
+        }
+
+        producer->sessions.erase( it );
+    }
+
+    void Access::_checkGroupSession( const char *groupName, unsigned int fd ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
+
+        _checkIssetSessions( group->sessions, fd );
+    }
+
+    void Access::_checkConsumerSession(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        unsigned int fd
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        _wait( channel->countProducersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mConsumers );
+
+        _checkIssetConsumer( channel->consumers, login );
+
+        auto consumer = channel->consumers[login];
+
+        _wait( consumer->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
+
+        _checkIssetSessions( consumer->sessions, fd );
+    }
+
+    void Access::_checkProducerSession(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        unsigned int fd
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName];
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+
+        _wait( channel->countProducersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mConsumers );
+
+        _checkIssetProducer( channel->producers, login );
+
+        auto producer = channel->producers[login];
+
+        _wait( producer->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
+
+        _checkIssetSessions( producer->sessions, fd );
+    }
+
+    void Access::checkPushMessage(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        unsigned int fd
+    ) {
+        _checkProducerSession( groupName, channelName, login, fd );
+    }
+
+    void Access::checkPopMessage(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        unsigned int fd
+    ) {
+        _checkConsumerSession( groupName, channelName, login, fd );
+    }
+
+    void Access::checkUpdateMyGroupPassword(
+        const char *groupName,
+        unsigned int fd
+    ) {
+        _checkGroupSession( groupName, fd );
+    }
+
+    void Access::checkUpdateMyConsumerPassword(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        unsigned int fd
+    ) {
+        _checkConsumerSession( groupName, channelName, login, fd );
+    }
+
+    void Access::checkUpdateMyProducerPassword(
+        const char *groupName,
+        const char *channelName,
+        const char *login,
+        unsigned int fd
+    ) {
+        _checkProducerSession( groupName, channelName, login, fd );
+    }
+
+    void Access::_checkIssetSessions( std::map<unsigned int, bool> &map, unsigned int fd ) {
+        if( map.find( fd ) == map.end() ) {
+            throw util::Error::NOT_FOUND_SESSION;
+        }
+    }
+
+    void Access::_checkNoIssetSessions( std::map<unsigned int, bool> &map, unsigned int fd ) {
+        if( map.find( fd ) != map.end() ) {
+            throw util::Error::DUPLICATE_SESSION;
+        }
+    }
+
+    void Access::_checkIssetGroup( const char *name ) {
+        if( _groups.find( name ) == _groups.end() ) {
+            throw util::Error::NOT_FOUND_GROUP;
+        }
+    }
+
+    void Access::_checkNoIssetGroup( const char *name ) {
+        if( _groups.find( name ) != _groups.end() ) {
+            throw util::Error::DUPLICATE_GROUP;
+        }
+    }
+
+    void Access::_checkIssetChannel(
+        std::map<std::string, Channel*> &map,
+        const char *name
+    ) {
+        if( map.find( name ) == map.end() ) {
+            throw util::Error::NOT_FOUND_CHANNEL;
+        }
+    }
+
+    void Access::_checkNoIssetChannel(
+        std::map<std::string, Channel*> &map,
+        const char *name
+    ) {
+        if( map.find( name ) != map.end() ) {
             throw util::Error::DUPLICATE_CHANNEL;
         }
     }
 
-    void Access::removeChannel( const char *group, const char *name ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
-
-        {
-            util::LockAtomic lockAtomicChannel( countChannelWrited );
-            std::lock_guard<std::shared_timed_mutex> lockChannel( mChannel );
-
-            auto iterGroup = channels.find( group );
-            if( iterGroup == channels.end() ) {
-                throw util::Error::NOT_FOUND_GROUP;
-            }
-
-            auto iterChannel = iterGroup->second.find( name );
-            if( iterChannel != iterGroup->second.end() ) {
-                iterGroup->second.erase( iterChannel );
-            } else {
-                throw util::Error::NOT_FOUND_CHANNEL;
-            }
-        }
-
-        {
-            util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-            std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
-
-            auto iterConsumer = consumers.find( group );
-            if( iterConsumer != consumers.end() ) {
-                auto iterChannel = iterConsumer->second.find( name );
-                if( iterChannel != iterConsumer->second.end() ) {
-                    for( auto itConsumer = iterChannel->second.begin(); itConsumer != iterChannel->second.end(); itConsumer++ ) {
-                        for( auto itSess: itConsumer->second.sessions ) {
-                            sessions[itSess].type = SessionType::NONE;
-                        }
-                    }
-
-                    consumers[group].erase( iterChannel );
-                }
-
-            }
-        }
-        
-        {
-            util::LockAtomic lockAtomicProducer( countProducerWrited );
-            std::lock_guard<std::shared_timed_mutex> lockProducer( mProducer );
-
-            auto iterProducer = producers.find( group );
-            if( iterProducer != producers.end() ) {
-                auto iterChannel = iterProducer->second.find( name );
-                if( iterChannel != iterProducer->second.end() ) {
-                    for( auto itProducer = iterChannel->second.begin(); itProducer != iterChannel->second.end(); itProducer++ ) {
-                        for( auto itSess: itProducer->second.sessions ) {
-                            sessions[itSess].type = SessionType::NONE;
-                        }
-                    }
-                    producers[group].erase( iterChannel );
-                }
-            }
-
+    void Access::_checkIssetConsumer(
+        std::map<std::string, Consumer*> &map,
+        const char *name
+    ) {
+        if( map.find( name ) == map.end() ) {
+            throw util::Error::NOT_FOUND_CONSUMER;
         }
     }
 
-    void Access::addConsumer( const char *group, const char *channel, const char *name, const unsigned char password[crypto::HASH_LENGTH] ) {
-        {
-            wait( countChannelWrited );
-            std::shared_lock<std::shared_timed_mutex> lockChannel( mChannel );
-
-            auto iterGroup = channels.find( group );
-            if( iterGroup == channels.end() ) {
-                throw util::Error::NOT_FOUND_GROUP;
-            }
-
-            if( !iterGroup->second.count( channel ) ) {
-                throw util::Error::NOT_FOUND_CHANNEL;
-            }
-        }
-
-        util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
-
-        auto consumer = Consumer();
-        memcpy( consumer.password, password, crypto::HASH_LENGTH );
-
-        if( !consumers.count( group ) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
-            consumers[group][channel][name] = consumer;
-        } else {
+    void Access::_checkNoIssetConsumer(
+        std::map<std::string, Consumer*> &map,
+        const char *name
+    ) {
+        if( map.find( name ) != map.end() ) {
             throw util::Error::DUPLICATE_CONSUMER;
         }
     }
 
-    void Access::removeConsumer( const char *group, const char *channel, const char *name ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
-
-        util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
-
-        if( !consumers.count(group) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
-            throw util::Error::NOT_FOUND_CONSUMER;
+    void Access::_checkIssetProducer(
+        std::map<std::string, Producer*> &map,
+        const char *name
+    ) {
+        if( map.find( name ) == map.end() ) {
+            throw util::Error::NOT_FOUND_PRODUCER;
         }
-
-        auto iterConsumer = consumers[group][channel].find( name );
-
-        for( auto it = iterConsumer->second.sessions.begin(); it != iterConsumer->second.sessions.end(); it++ ) {
-            sessions[*it].type = SessionType::NONE;
-        }
-
-        consumers[group][channel].erase( iterConsumer );
     }
 
-    void Access::authConsumer( const char *group, const char *channel, const char *name, const unsigned char password[crypto::HASH_LENGTH], unsigned int fd ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
-
-        if( sessions.count( fd ) ) {
-            throw util::Error::DUPLICATE_SESSION;
-        }
-
-        auto sess = Session();
-        sess.type = SessionType::CONSUMER;
-
-        util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
-
-        if( !consumers.count( group ) ) {
-            throw util::Error::NOT_FOUND_GROUP;
-        } else if( !consumers[group].count( channel ) ) {
-            throw util::Error::NOT_FOUND_CHANNEL;
-        } else if( !consumers[group][channel].count( name ) ) {
-            throw util::Error::NOT_FOUND_CONSUMER;
-        }
-
-        auto iterConsumer = consumers[group][channel].find( name );
-        if( strncmp( ( char *)iterConsumer->second.password, ( char *)password, crypto::HASH_LENGTH ) != 0 ) {
-            throw util::Error::WRONG_PASSWORD;
-        }
-
-        auto lengthGroup = strlen( group );
-        auto lengthChannel = strlen( channel );
-        auto lengthName = strlen( name );
-        auto allLength = lengthGroup + lengthChannel + lengthName + 3;
-        sess.data = new char[allLength]{};
-        memcpy( sess.data, group, lengthGroup );
-        memcpy( &sess.data[lengthGroup+1], channel, lengthChannel );
-        memcpy( &sess.data[lengthGroup+lengthChannel+2], name, lengthName );
-        sess.offsetChannel = lengthGroup + 1;
-        sess.offsetLogin = lengthGroup + lengthName + 2;
-
-        consumers[group][channel][name].sessions.push_back( fd );
-        sessions[fd] = sess;
-    }
-     
-    void Access::addProducer( const char *group, const char *channel, const char *name, const unsigned char password[crypto::HASH_LENGTH] ) {
-        {
-            wait( countChannelWrited );
-            std::shared_lock<std::shared_timed_mutex> lockChannel( mChannel );
-
-            auto iterGroup = channels.find( group );
-            if( iterGroup == channels.end() ) {
-                throw util::Error::NOT_FOUND_GROUP;
-            }
-
-            if( !iterGroup->second.count( channel ) ) {
-                throw util::Error::NOT_FOUND_CHANNEL;
-            }
-        }
-
-        util::LockAtomic lockAtomicConsumer( countProducerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockProducer( mProducer );
-
-        auto producer = Producer();
-        memcpy( producer.password, password, crypto::HASH_LENGTH );
-
-        if( !producers.count( group ) || !producers[group].count( channel ) || !producers[group][channel].count( name ) ) {
-            producers[group][channel][name] = producer;
-        } else {
+    void Access::_checkNoIssetProducer(
+        std::map<std::string, Producer*> &map,
+        const char *name
+    ) {
+        if( map.find( name ) != map.end() ) {
             throw util::Error::DUPLICATE_PRODUCER;
         }
     }
 
-    void Access::removeProducer( const char *group, const char *channel, const char *name ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+    void Access::checkCreateChannel(
+        const char *groupName,
+        unsigned int fd,
+        const char *channelName
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        util::LockAtomic lockAtomicProducer( countProducerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockProducer( mProducer );
+        _checkIssetGroup( groupName );
 
-        if( !producers.count(group) || !producers[group].count( channel ) || !producers[group][channel].count( name ) ) {
-            throw util::Error::NOT_FOUND_PRODUCER;
-        }
+        auto group = _groups[groupName];
 
-        auto iterProducer = producers[group][channel].find( name );
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
 
-        for( auto it = iterProducer->second.sessions.begin(); it != iterProducer->second.sessions.end(); it++ ) {
-            sessions[*it].type = SessionType::NONE;
-        }
+        _checkIssetSessions( group->sessions, fd );
 
-        producers[group][channel].erase( iterProducer );
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkNoIssetChannel( group->channels, channelName );
     }
 
-    void Access::authProducer( const char *group, const char *channel, const char *name, const unsigned char password[crypto::HASH_LENGTH], unsigned int fd ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+    void Access::checkUpdateChannelLimitMessages(
+        const char *groupName,
+        unsigned int fd,
+        const char *channelName
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        if( sessions.count( fd ) ) {
-            throw util::Error::DUPLICATE_SESSION;
-        }
+        _checkIssetGroup( groupName );
 
-        auto sess = Session();
-        sess.type = SessionType::PRODUCER;
+        auto group = _groups[groupName];
 
-        util::LockAtomic lockAtomicProducer( countProducerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockProducer( mProducer );
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
 
-        if( !producers.count( group ) ) {
-            throw util::Error::NOT_FOUND_GROUP;
-        } else if( !producers[group].count( channel ) ) {
-            throw util::Error::NOT_FOUND_CHANNEL;
-        } else if( !producers[group][channel].count( name ) ) {
-            throw util::Error::NOT_FOUND_CONSUMER;
-        }
+        _checkIssetSessions( group->sessions, fd );
 
-        auto iterProducer = producers[group][channel].find( name );
-        if( strncmp( ( char *)iterProducer->second.password, ( char *)password, crypto::HASH_LENGTH ) != 0 ) {
-            throw util::Error::WRONG_PASSWORD;
-        }
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
-        auto lengthGroup = strlen( group );
-        auto lengthChannel = strlen( channel );
-        auto lengthName = strlen( name );
-        auto allLength = lengthGroup + lengthChannel + lengthName + 3;
-        sess.data = new char[allLength]{};
-        sess.offsetChannel = lengthGroup + 1;
-        sess.offsetLogin = lengthGroup + lengthName + 2;
-        memcpy( sess.data, group, lengthGroup );
-        memcpy( &sess.data[sess.offsetChannel], channel, lengthChannel );
-        memcpy( &sess.data[sess.offsetLogin], name, lengthName );
-
-        producers[group][channel][name].sessions.push_back( fd );
-        sessions[fd] = sess;
+        _checkIssetChannel( group->channels, channelName );
     }
 
-    void Access::_clearGroupSession( const char *name, unsigned int fd ) {
-        util::LockAtomic lockAtomicGroup( countGroupWrited );
-        std::lock_guard<std::shared_timed_mutex> lockGroup( mGroup );
+    void Access::checkRemoveChannel(
+        const char *groupName,
+        unsigned int fd,
+        const char *channelName
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        auto iter = groups.find( name );
+        _checkIssetGroup( groupName );
 
-        if( iter == groups.end() ) {
-            return;
-        }
+        auto group = _groups[groupName];
 
-        for( auto iterSess = groups[name].sessions.begin(); iterSess != groups[name].sessions.end(); ) {
-            if( *iterSess == fd ) {
-                groups[name].sessions.erase( iterSess );
-                break;
-            } else {
-                iterSess++;
-            }
-        }
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
+
+        _checkIssetSessions( group->sessions, fd );
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
     }
 
-    void Access::_clearConsumerSession( const char *group, const char *channel, const char *name, unsigned int fd ) {
-        util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
+    void Access::checkCreateConsumer(
+        const char *groupName,
+        unsigned int fd,
+        const char *channelName,
+        const char *login
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        if( !consumers.count( group ) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
-            return;
-        }
+        _checkIssetGroup( groupName );
 
-        for( auto iterSess = consumers[group][channel][name].sessions.begin(); iterSess != consumers[group][channel][name].sessions.end(); ) {
-            if( *iterSess == fd ) {
-                consumers[group][channel][name].sessions.erase( iterSess );
-                break;
-            } else {
-                iterSess++;
-            }
-        }
+        auto group = _groups[groupName];
+
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
+
+        _checkIssetSessions( group->sessions, fd );
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+        _wait( channel->countConsumersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
+
+        _checkNoIssetConsumer( channel->consumers, login );
     }
 
-    void Access::_clearProducerSession( const char *group, const char *channel, const char *name, unsigned int fd ) {
-        util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
+    void Access::checkUpdateConsumerPassword(
+        const char *groupName,
+        unsigned int fd,
+        const char *channelName,
+        const char *login
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        if( !producers.count( group ) || !producers[group].count( channel ) || !producers[group][channel].count( name ) ) {
-            return;
-        }
+        _checkIssetGroup( groupName );
 
-        for( auto iterSess = producers[group][channel][name].sessions.begin(); iterSess != producers[group][channel][name].sessions.end(); ) {
-            if( *iterSess == fd ) {
-                producers[group][channel][name].sessions.erase( iterSess );
-                break;
-            } else {
-                iterSess++;
-            }
-        }
-    }
-     
-    void Access::logout( unsigned int fd ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
+        auto group = _groups[groupName];
 
-        auto iter = sessions.find( fd );
-        if( iter == sessions.end() ) {
-            throw util::Error::NOT_FOUND_SESSION;
-        }
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
 
-        Consumer consumer;
-        Producer producer;
+        _checkIssetSessions( group->sessions, fd );
 
-        auto type = sessions[fd].type;
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
-        if( type == SessionType::GROUP ) {
-            _clearGroupSession( iter->second.data, fd );
-        } else if( type == SessionType::CONSUMER ) {
-            auto val = iter->second;
-            _clearConsumerSession( val.data, &val.data[val.offsetChannel], &val.data[val.offsetLogin], fd );
-        } else if( type == SessionType::PRODUCER ) {
-            auto val = iter->second;
-            _clearProducerSession( val.data, &val.data[val.offsetChannel], &val.data[val.offsetLogin], fd );
-        }
-        delete[] sessions[fd].data;
-        sessions.erase( iter );
-    }
-     
-    bool Access::canSendMessage( unsigned int fd ) {
-        wait( countSessWrited );
-        std::shared_lock<std::shared_timed_mutex> lockSess( mSess );
-
-        auto iterSess = sessions.find( fd );
-        if( iterSess == sessions.end() ) {
-            throw util::Error::NOT_FOUND_SESSION;
-        }
-
-     
-        return iterSess->second.type == SessionType::PRODUCER;
-    }
-     
-    bool Access::canRecvMessage( unsigned int fd ) {
-        wait( countSessWrited );
-        std::shared_lock<std::shared_timed_mutex> lockSess( mSess );
-     
-     
-        auto iterSess = sessions.find( fd );
-        if( iterSess == sessions.end() ) {
-            throw util::Error::NOT_FOUND_SESSION;
-        }
-
-     
-        return iterSess->second.type == SessionType::CONSUMER;
+        _checkIssetChannel( group->channels, channelName );
+        auto channel = group->channels[channelName];
+        _wait( channel->countConsumersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
+        _checkIssetConsumer( channel->consumers, login );
     }
 
-    bool Access::canCreateChannel( unsigned int fd, const char *channel ) {
-        std::string groupName;
+    void Access::checkRemoveConsumer(
+        const char *groupName,
+        unsigned int fd,
+        const char *channelName,
+        const char *login
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        if( !_validateSessGroup( fd, groupName ) ) {
-            return false;
-        }
+        _checkIssetGroup( groupName );
 
-        if( !_validateIssetGroup( fd, groupName.c_str() ) ) {
-            return false;
-        }
+        auto group = _groups[groupName];
 
-        return !_validateIssetChannel( fd, groupName.c_str(), channel );
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
+
+        _checkIssetSessions( group->sessions, fd );
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+        _wait( channel->countConsumersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
+
+        _checkIssetConsumer( channel->consumers, login );
     }
 
-    bool Access::canRemoveChannel( unsigned int fd, const char *channel ) {
-        std::string groupName;
+    void Access::checkCreateProducer(
+        const char *groupName,
+        unsigned int fd,
+        const char *channelName,
+        const char *login
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        if( !_validateSessGroup( fd, groupName ) ) {
-            return false;
-        }
+        _checkIssetGroup( groupName );
 
-        return _validateIssetChannel( fd, groupName.c_str(), channel );
+        auto group = _groups[groupName];
+
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
+
+        _checkIssetSessions( group->sessions, fd );
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+        _wait( channel->countProducersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
+
+        _checkNoIssetProducer( channel->producers, login );
     }
 
-    bool Access::canCreateConsumer( unsigned int fd, const char *channel, const char *name ) {
-        std::string groupName;
+    void Access::checkUpdateProducerPassword(
+        const char *groupName,
+        unsigned int fd,
+        const char *channelName,
+        const char *login
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        if( !_validateSessGroup( fd, groupName ) ) {
-            return false;
-        }
+        _checkIssetGroup( groupName );
 
-        const char *group = groupName.c_str();
+        auto group = _groups[groupName];
 
-        if( !_validateIssetChannel( fd, group, channel ) ) {
-            return false;
-        }
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
 
-        wait( countConsumerWrited );
-        std::shared_lock<std::shared_timed_mutex> lockConsumer( mConsumer );
+        _checkIssetSessions( group->sessions, fd );
 
-        if( !consumers.count( group ) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
-            return true;
-        }
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
-        return false;
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+        _wait( channel->countProducersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
+
+        _checkIssetProducer( channel->producers, login );
     }
 
-    bool Access::canUpdateConsumerPassword( unsigned int fd, const char *channel, const char *name ) {
-        std::string groupName;
+    void Access::checkRemoveProducer(
+        const char *groupName,
+        unsigned int fd,
+        const char *channelName,
+        const char *login
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        if( !_validateSessGroup( fd, groupName ) ) {
-            return false;
-        }
+        _checkIssetGroup( groupName );
 
-        const char *group = groupName.c_str();
+        auto group = _groups[groupName];
 
-        if( !_validateIssetChannel( fd, group, channel ) ) {
-            return false;
-        }
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
 
-        wait( countConsumerWrited );
-        std::shared_lock<std::shared_timed_mutex> lockConsumer( mConsumer );
+        _checkIssetSessions( group->sessions, fd );
 
-        if( !consumers.count( group ) || !consumers[group].count( channel ) || !consumers[group][channel].count( name ) ) {
-            return false;
-        }
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
-        return true;
+        _checkIssetChannel( group->channels, channelName );
+
+        auto channel = group->channels[channelName];
+        _wait( channel->countProducersWrited );
+        std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
+
+        _checkIssetProducer( channel->producers, login );
     }
 
-    bool Access::canRemoveConsumer( unsigned int fd, const char *channel, const char *name ) {
-        return canUpdateConsumerPassword( fd, channel, name );
-    }
-
-    bool Access::canCreateProducer( unsigned int fd, const char *channel, const char *name ) {
-        std::string groupName;
-
-        if( !_validateSessGroup( fd, groupName ) ) {
-            return false;
-        }
-
-        const char *group = groupName.c_str();
-
-        if( !_validateIssetChannel( fd, group, channel ) ) {
-            return false;
-        }
-
-        wait( countProducerWrited );
-        std::shared_lock<std::shared_timed_mutex> lockProducer( mProducer );
-
-        if( !producers.count( group ) || !producers[group].count( channel ) || !producers[group][channel].count( name ) ) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    bool Access::canUpdateProducerPassword( unsigned int fd, const char *channel, const char *name ) {
-        std::string groupName;
-
-        if( !_validateSessGroup( fd, groupName ) ) {
-            return false;
-        }
-
-        const char *group = groupName.c_str();
-
-        if( !_validateIssetChannel( fd, group, channel ) ) {
-            return false;
-        }
-
-        wait( countProducerWrited );
-        std::shared_lock<std::shared_timed_mutex> lockProducer( mProducer );
-
-        if( !producers.count( group ) || !producers[group].count( channel ) || !producers[group][channel].count( name ) ) {
-            return false;
-        }
-
-        return true;
-    }
-
-    bool Access::canRemoveProducer( unsigned int fd, const char *channel, const char *name ) {
-        return canUpdateProducerPassword( fd, channel, name );
-    }
-
-    void Access::_validateConsumer( const char *group, const char *channel, const char *name ) {
-        if( !consumers.count( group ) ) {
-            throw util::Error::NOT_FOUND_GROUP;
-        } else if( !consumers[group].count( channel ) ) {
-            throw util::Error::NOT_FOUND_CHANNEL;
-        } else if( !consumers[group][channel].count( name ) ) {
-            throw util::Error::NOT_FOUND_CONSUMER;
-        }
-    }
-
-    void Access::_validateProducer( const char *group, const char *channel, const char *name ) {
-        if( !producers.count( group ) ) {
-            throw util::Error::NOT_FOUND_GROUP;
-        } else if( !producers[group].count( channel ) ) {
-            throw util::Error::NOT_FOUND_CHANNEL;
-        } else if( !producers[group][channel].count( name ) ) {
-            throw util::Error::NOT_FOUND_CONSUMER;
-        }
-    }
-
-    bool Access::_validateSessGroup( unsigned int fd, std::string &groupName ) {
-        wait( countSessWrited );
-        std::shared_lock<std::shared_timed_mutex> lockSess( mSess );
-
-        if( !sessions.count( fd ) ) {
-            return false;
-        }
-
-        auto sess = sessions[fd];
-        if( sess.type != SessionType::GROUP ) {
-            return false;
-        }
-        groupName = sess.data;
-
-        return true;
-    }
-
-    bool Access::_validateIssetGroup( unsigned int fd, const char *group ) {
-        wait( countGroupWrited );
-        std::shared_lock<std::shared_timed_mutex> lockGroup( mGroup );
-
-        return groups.count( group ) == 1;
-    }
-
-    bool Access::_validateIssetChannel( unsigned int fd, const char *group, const char *channel ) {
-        wait( countChannelWrited );
-        std::shared_lock<std::shared_timed_mutex> lockChannel( mChannel );
-
-        auto iterGroup = channels.find( group );
-        if( iterGroup == channels.end() ) {
-            return false;
-        }
-
-        if( !iterGroup->second.count( channel ) ) {
-            return false;
-        }
-        
-        return true;
-    }
-
-    void Access::updateGroupPassword( const char *group, const unsigned char newPassword[crypto::HASH_LENGTH] ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
-
-        util::LockAtomic lockAtomicGroup( countGroupWrited );
-        std::lock_guard<std::shared_timed_mutex> lockGroup( mGroup );
-            
-        if( !groups.count( group ) ) {
-            throw util::Error::NOT_FOUND_GROUP;
-        }
-
-        memcpy( groups[group].password, newPassword, crypto::HASH_LENGTH );
-
-        for( auto it = groups[group].sessions.begin(); it != groups[group].sessions.end(); it++ ) {
-            sessions[*it].type = SessionType::NONE;
-        }
-
-        groups[group].sessions.clear();
-    }
-
-    void Access::updateConsumerPassword( const char *group, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
-
-        util::LockAtomic lockAtomicConsumer( countConsumerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockConsumer( mConsumer );
-
-        _validateConsumer( group, channel, name );
-        memcpy( consumers[group][channel][name].password, newPassword, crypto::HASH_LENGTH );
-
-        for( auto it = consumers[group][channel][name].sessions.begin(); it != consumers[group][channel][name].sessions.end(); it++ ) {
-            if( sessions.count( *it ) ) {
-                sessions[*it].type = SessionType::NONE;
-            }
-        }
-
-        consumers[group][channel][name].sessions.clear();
-    }
-
-    void Access::updateProducerPassword( const char *group, const char *channel, const char *name, const unsigned char newPassword[crypto::HASH_LENGTH] ) {
-        util::LockAtomic lockAtomicSess( countSessWrited );
-        std::lock_guard<std::shared_timed_mutex> lockSess( mSess );
-
-        util::LockAtomic lockAtomicProducer( countProducerWrited );
-        std::lock_guard<std::shared_timed_mutex> lockProducer( mProducer );
-
-        _validateProducer( group, channel, name );
-        memcpy( producers[group][channel][name].password, newPassword, crypto::HASH_LENGTH );
-
-        for( auto it = producers[group][channel][name].sessions.begin(); it != producers[group][channel][name].sessions.end(); it++ ) {
-            if( sessions.count( *it ) ) {
-                sessions[*it].type = SessionType::NONE;
-            }
-        }
-
-        producers[group][channel][name].sessions.clear();
-    }
 }
 
 #endif
