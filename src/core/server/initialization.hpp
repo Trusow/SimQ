@@ -441,6 +441,7 @@ namespace simq::core::server {
             auto iGroup = _changes->getInitiatorGroup( change );
             auto iChannel = _changes->getInitiatorChannel( change );
             auto iLogin = _changes->getInitiatorLogin( change );
+            auto ip = _changes->getIP( change );
 
             std::list<Logger::Detail> details;
             Logger::addItemToDetails( details, "group", _changes->getGroup( change ) );
@@ -563,7 +564,7 @@ namespace simq::core::server {
 
                 Logger::success(
                     operation,
-                    0,
+                    ip,
                     details,
                     initiator,
                     iGroup, iChannel, iLogin
@@ -575,7 +576,7 @@ namespace simq::core::server {
                 Logger::fail(
                     operation,
                     err,
-                    0,
+                    ip,
                     details,
                     initiator,
                     iGroup, iChannel, iLogin
@@ -586,7 +587,7 @@ namespace simq::core::server {
                 Logger::fail(
                     operation,
                     util::Error::UNKNOWN,
-                    0,
+                    ip,
                     details,
                     initiator,
                     iGroup, iChannel, iLogin
