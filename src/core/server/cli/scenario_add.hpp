@@ -230,14 +230,14 @@ namespace simq::core::server::CLI {
                 try {
                     if( _nav->isGroups() ) {
                         _cb->addGroup( _name.c_str(), hashPswd );
-                    } else if( _nav->isProducers() ) {
+                    } else if( _nav->isConsumers() ) {
                         _cb->addConsumer(
                             _nav->getGroup(),
                             _nav->getChannel(),
                             _name.c_str(),
                             hashPswd
                         );
-                    } else if( _nav->isConsumers() ) {
+                    } else if( _nav->isProducers() ) {
                         _cb->addProducer(
                             _nav->getGroup(),
                             _nav->getChannel(),
