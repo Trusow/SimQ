@@ -35,10 +35,6 @@ namespace simq::core::server {
                 CH_CREATE_PRODUCER = 4000,
                 CH_UPDATE_PRODUCER_PASSWORD,
                 CH_REMOVE_PRODUCER,
-
-                CH_UPDATE_MASTER_PASSWORD = 5000,
-                CH_UPDATE_PORT,
-                CH_UPDATE_COUNT_THREADS,
             };
             const char *defPath = util::constants::PATH_DIR_CHANGES;
             const unsigned int LENGTH_VALUES = 16;
@@ -102,17 +98,10 @@ namespace simq::core::server {
 
             char *_convertChannelLimitMessagesDataToFile( Change *change );
             char *_convertChannelLimitMessagesDataFromFile( Change *change );
-            char *_convertPortDataToFile( Change *change );
-            char *_convertPortDataFromFile( Change *change );
-            char *_convertCountThreadsDataToFile( Change *change );
-            char *_convertCountThreadsDataFromFile( Change *change );
 
             bool _isValidGroup( Change *change, unsigned int length );
             bool _isValidChannel( Change *change, unsigned int length );
             bool _isValidUser( Change *change, unsigned int length );
-            bool _isValidUpdatePort( Change *change );
-            bool _isValidUpdateCountThreads( Change *change );
-            bool _isValidUpdateMasterPassword( Change *change, unsigned int length );
             bool _isValidChangeFromFile( Change *change, unsigned int length );
 
             void _clearFailedFiles();
@@ -179,12 +168,6 @@ namespace simq::core::server {
                 const char *login
             );
 
-            Change *updatePort( unsigned short int port );
-            Change *updateCountThreads( unsigned short int port );
-            Change *updateMasterPassword(
-                unsigned char password[crypto::HASH_LENGTH]
-            );
-
             bool isAddGroup( Change *change );
             bool isUpdateGroupPassword( Change *change );
             bool isRemoveGroup( Change *change );
@@ -200,10 +183,6 @@ namespace simq::core::server {
             bool isAddProducer( Change *change );
             bool isUpdateProducerPassword( Change *change );
             bool isRemoveProducer( Change *change );
-
-            bool isUpdatePort( Change *change );
-            bool isUpdateCountThreads( Change *change );
-            bool isUpdateMasterPassword( Change *change );
 
             const char *getGroup( Change *change );
             const char *getChannel( Change *change );
@@ -513,51 +492,6 @@ namespace simq::core::server {
         return _buildUserChange( CH_REMOVE_PRODUCER, group, channel, login, nullptr );
     }
 
-    Changes::Change *Changes::updatePort( unsigned short int port ) {
-        if( !util::Validation::isPort( port ) ) {
-            throw util::Error::WRONG_PARAM;
-        }
-
-        auto change = new Change{};
-        change->type = CH_UPDATE_PORT;
-        auto size = sizeof( unsigned short int );
-        change->values[0] = size;
-
-        change->data = new char[size+1]{};
-        memcpy( change->data, &port, size );
-
-        return change;
-    }
-
-    Changes::Change *Changes::updateCountThreads( unsigned short int threads ) {
-        if( threads == 0 ) {
-            throw util::Error::WRONG_PARAM;
-        }
-
-        auto change = new Change{};
-        change->type = CH_UPDATE_COUNT_THREADS;
-        auto size = sizeof( unsigned short int );
-        change->values[0] = size;
-
-        change->data = new char[size+1]{};
-        memcpy( change->data, &threads, size );
-
-        return change;
-    }
-
-    Changes::Change *Changes::updateMasterPassword(
-        unsigned char password[crypto::HASH_LENGTH]
-    ) {
-        auto change = new Change{};
-        change->type = CH_UPDATE_COUNT_THREADS;
-        change->values[0] = crypto::HASH_LENGTH;
-
-        change->data = new char[crypto::HASH_LENGTH+1]{};
-        memcpy( change->data, password, crypto::HASH_LENGTH );
-
-        return change;
-    }
-
     const char *Changes::getGroup( Change *change ) {
         return change->data;
     }
@@ -593,9 +527,6 @@ namespace simq::core::server {
         unsigned int offset = 0;
 
         switch( change->type ) {
-            case CH_UPDATE_MASTER_PASSWORD:
-                offset = 0;
-                break;
             case CH_CREATE_GROUP:
             case CH_UPDATE_GROUP_PASSWORD:
                 offset = change->values[0]+1;
@@ -661,17 +592,6 @@ namespace simq::core::server {
 
     bool Changes::isRemoveProducer( Change *change ) {
         return change->type == CH_REMOVE_PRODUCER;
-    }
-
-    bool Changes::isUpdatePort( Change *change ) {
-        return change->type == CH_UPDATE_PORT;
-    }
-    bool Changes::isUpdateCountThreads( Change *change ) {
-        return change->type == CH_UPDATE_COUNT_THREADS;
-    }
-
-    bool Changes::isUpdateMasterPassword( Change *change ) {
-        return change->type == CH_UPDATE_MASTER_PASSWORD;
     }
 
     void Changes::free( Change *change ) {
@@ -780,66 +700,6 @@ namespace simq::core::server {
         return data;
     }
 
-    char *Changes::_convertPortDataToFile( Change *change ) {
-        unsigned int length = change->values[0] + 1;
-        unsigned short int port;
-        auto size = sizeof( unsigned short int );
-
-        auto data = new char[length]{};
-        memcpy( data, change->data, length );
-
-        memcpy( &port, data, size );
-        port = htons( port );
-        memcpy( data, &port, size );
-
-        return data;
-    }
-
-    char *Changes::_convertPortDataFromFile( Change *change ) {
-        unsigned int length = change->values[0] + 1;
-        unsigned short int port;
-        auto size = sizeof( unsigned short int );
-
-        auto data = new char[length]{};
-        memcpy( data, change->data, length );
-
-        memcpy( &port, data, size );
-        port = ntohs( port );
-        memcpy( data, &port, size );
-
-        return data;
-    }
-
-    char *Changes::_convertCountThreadsDataToFile( Change *change ) {
-        unsigned int length = change->values[0] + 1;
-        unsigned short int count;
-        auto size = sizeof( unsigned short int );
-
-        auto data = new char[length]{};
-        memcpy( data, change->data, length );
-
-        memcpy( &count, data, size );
-        count = htons( count );
-        memcpy( data, &count, size );
-
-        return data;
-    }
-
-    char *Changes::_convertCountThreadsDataFromFile( Change *change ) {
-        unsigned int length = change->values[0] + 1;
-        unsigned short int count;
-        auto size = sizeof( unsigned short int );
-
-        auto data = new char[length]{};
-        memcpy( data, change->data, length );
-
-        memcpy( &count, data, size );
-        count = ntohs( count );
-        memcpy( data, &count, size );
-
-        return data;
-    }
-
     bool Changes::_isValidGroup( Change *change, unsigned int length ) {
         if( change->values[0] == 0 ) {
             return false;
@@ -942,18 +802,6 @@ namespace simq::core::server {
         }
     }
 
-    bool Changes::_isValidUpdatePort( Change *change ) {
-        return util::Validation::isPort( change->values[0] );
-    }
-
-    bool Changes::_isValidUpdateCountThreads( Change *change ) {
-        return change->values[0] != 0;
-    }
-
-    bool Changes::_isValidUpdateMasterPassword( Change *change, unsigned int length ) {
-        return change->values[0] != crypto::HASH_LENGTH || length != crypto::HASH_LENGTH + 1;
-    }
-
     bool Changes::_isValidChangeFromFile( Change *change, unsigned int length ) {
         switch( change->type ) {
             case CH_CREATE_GROUP:
@@ -971,12 +819,6 @@ namespace simq::core::server {
             case CH_UPDATE_PRODUCER_PASSWORD:
             case CH_REMOVE_PRODUCER:
                 return _isValidUser( change, length );
-            case CH_UPDATE_PORT:
-                return _isValidUpdatePort( change );
-            case CH_UPDATE_COUNT_THREADS:
-                return _isValidUpdateCountThreads( change );
-            case CH_UPDATE_MASTER_PASSWORD:
-                return _isValidUpdateMasterPassword( change, length );
         }
 
         return false;
@@ -1015,14 +857,6 @@ namespace simq::core::server {
             auto data = _convertChannelLimitMessagesDataToFile( change );
             file.write( data, length );
             delete[] data;
-        } else if( isUpdatePort( change ) ) {
-            auto data = _convertPortDataToFile( change );
-            file.write( data, length );
-            delete[] data;
-        } else if( isUpdateCountThreads( change ) ) {
-            auto data = _convertCountThreadsDataToFile( change );
-            file.write( data, length );
-            delete[] data;
         } else {
             file.write( change->data, length );
         }
@@ -1031,9 +865,6 @@ namespace simq::core::server {
 
     bool Changes::_isAllowedType( unsigned int type ) {
         switch( type ) {
-            case CH_UPDATE_PORT:
-            case CH_UPDATE_MASTER_PASSWORD:
-            case CH_UPDATE_COUNT_THREADS:
             case CH_CREATE_GROUP:
             case CH_UPDATE_GROUP_PASSWORD:
             case CH_REMOVE_GROUP:
@@ -1118,14 +949,6 @@ namespace simq::core::server {
         if( isUpdateChannelLimitMessages( ch ) || isAddChannel( ch ) ) {
             auto _tmpData = ch->data;
             ch->data = _convertChannelLimitMessagesDataFromFile( ch );
-            delete[] _tmpData;
-        } else if( isUpdatePort( ch ) ) {
-            auto _tmpData = ch->data;
-            ch->data = _convertPortDataFromFile( ch );
-            delete[] _tmpData;
-        } else if( isUpdateCountThreads( ch ) ) {
-            auto _tmpData = ch->data;
-            ch->data = _convertCountThreadsDataFromFile( ch );
             delete[] _tmpData;
         }
 
