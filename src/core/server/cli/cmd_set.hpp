@@ -108,6 +108,11 @@ namespace simq::core::server::CLI {
                 if( !util::Validation::isChannelLimitMessages( limitMessages ) ) {
                     Ini::printDanger( _console, "Wrong value" );
                 } else {
+                    _cb->updateChannelLimitMessages(
+                        _nav->getGroup(),
+                        _nav->getChannel(),
+                        &limitMessages
+                    );
                     Ini::printWarning( _console, Ini::msgApplyChangesDefer );
                 }
             }
