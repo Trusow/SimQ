@@ -453,6 +453,7 @@ namespace simq::test {
     void Access::run() {
         _runGroup();
         _runChannel();
+        // TODO: Дописать тесты
     }
 }
 
