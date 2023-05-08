@@ -48,16 +48,16 @@ namespace simq::core::server::CLI {
 
             if( cmd == Ini::cmdAdd ) {
                 if( _nav->isGroups() ) {
-                    str += " - create group, example '";
+                    str += " - add group, example '";
                     str += cmd + " groupTest'";
                 } else if( _nav->isGroup() ) {
-                    str += " - create channel, example '";
+                    str += " - add channel, example '";
                     str += cmd + " channelTest'";
                 } else if( _nav->isConsumers() ) {
-                    str += " - create consumer, example '";
+                    str += " - add consumer, example '";
                     str += cmd + " consumerTest'";
                 } else if( _nav->isProducers() ) {
-                    str += " - create producer, example '";
+                    str += " - add producer, example '";
                     str += cmd + " producerTest'";
                 }
             } else if( cmd == Ini::cmdRemove ) {
