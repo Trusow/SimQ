@@ -5,6 +5,7 @@
 #include <string>
 #include "../../util/logger.hpp"
 #include "../../util/error.h"
+#include "../../util/ip.hpp"
 #include "../../util/types.h"
 
 namespace simq::core::server {
@@ -196,8 +197,10 @@ namespace simq::core::server {
     ) {
         std::string ceilType = "Fail";
         std::string ceilInitiator = "~";
-        std::string ceilIP = "0.0.0.0";
+        char ceilIP[16]{};
         std::string ceilValues = "";
+
+        util::IP::toString( ip, ceilIP );
 
         std::string strOperation;
         std::string strErr = util::Error::getDescription( error );
@@ -232,8 +235,10 @@ namespace simq::core::server {
     ) {
         std::string ceilType = "Success";
         std::string ceilInitiator = "~";
-        std::string ceilIP = "0.0.0.0";
         std::string ceilValues = "";
+
+        char ceilIP[16]{};
+        util::IP::toString( ip, ceilIP );
 
         std::string strOperation;
         std::string strErr;
