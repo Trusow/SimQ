@@ -48,6 +48,7 @@ namespace simq::core::server {
 
             struct Change: ChangeFile {
                 char *data;
+                unsigned int ip;
                 util::types::Initiator initiator;
                 char *group;
                 char *channel;
@@ -194,6 +195,7 @@ namespace simq::core::server {
 
             void push(
                 Change *change,
+                unsigned int ip = 0,
                 util::types::Initiator initiator = util::types::Initiator::I_ROOT,
                 const char *group = nullptr,
                 const char *channel = nullptr,
@@ -203,6 +205,7 @@ namespace simq::core::server {
             Change *pop();
 
             util::types::Initiator getInitiator( Change *change );
+            unsigned int getIP( Change *change );
             const char *getInitiatorGroup( Change *change );
             const char *getInitiatorChannel( Change *change );
             const char *getInitiatorLogin( Change *change );
@@ -616,6 +619,7 @@ namespace simq::core::server {
 
     void Changes::push(
         Change *change,
+        unsigned int ip,
         util::types::Initiator initiator,
         const char *group,
         const char *channel,
@@ -626,6 +630,7 @@ namespace simq::core::server {
         auto ch = new Change{};
         memcpy( ch, change, sizeof( Change ) );
         ch->initiator = initiator;
+        ch->ip = ip;
 
         switch( ch->initiator ) {
             case util::types::Initiator::I_GROUP:
@@ -1033,6 +1038,10 @@ namespace simq::core::server {
 
     util::types::Initiator Changes::getInitiator( Change *change ) {
         return change->initiator;
+    }
+
+    unsigned int Changes::getIP( Change *change ) {
+        return change->ip;
     }
 
     const char *Changes::getInitiatorGroup( Change *change ) {
