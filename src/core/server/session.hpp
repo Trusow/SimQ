@@ -30,19 +30,21 @@ namespace simq::core::server {
             void _checkIsset( unsigned int fd );
 
         public:
-            void joinGroup(
-                unsigned int fd, unsigned int ip,
+            void join( unsigned int fd, unsigned int ip );
+            void leave( unsigned int fd );
+
+            void setGroupInfo(
+                unsigned int fd,
                 const char *groupName
             );
-            void joinConsumer(
-                unsigned int fd, unsigned int ip,
+            void setConsumerInfo(
+                unsigned int fd,
                 const char *groupName, const char *channelName, const char *login
             );
-            void joinProducer(
-                unsigned int fd, unsigned int ip,
+            void setProducerInfo(
+                unsigned int fd,
                 const char *groupName, const char *channelName, const char *login
             );
-            void leave( unsigned int fd );
 
             const char *getGroup( unsigned int fd );
             const char *getChannel( unsigned int fd );
@@ -68,26 +70,35 @@ namespace simq::core::server {
         }
     }
 
-    void Session::joinGroup(
-        unsigned int fd, unsigned int ip,
-        const char *groupName
-    ) {
+    void Session::join( unsigned int fd, unsigned int ip ) {
         _checkDuplicate( fd );
 
         Item item{};
         item.lastTS = time( NULL );
-        item.initiator = util::types::I_GROUP;
-        item.group = util::String::copy( groupName );
         item.ip = ip;
 
         _items[fd] = item;
     }
 
-    void Session::joinConsumer(
-        unsigned int fd, unsigned int ip,
+    void Session::setGroupInfo(
+        unsigned int fd,
+        const char *groupName
+    ) {
+        _checkIsset( fd );
+
+        Item item{};
+        item.lastTS = time( NULL );
+        item.initiator = util::types::I_GROUP;
+        item.group = util::String::copy( groupName );
+
+        _items[fd] = item;
+    }
+
+    void Session::setConsumerInfo(
+        unsigned int fd,
         const char *groupName, const char *channelName, const char *login
     ) {
-        _checkDuplicate( fd );
+        _checkIsset( fd );
 
         Item item{};
         item.lastTS = time( NULL );
@@ -95,13 +106,12 @@ namespace simq::core::server {
         item.group = util::String::copy( groupName );
         item.channel = util::String::copy( channelName );
         item.login = util::String::copy( login );
-        item.ip = ip;
 
         _items[fd] = item;
     }
 
-    void Session::joinProducer(
-        unsigned int fd, unsigned int ip,
+    void Session::setProducerInfo(
+        unsigned int fd,
         const char *groupName, const char *channelName, const char *login
     ) {
         _checkDuplicate( fd );
@@ -112,7 +122,6 @@ namespace simq::core::server {
         item.group = util::String::copy( groupName );
         item.channel = util::String::copy( channelName );
         item.login = util::String::copy( login );
-        item.ip = ip;
 
         _items[fd] = item;
     }
