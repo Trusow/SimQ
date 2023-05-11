@@ -5,12 +5,13 @@
 #include <string.h>
 #include <string>
 #include <unistd.h>
+#include <memory>
 #include "error.h"
 
 namespace simq::util {
     class File {
         private:
-            char *filePath = nullptr;
+            std::unique_ptr<char[]> filePath;
             FILE *file = NULL;
             bool exists( const char *path );
             FILE *create( const char *path );
@@ -51,17 +52,13 @@ namespace simq::util {
         }
 
         auto length = strlen( path );
-        filePath = new char[length+1]{};
-        memcpy( filePath, path, length );
+        filePath = std::make_unique<char[]>(length+1);
+        memcpy( filePath.get(), path, length );
     }
 
     File::~File() {
         if( file != NULL ) {
             fclose( file );
-        }
-
-        if( filePath != nullptr ) {
-            delete[] filePath;
         }
     }
 
@@ -92,7 +89,7 @@ namespace simq::util {
     }
 
     void File::atomicWrite( void *data, unsigned int length ) {
-        std::string atomicPath = filePath;
+        std::string atomicPath = filePath.get();
         atomicPath += ".atomic";
 
         auto f = fopen( atomicPath.c_str(), "w+" );
@@ -108,12 +105,12 @@ namespace simq::util {
         fclose( f );
         fclose( file );
 
-        if( ::rename( atomicPath.c_str(), filePath ) != 0 ) {
-            file = open( filePath );
+        if( ::rename( atomicPath.c_str(), filePath.get() ) != 0 ) {
+            file = open( filePath.get() );
             throw util::Error::FS_ERROR;
         }
 
-        file = open( filePath );
+        file = open( filePath.get() );
     }
 
     void File::write( void *data, unsigned int length ) {
@@ -144,7 +141,7 @@ namespace simq::util {
     }
 
     unsigned long int File::size() {
-        auto *file = fopen( filePath, "r" );
+        auto *file = fopen( filePath.get(), "r" );
 
         if( fseek( file, 0L, SEEK_END ) != 0 ) {
             throw util::Error::FS_ERROR;
@@ -168,16 +165,14 @@ namespace simq::util {
         }
 
         auto l = strlen( name );
-        char *newPath = new char[lastOffset+1+l+1]{};
-        memcpy( newPath, filePath, lastOffset+1 );
-        memcpy( &newPath[lastOffset+1], name, l );
+        auto newPath = std::make_unique<char[]>(lastOffset+1+l+1);
+        memcpy( newPath.get(), filePath.get(), lastOffset+1 );
+        memcpy( &newPath.get()[lastOffset+1], name, l );
 
-        if( ::rename( filePath, newPath ) != 0 ) {
-            delete[] newPath;
+        if( ::rename( filePath.get(), newPath.get() ) != 0 ) {
             throw util::Error::FS_ERROR;
         } else {
-            delete[] filePath;
-            filePath = newPath;
+            filePath = std::move(newPath);
         }
     }
 
