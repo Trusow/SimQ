@@ -12,6 +12,7 @@
 #include <chrono>
 #include <map>
 #include <list>
+#include <memory>
 #include <string.h>
 #include <cstring>
 #include <string>
@@ -36,20 +37,20 @@ namespace simq::core::server {
         struct Channel {
             std::shared_timed_mutex mConsumers;
             std::atomic_uint countConsumersWrited;
-            std::map<std::string, Consumer *> consumers;
+            std::map<std::string, std::unique_ptr<Consumer>> consumers;
 
             std::shared_timed_mutex mProducers;
             std::atomic_uint countProducersWrited;
-            std::map<std::string, Producer *> producers;
+            std::map<std::string, std::unique_ptr<Producer>> producers;
         };
 
         struct Group: Entity {
             std::shared_timed_mutex mChannels;
             std::atomic_uint countChannelsWrited;
-            std::map<std::string, Channel *> channels;
+            std::map<std::string, std::unique_ptr<Channel>> channels;
         };
 
-        std::map<std::string, Group*> _groups;
+        std::map<std::string, std::unique_ptr<Group>> _groups;
 
         void _wait( std::atomic_uint &atom );
         void _checkGroupSession( const char *groupName, unsigned int fd );
@@ -72,32 +73,32 @@ namespace simq::core::server {
         void _checkNoIssetSessions( std::map<unsigned int, bool> &map, unsigned int fd );
 
         void _checkIssetChannel(
-            std::map<std::string, Channel*> &map,
+            std::map<std::string, std::unique_ptr<Channel>> &map,
             const char *name
         );
 
         void _checkNoIssetChannel(
-            std::map<std::string, Channel*> &map,
+            std::map<std::string, std::unique_ptr<Channel>> &map,
             const char *name
         );
 
         void _checkIssetConsumer(
-            std::map<std::string, Consumer*> &map,
+            std::map<std::string, std::unique_ptr<Consumer>> &map,
             const char *name
         );
 
         void _checkNoIssetConsumer(
-            std::map<std::string, Consumer*> &map,
+            std::map<std::string, std::unique_ptr<Consumer>> &map,
             const char *name
         );
 
         void _checkIssetProducer(
-            std::map<std::string, Producer*> &map,
+            std::map<std::string, std::unique_ptr<Producer>> &map,
             const char *name
         );
 
         void _checkNoIssetProducer(
-            std::map<std::string, Producer*> &map,
+            std::map<std::string, std::unique_ptr<Producer>> &map,
             const char *name
         );
      
@@ -286,7 +287,7 @@ namespace simq::core::server {
 
         _checkNoIssetGroup( groupName );
 
-        _groups[groupName] = new Group{};
+        _groups[groupName] = std::make_unique<Group>();
     }
 
     void Access::updateGroupPassword(
@@ -297,7 +298,7 @@ namespace simq::core::server {
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
         _checkIssetGroup( groupName );
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         util::LockAtomic lockAtomicGroupSessions( group->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -316,25 +317,6 @@ namespace simq::core::server {
             return;
         }
 
-        auto group = _groups[groupName];
-
-
-        for( auto itCh = group->channels.begin(); itCh != group->channels.end(); itCh++ ) {
-            auto channel = group->channels[itCh->first];
-
-            for( auto _it = channel->consumers.begin(); _it != channel->consumers.end(); _it++ ) {
-                delete _it->second;
-            }
-
-            for( auto _it = channel->producers.begin(); _it != channel->producers.end(); _it++ ) {
-                delete _it->second;
-            }
-
-            delete itCh->second;
-        }
-
-        delete group;
-
         _groups.erase( it );
     }
 
@@ -344,14 +326,14 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         util::LockAtomic lockAtomicChannels( group->countChannelsWrited );
         std::lock_guard<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkNoIssetChannel( group->channels, channelName );
 
-        group->channels[channelName] = new Channel{};
+        group->channels[channelName] = std::make_unique<Channel>();
     }
 
     void Access::removeChannel( const char *groupName, const char *channelName ) {
@@ -360,7 +342,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         util::LockAtomic lockAtomicChannels( group->countChannelsWrited );
         std::lock_guard<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -370,17 +352,6 @@ namespace simq::core::server {
             return;
         }
 
-        auto channel = group->channels[channelName];
-
-        for( auto it = channel->consumers.begin(); it != channel->consumers.end(); it++ ) {
-            delete it->second;
-        }
-
-        for( auto it = channel->producers.begin(); it != channel->producers.end(); it++ ) {
-            delete it->second;
-        }
-
-        delete group->channels[channelName];
         group->channels.erase( itCh );
     }
 
@@ -395,24 +366,22 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicConsumers( channel->countConsumersWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
 
         _checkNoIssetConsumer( channel->consumers, login );
 
-        auto item = new Consumer{};
-        memcpy( item->password, password, crypto::HASH_LENGTH );
-
-        channel->consumers[login] = item;
+        channel->consumers[login] = std::make_unique<Consumer>();
+        memcpy( channel->consumers[login]->password, password, crypto::HASH_LENGTH );
     }
 
     void Access::updateConsumerPassword(
@@ -426,21 +395,21 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicConsumers( channel->countConsumersWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
 
         _checkIssetConsumer( channel->consumers, login );
 
-        auto consumer = channel->consumers[login];
+        auto consumer = channel->consumers[login].get();
 
         util::LockAtomic lockAtomicConsumerSessions( consumer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
@@ -459,14 +428,14 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicConsumers( channel->countConsumersWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
@@ -475,8 +444,6 @@ namespace simq::core::server {
         if( itConsumer == channel->consumers.end() ) {
             return;
         }
-
-        delete itConsumer->second;
 
         channel->consumers.erase( itConsumer );
     }
@@ -492,24 +459,22 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicProducers( channel->countProducersWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducers( channel->mProducers );
 
         _checkNoIssetProducer( channel->producers, login );
 
-        auto item = new Producer{};
-        memcpy( item->password, password, crypto::HASH_LENGTH );
-
-        channel->producers[login] = item;
+        channel->producers[login] = std::make_unique<Producer>();
+        memcpy( channel->producers[login]->password, password, crypto::HASH_LENGTH );
     }
 
     void Access::updateProducerPassword(
@@ -523,21 +488,21 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicProducers( channel->countProducersWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducers( channel->mProducers );
 
         _checkIssetProducer( channel->producers, login );
 
-        auto producer = channel->producers[login];
+        auto producer = channel->producers[login].get();
 
         util::LockAtomic lockAtomicProducerSessions( producer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
@@ -557,14 +522,14 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicProducers( channel->countProducersWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducers( channel->mProducers );
@@ -587,7 +552,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         util::LockAtomic lockAtomicGroupSessions( group->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -617,21 +582,21 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
 
         _checkIssetConsumer( channel->consumers, login );
 
-        auto consumer = channel->consumers[login];
+        auto consumer = channel->consumers[login].get();
 
         util::LockAtomic lockAtomicConsumerSessions( consumer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
@@ -653,21 +618,21 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
 
         _checkIssetProducer( channel->producers, login );
 
-        auto producer = channel->producers[login];
+        auto producer = channel->producers[login].get();
 
         util::LockAtomic lockAtomicProducerSessions( producer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
@@ -685,7 +650,7 @@ namespace simq::core::server {
             return;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         util::LockAtomic lockAtomicGroupSessions( group->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -712,7 +677,7 @@ namespace simq::core::server {
             return;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -721,7 +686,7 @@ namespace simq::core::server {
             return;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
@@ -730,7 +695,7 @@ namespace simq::core::server {
             return;
         }
 
-        auto consumer = channel->consumers[login];
+        auto consumer = channel->consumers[login].get();
 
         util::LockAtomic lockAtomicConsumerSessions( consumer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
@@ -757,7 +722,7 @@ namespace simq::core::server {
             return;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -766,7 +731,7 @@ namespace simq::core::server {
             return;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
@@ -775,7 +740,7 @@ namespace simq::core::server {
             return;
         }
 
-        auto producer = channel->producers[login];
+        auto producer = channel->producers[login].get();
 
         util::LockAtomic lockAtomicProducerSessions( producer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
@@ -795,7 +760,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -814,21 +779,21 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mConsumers );
 
         _checkIssetConsumer( channel->consumers, login );
 
-        auto consumer = channel->consumers[login];
+        auto consumer = channel->consumers[login].get();
 
         _wait( consumer->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
@@ -847,21 +812,21 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mConsumers );
 
         _checkIssetProducer( channel->producers, login );
 
-        auto producer = channel->producers[login];
+        auto producer = channel->producers[login].get();
 
         _wait( producer->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
@@ -937,7 +902,7 @@ namespace simq::core::server {
     }
 
     void Access::_checkIssetChannel(
-        std::map<std::string, Channel*> &map,
+        std::map<std::string, std::unique_ptr<Channel>> &map,
         const char *name
     ) {
         if( map.find( name ) == map.end() ) {
@@ -946,7 +911,7 @@ namespace simq::core::server {
     }
 
     void Access::_checkNoIssetChannel(
-        std::map<std::string, Channel*> &map,
+        std::map<std::string, std::unique_ptr<Channel>> &map,
         const char *name
     ) {
         if( map.find( name ) != map.end() ) {
@@ -955,7 +920,7 @@ namespace simq::core::server {
     }
 
     void Access::_checkIssetConsumer(
-        std::map<std::string, Consumer*> &map,
+        std::map<std::string, std::unique_ptr<Consumer>> &map,
         const char *name
     ) {
         if( map.find( name ) == map.end() ) {
@@ -964,7 +929,7 @@ namespace simq::core::server {
     }
 
     void Access::_checkNoIssetConsumer(
-        std::map<std::string, Consumer*> &map,
+        std::map<std::string, std::unique_ptr<Consumer>> &map,
         const char *name
     ) {
         if( map.find( name ) != map.end() ) {
@@ -973,7 +938,7 @@ namespace simq::core::server {
     }
 
     void Access::_checkIssetProducer(
-        std::map<std::string, Producer*> &map,
+        std::map<std::string, std::unique_ptr<Producer>> &map,
         const char *name
     ) {
         if( map.find( name ) == map.end() ) {
@@ -982,7 +947,7 @@ namespace simq::core::server {
     }
 
     void Access::_checkNoIssetProducer(
-        std::map<std::string, Producer*> &map,
+        std::map<std::string, std::unique_ptr<Producer>> &map,
         const char *name
     ) {
         if( map.find( name ) != map.end() ) {
@@ -1000,7 +965,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -1023,7 +988,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -1046,7 +1011,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -1070,7 +1035,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -1082,7 +1047,7 @@ namespace simq::core::server {
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
 
@@ -1100,7 +1065,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -1111,7 +1076,7 @@ namespace simq::core::server {
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         _checkIssetChannel( group->channels, channelName );
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
         _checkIssetConsumer( channel->consumers, login );
@@ -1128,7 +1093,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -1140,7 +1105,7 @@ namespace simq::core::server {
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
 
@@ -1158,7 +1123,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -1170,7 +1135,7 @@ namespace simq::core::server {
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
 
@@ -1188,7 +1153,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -1200,7 +1165,7 @@ namespace simq::core::server {
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
 
@@ -1218,7 +1183,7 @@ namespace simq::core::server {
 
         _checkIssetGroup( groupName );
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countSessionsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
@@ -1230,7 +1195,7 @@ namespace simq::core::server {
 
         _checkIssetChannel( group->channels, channelName );
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducers( channel->mProducers );
 
