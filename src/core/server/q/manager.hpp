@@ -10,6 +10,7 @@
 #include <atomic>
 #include <iterator>
 #include <algorithm>
+#include <memory>
 #include "../../../util/lock_atomic.hpp"
 #include "../../../util/error.h"
 #include "../../../util/types.h"
@@ -29,7 +30,7 @@ namespace simq::core::server::q {
                 std::map<unsigned int, std::list<unsigned int>> consumers;
                 std::map<unsigned int, bool> producers;
 
-                Messages *messages;
+                std::unique_ptr<Messages> messages;
 
                 std::shared_timed_mutex mQList;
                 std::atomic_uint countQListWrited;
@@ -39,13 +40,13 @@ namespace simq::core::server::q {
             struct Group {
                 std::shared_timed_mutex mChannels;
                 std::atomic_uint countChannelsWrited;
-                std::map<std::string, Channel *> channels;
+                std::map<std::string, std::unique_ptr<Channel>> channels;
             };
 
             std::shared_timed_mutex _mGroups;
             std::atomic_uint _countGroupsWrited{0};
 
-            std::map<std::string, Group *> _groups;
+            std::map<std::string, std::unique_ptr<Group>> _groups;
 
             void _wait( std::atomic_uint &atom );
             unsigned int _calculateTotalConsumersByMessagedID(
@@ -166,8 +167,7 @@ namespace simq::core::server::q {
             throw util::Error::DUPLICATE_GROUP;
         }
 
-        auto group = new Group{};
-        _groups[groupName] = group;
+        _groups[groupName] = std::make_unique<Group>();
     }
 
     void Manager::removeGroup( const char *groupName ) {
@@ -179,14 +179,6 @@ namespace simq::core::server::q {
             return;
         }
 
-        auto group = _groups[groupName];
-
-        for( auto itChannel = group->channels.begin(); itChannel != group->channels.end(); itChannel++ ) {
-            delete itChannel->second->messages;
-            delete itChannel->second;
-        }
-
-        delete _groups[groupName];
         _groups.erase( it );
     }
 
@@ -203,7 +195,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         util::LockAtomic lockAtomicChannels( group->countChannelsWrited );
         std::lock_guard<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -212,10 +204,8 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = new Channel{};
-        channel->messages = new Messages( path, limitMessages );
-
-        group->channels[channelName] = channel;
+        group->channels[channelName] = std::make_unique<Channel>();
+        group->channels[channelName]->messages = std::make_unique<Messages>( path, limitMessages );
     }
 
     void Manager::updateChannelLimitMessages(
@@ -230,13 +220,13 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         util::LockAtomic lockAtomicChannels( group->countChannelsWrited );
         std::lock_guard<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         if( group->channels.find( channelName ) == group->channels.end() ) {
-            throw -1;
+            throw util::Error::NOT_FOUND_CHANNEL;
         }
 
         group->channels[channelName]->messages->updateLimits( limitMessages );
@@ -253,7 +243,7 @@ namespace simq::core::server::q {
             return;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         util::LockAtomic lockAtomicChannels( group->countChannelsWrited );
         std::lock_guard<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -263,9 +253,6 @@ namespace simq::core::server::q {
             return;
         }
 
-        auto channel = group->channels[channelName];
-
-        delete channel->messages;
         group->channels.erase( itChannel );
     }
 
@@ -277,7 +264,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -286,7 +273,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicChannels( channel->countConsumersWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumer( channel->mConsumers );
@@ -324,7 +311,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -333,7 +320,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicChannels( channel->countConsumersWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumer( channel->mConsumers );
@@ -362,7 +349,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -371,7 +358,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicChannels( channel->countProducersWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducer( channel->mProducers );
@@ -391,7 +378,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -400,7 +387,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicChannels( channel->countProducersWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducer( channel->mProducers );
@@ -452,7 +439,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -461,7 +448,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducer( channel->mProducers );
@@ -487,7 +474,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -496,7 +483,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducer( channel->mProducers );
@@ -521,7 +508,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -530,7 +517,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducer( channel->mProducers );
@@ -555,7 +542,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -564,7 +551,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducer( channel->mProducers );
@@ -601,7 +588,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -610,7 +597,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicQ( channel->countQListWrited );
         std::lock_guard<std::shared_timed_mutex> lockQ( channel->mQList );
@@ -644,7 +631,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -653,7 +640,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducer( channel->mProducers );
@@ -677,7 +664,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -686,7 +673,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumer( channel->mConsumers );
@@ -709,7 +696,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -718,7 +705,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicQ( channel->countQListWrited );
         std::lock_guard<std::shared_timed_mutex> lockQ( channel->mQList );
@@ -760,7 +747,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -769,7 +756,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicQ( channel->countQListWrited );
         std::lock_guard<std::shared_timed_mutex> lockQ( channel->mQList );
@@ -813,7 +800,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_GROUP;
         }
 
-        auto group = _groups[groupName];
+        auto group = _groups[groupName].get();
 
         _wait( group->countChannelsWrited );
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
@@ -822,7 +809,7 @@ namespace simq::core::server::q {
             throw util::Error::NOT_FOUND_CHANNEL;
         }
 
-        auto channel = group->channels[channelName];
+        auto channel = group->channels[channelName].get();
 
         util::LockAtomic lockAtomicQ( channel->countQListWrited );
         std::lock_guard<std::shared_timed_mutex> lockQ( channel->mQList );

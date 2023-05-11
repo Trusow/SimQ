@@ -6,6 +6,7 @@
 #include <atomic>
 #include <unordered_map>
 #include <string>
+#include <memory>
 #include <string.h>
 #include "../../../util/uuid.hpp"
 #include "../../../util/lock_atomic.hpp"
@@ -24,7 +25,7 @@ namespace simq::core::server::q {
         private:
             const unsigned int MESSAGES_IN_PACKET = 10'000;
             const unsigned int MESSAGE_PACKET_SIZE = util::constants::MESSAGE_PACKET_SIZE;
-            util::Buffer *_buffer;
+            std::unique_ptr<util::Buffer> _buffer;
 
             struct Message {
                 char uuid[util::UUID::LENGTH+1];
@@ -72,14 +73,12 @@ namespace simq::core::server::q {
     };
 
     Messages::Messages( const char *path, util::types::ChannelLimitMessages &limits ) {
-        _buffer = new util::Buffer( path );
+        _buffer = std::make_unique<util::Buffer>( path );
         _messages = new Message*[MESSAGES_IN_PACKET];
         _limits = limits;
     }
 
     Messages::~Messages() {
-        delete _buffer;
-
         for( unsigned int i = 0; i < _total; i++ ) {
             if( _messages[i] != nullptr ) {
                 delete _messages[i];
