@@ -158,8 +158,7 @@ namespace simq::core::server {
         unsigned char password[crypto::HASH_LENGTH]
     ) {
         auto ch = _changes->addGroup( group, password );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::updateGroupPassword(
@@ -167,14 +166,12 @@ namespace simq::core::server {
         unsigned char password[crypto::HASH_LENGTH]
     ) {
         auto ch = _changes->updateGroupPassword( group, password );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::removeGroup( const char *group ) {
         auto ch = _changes->removeGroup( group );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::addChannel(
@@ -183,8 +180,7 @@ namespace simq::core::server {
         util::types::ChannelLimitMessages *limitMessages
     ) {
         auto ch = _changes->addChannel( group, channel, limitMessages );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::updateChannelLimitMessages(
@@ -193,8 +189,7 @@ namespace simq::core::server {
         util::types::ChannelLimitMessages *limitMessages
     ) {
         auto ch = _changes->updateChannelLimitMessages( group, channel, limitMessages );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::removeChannel(
@@ -202,8 +197,7 @@ namespace simq::core::server {
         const char *channel
     ) {
         auto ch = _changes->removeChannel( group, channel );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::addConsumer(
@@ -213,8 +207,7 @@ namespace simq::core::server {
         unsigned char password[crypto::HASH_LENGTH]
     ) {
         auto ch = _changes->addConsumer( group, channel, login, password );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::updateConsumerPassword(
@@ -224,8 +217,7 @@ namespace simq::core::server {
         unsigned char password[crypto::HASH_LENGTH]
     ) {
         auto ch = _changes->updateConsumerPassword( group, channel, login, password );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::removeConsumer(
@@ -234,8 +226,7 @@ namespace simq::core::server {
         const char *login
     ) {
         auto ch = _changes->removeConsumer( group, channel, login );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::addProducer(
@@ -245,8 +236,7 @@ namespace simq::core::server {
         unsigned char password[crypto::HASH_LENGTH]
     ) {
         auto ch = _changes->addProducer( group, channel, login, password );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::updateProducerPassword(
@@ -256,8 +246,7 @@ namespace simq::core::server {
         unsigned char password[crypto::HASH_LENGTH]
     ) {
         auto ch = _changes->updateProducerPassword( group, channel, login, password );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::removeProducer(
@@ -266,8 +255,7 @@ namespace simq::core::server {
         const char *login
     ) {
         auto ch = _changes->removeProducer( group, channel, login );
-        _changes->pushDefered( ch );
-        _changes->free( ch );
+        _changes->pushDefered( std::move( ch ) );
     }
 
     void BindingCallbacksCLI::updateMasterPassword( unsigned char password[crypto::HASH_LENGTH] ) {
