@@ -7,7 +7,6 @@
 #include "../../util/fs.hpp"
 #include "../../util/validation.hpp"
 #include "../../util/uuid.hpp"
-#include "../../util/string.hpp"
 #include "../../util/constants.h"
 #include <list>
 #include <map>
@@ -15,6 +14,7 @@
 #include <mutex>
 #include <vector>
 #include <arpa/inet.h>
+#include <memory>
 
 namespace simq::core::server {
     class Changes {
@@ -47,25 +47,25 @@ namespace simq::core::server {
         public:
 
             struct Change: ChangeFile {
-                char *data;
+                std::unique_ptr<char[]> data;
                 unsigned int ip;
                 util::types::Initiator initiator;
-                char *group;
-                char *channel;
-                char *login;
+                std::string group;
+                std::string channel;
+                std::string login;
             };
 
         private:
 
-            char *_path = nullptr;
+            std::unique_ptr<char[]> _path;
 
             struct ChangeDisk {
-                Change *change;
+                std::unique_ptr<Change> change;
                 char uuid[util::UUID::LENGTH];
             };
 
-            std::list<Change *> listMemory;
-            std::list<ChangeDisk> listDisk;
+            std::list<std::unique_ptr<Change>> listMemory;
+            std::list<std::unique_ptr<ChangeDisk>> listDisk;
             std::map<std::string, bool> unknownFiles;
             std::map<std::string, bool> passedFiles;
             std::list<std::string> failedFiles;
@@ -76,20 +76,20 @@ namespace simq::core::server {
             void _popFile();
             void _generateUniqFileName( char *name );
             bool _isAllowedType( unsigned int type );
-            Change *_buildGroupChange(
+            std::unique_ptr<Change> _buildGroupChange(
                 unsigned int type,
                 const char *group,
                 unsigned char password[crypto::HASH_LENGTH]
             );
 
-            Change *_buildChannelChange(
+            std::unique_ptr<Change> _buildChannelChange(
                 unsigned int type,
                 const char *group,
                 const char *channel,
                 util::types::ChannelLimitMessages *limitMessages
             );
 
-            Change *_buildUserChange(
+            std::unique_ptr<Change> _buildUserChange(
                 unsigned int type,
                 const char *group,
                 const char *channel,
@@ -97,8 +97,8 @@ namespace simq::core::server {
                 unsigned char password[crypto::HASH_LENGTH]
             );
 
-            char *_convertChannelLimitMessagesDataToFile( Change *change );
-            char *_convertChannelLimitMessagesDataFromFile( Change *change );
+            std::unique_ptr<char[]> _convertChannelLimitMessagesDataToFile( Change *change );
+            std::unique_ptr<char[]> _convertChannelLimitMessagesDataFromFile( Change *change );
 
             bool _isValidGroup( Change *change, unsigned int length );
             bool _isValidChannel( Change *change, unsigned int length );
@@ -109,108 +109,103 @@ namespace simq::core::server {
 
         public:
             Changes( const char *path );
-            ~Changes();
 
-            Change *addGroup(
+            std::unique_ptr<Change> addGroup(
                 const char *group,
                 unsigned char password[crypto::HASH_LENGTH]
             );
-            Change *updateGroupPassword(
+            std::unique_ptr<Change> updateGroupPassword(
                 const char *group,
                 unsigned char password[crypto::HASH_LENGTH]
             );
-            Change *removeGroup( const char *group );
+            std::unique_ptr<Change> removeGroup( const char *group );
 
-            Change *addChannel(
+            std::unique_ptr<Change> addChannel(
                 const char *group,
                 const char *channel,
                 util::types::ChannelLimitMessages *limitMessages
             );
-            Change *updateChannelLimitMessages(
+            std::unique_ptr<Change> updateChannelLimitMessages(
                 const char *group,
                 const char *channel,
                 util::types::ChannelLimitMessages *limitMessages
             );
-            Change *removeChannel( const char *group, const char *channel );
+            std::unique_ptr<Change> removeChannel( const char *group, const char *channel );
 
-            Change *addConsumer(
+            std::unique_ptr<Change> addConsumer(
                 const char *group,
                 const char *channel,
                 const char *login,
                 unsigned char password[crypto::HASH_LENGTH]
             );
-            Change *updateConsumerPassword(
+            std::unique_ptr<Change> updateConsumerPassword(
                 const char *group,
                 const char *channel,
                 const char *login,
                 unsigned char password[crypto::HASH_LENGTH]
             );
-            Change *removeConsumer(
+            std::unique_ptr<Change> removeConsumer(
                 const char *group,
                 const char *channel,
                 const char *login
             );
 
-            Change *addProducer(
+            std::unique_ptr<Change> addProducer(
                 const char *group,
                 const char *channel,
                 const char *login,
                 unsigned char password[crypto::HASH_LENGTH]
             );
-            Change *updateProducerPassword(
+            std::unique_ptr<Change> updateProducerPassword(
                 const char *group,
                 const char *channel,
                 const char *login,
                 unsigned char password[crypto::HASH_LENGTH]
             );
-            Change *removeProducer(
+            std::unique_ptr<Change> removeProducer(
                 const char *group,
                 const char *channel,
                 const char *login
             );
 
-            bool isAddGroup( Change *change );
-            bool isUpdateGroupPassword( Change *change );
-            bool isRemoveGroup( Change *change );
+            bool isAddGroup( std::unique_ptr<Change> &change );
+            bool isUpdateGroupPassword( std::unique_ptr<Change> &change );
+            bool isRemoveGroup( std::unique_ptr<Change> &change );
 
-            bool isAddChannel( Change *change );
-            bool isUpdateChannelLimitMessages( Change *change );
-            bool isRemoveChannel( Change *change );
+            bool isAddChannel( std::unique_ptr<Change> &change );
+            bool isUpdateChannelLimitMessages( std::unique_ptr<Change> &change );
+            bool isRemoveChannel( std::unique_ptr<Change> &change );
 
-            bool isAddConsumer( Change *change );
-            bool isUpdateConsumerPassword( Change *change );
-            bool isRemoveConsumer( Change *change );
+            bool isAddConsumer( std::unique_ptr<Change> &change );
+            bool isUpdateConsumerPassword( std::unique_ptr<Change> &change );
+            bool isRemoveConsumer( std::unique_ptr<Change> &change );
 
-            bool isAddProducer( Change *change );
-            bool isUpdateProducerPassword( Change *change );
-            bool isRemoveProducer( Change *change );
+            bool isAddProducer( std::unique_ptr<Change> &change );
+            bool isUpdateProducerPassword( std::unique_ptr<Change> &change );
+            bool isRemoveProducer( std::unique_ptr<Change> &change );
 
-            const char *getGroup( Change *change );
-            const char *getChannel( Change *change );
-            const char *getLogin( Change *change );
-            const util::types::ChannelLimitMessages *getChannelLimitMessages( Change *change );
-            unsigned short int getPort( Change *change );
-            unsigned short int getCountThreads( Change *change );
-            void getPassword( Change *change, unsigned char password[crypto::HASH_LENGTH] );
+            const char *getGroup( std::unique_ptr<Change> &change );
+            const char *getChannel( std::unique_ptr<Change> &change );
+            const char *getLogin( std::unique_ptr<Change> &change );
+            const util::types::ChannelLimitMessages *getChannelLimitMessages( std::unique_ptr<Change> &change );
+            void getPassword( std::unique_ptr<Change> &change, unsigned char password[crypto::HASH_LENGTH] );
 
             void push(
-                Change *change,
+                std::unique_ptr<Change> change,
                 unsigned int ip = 0,
                 util::types::Initiator initiator = util::types::Initiator::I_ROOT,
                 const char *group = nullptr,
                 const char *channel = nullptr,
                 const char *login = nullptr
             );
-            void pushDefered( Change *change );
-            Change *pop();
+            void pushDefered( std::unique_ptr<Change> change );
+            std::unique_ptr<Change> pop();
 
-            util::types::Initiator getInitiator( Change *change );
-            unsigned int getIP( Change *change );
-            const char *getInitiatorGroup( Change *change );
-            const char *getInitiatorChannel( Change *change );
-            const char *getInitiatorLogin( Change *change );
-
-            void free( Change *change );
+            util::types::Initiator getInitiator( std::unique_ptr<Change> &change );
+            unsigned int getIP( std::unique_ptr<Change> &change );
+            const char *getInitiatorGroup( std::unique_ptr<Change> &change );
+            const char *getInitiatorChannel( std::unique_ptr<Change> &change );
+            const char *getInitiatorLogin( std::unique_ptr<Change> &change );
     };
 
     Changes::Changes( const char *path ) {
@@ -227,38 +222,11 @@ namespace simq::core::server {
             }
         }
 
-        _path = new char[l+1]{};
-        memcpy( _path, _strPath, l );
+        _path = std::make_unique<char[]>( l+1 );
+        memcpy( _path.get(), _strPath, l );
     }
 
-    Changes::~Changes() {
-        if( _path != nullptr ) {
-            delete[] _path;
-        }
-
-        for( auto it = listMemory.begin(); it != listMemory.end(); it++ ) {
-            delete[] (*it)->data;
-            switch( (*it)->initiator ) {
-                case util::types::Initiator::I_GROUP:
-                    delete[] (*it)->group;
-                    break;
-                case util::types::Initiator::I_CONSUMER:
-                case util::types::Initiator::I_PRODUCER:
-                    delete[] (*it)->group;
-                    delete[] (*it)->channel;
-                    delete[] (*it)->login;
-                    break;
-            }
-            delete *it;
-        }
-
-        for( auto it = listDisk.begin(); it != listDisk.end(); it++ ) {
-            delete[] (*it).change->data;
-            delete (*it).change;
-        }
-    }
-
-    Changes::Change *Changes::_buildGroupChange(
+    std::unique_ptr<Changes::Change> Changes::_buildGroupChange(
         unsigned int type,
         const char *group,
         unsigned char password[crypto::HASH_LENGTH]
@@ -270,27 +238,27 @@ namespace simq::core::server {
         auto groupLength = strlen( group );
 
 
-        auto change = new Change{};
+        auto change = std::make_unique<Change>();
         change->type = type;
 
         if( password != nullptr ) {
-            change->data = new char[groupLength+1+crypto::HASH_LENGTH]{};
+            change->data = std::make_unique<char[]>( groupLength+1+crypto::HASH_LENGTH );
 
             change->values[0] = groupLength;
-            memcpy( change->data, group, groupLength );
+            memcpy( change->data.get(), group, groupLength );
             change->values[1] = crypto::HASH_LENGTH;
             memcpy( &change->data[groupLength+1], password, crypto::HASH_LENGTH );
         } else {
-            change->data = new char[groupLength+1]{};
+            change->data = std::make_unique<char[]>(groupLength+1 );
 
             change->values[0] = groupLength;
-            memcpy( change->data, group, groupLength );
+            memcpy( change->data.get(), group, groupLength );
         }
 
         return change;
     }
 
-    Changes::Change *Changes::_buildChannelChange(
+    std::unique_ptr<Changes::Change> Changes::_buildChannelChange(
         unsigned int type,
         const char *group,
         const char *channel,
@@ -314,25 +282,25 @@ namespace simq::core::server {
         auto channelLength = strlen( channel );
         auto limitMessagesLength = sizeof( util::types::ChannelLimitMessages );
 
-        auto change = new Change{};
+        auto change = std::make_unique<Change>();
         change->type = type;
 
         if( limitMessages == nullptr ) {
-            change->data = new char[groupLength+1+channelLength+1]{};
+            change->data = std::make_unique<char[]>( groupLength+1+channelLength+1 );
 
             change->values[0] = groupLength;
-            memcpy( change->data, group, groupLength );
+            memcpy( change->data.get(), group, groupLength );
             change->values[1] = channelLength;
-            memcpy( &change->data[groupLength+1], channel, channelLength );
+            memcpy( &change->data.get()[groupLength+1], channel, channelLength );
         } else {
-            change->data = new char[groupLength+1+channelLength+1+limitMessagesLength+1]{};
+            change->data = std::make_unique<char[]>( groupLength+1+channelLength+1+limitMessagesLength+1 );
 
             change->values[0] = groupLength;
-            memcpy( change->data, group, groupLength );
+            memcpy( change->data.get(), group, groupLength );
             change->values[1] = channelLength;
-            memcpy( &change->data[groupLength+1], channel, channelLength );
+            memcpy( &change->data.get()[groupLength+1], channel, channelLength );
             change->values[2] = limitMessagesLength;
-            memcpy( &change->data[groupLength+1+channelLength+1], limitMessages, limitMessagesLength );
+            memcpy( &change->data.get()[groupLength+1+channelLength+1], limitMessages, limitMessagesLength );
         }
 
         return change;
@@ -340,7 +308,7 @@ namespace simq::core::server {
 
     void Changes::_clearFailedFiles() {
         for( auto it = failedFiles.begin(); it != failedFiles.end(); it++ ) {
-            std::string p = _path;
+            std::string p = _path.get();
             p += *it;
 
             util::FS::removeFile( p.c_str() );
@@ -349,7 +317,7 @@ namespace simq::core::server {
         failedFiles.clear();
     }
 
-    Changes::Change *Changes::_buildUserChange(
+    std::unique_ptr<Changes::Change> Changes::_buildUserChange(
         unsigned int type,
         const char *group,
         const char *channel,
@@ -383,23 +351,23 @@ namespace simq::core::server {
         auto channelLength = strlen( channel );
         auto loginLength = strlen( login );
 
-        auto change = new Change{};
+        auto change = std::make_unique<Change>();
         change->type = type;
 
         if( password == nullptr ) {
-            change->data = new char[groupLength+1+channelLength+1+loginLength+1]{};
+            change->data = std::make_unique<char[]>( groupLength+1+channelLength+1+loginLength+1 );
 
             change->values[0] = groupLength;
-            memcpy( change->data, group, groupLength );
+            memcpy( change->data.get(), group, groupLength );
             change->values[1] = channelLength;
             memcpy( &change->data[groupLength+1], channel, channelLength );
             change->values[2] = loginLength;
             memcpy( &change->data[groupLength+1+channelLength+1], login, loginLength );
         } else {
-            change->data = new char[groupLength+1+channelLength+1+loginLength+1+crypto::HASH_LENGTH+1]{};
+            change->data = std::make_unique<char[]>( groupLength+1+channelLength+1+loginLength+1+crypto::HASH_LENGTH+1 );
 
             change->values[0] = groupLength;
-            memcpy( change->data, group, groupLength );
+            memcpy( change->data.get(), group, groupLength );
             change->values[1] = channelLength;
             memcpy( &change->data[groupLength+1], channel, channelLength );
             change->values[2] = loginLength;
@@ -411,19 +379,19 @@ namespace simq::core::server {
         return change;
     }
 
-    Changes::Change *Changes::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+    std::unique_ptr<Changes::Change> Changes::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
         return _buildGroupChange( CH_ADD_GROUP, group, password );
     }
 
-    Changes::Change *Changes::updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+    std::unique_ptr<Changes::Change> Changes::updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
         return _buildGroupChange( CH_UPDATE_GROUP_PASSWORD, group, password );
     }
 
-    Changes::Change *Changes::removeGroup( const char *group ) {
+    std::unique_ptr<Changes::Change> Changes::removeGroup( const char *group ) {
         return _buildGroupChange( CH_REMOVE_GROUP, group, nullptr );
     }
 
-    Changes::Change *Changes::addChannel(
+    std::unique_ptr<Changes::Change> Changes::addChannel(
         const char *group,
         const char *channel,
         util::types::ChannelLimitMessages *limitMessages
@@ -431,7 +399,7 @@ namespace simq::core::server {
         return _buildChannelChange( CH_ADD_CHANNEL, group, channel, limitMessages );
     }
 
-    Changes::Change *Changes::updateChannelLimitMessages(
+    std::unique_ptr<Changes::Change> Changes::updateChannelLimitMessages(
         const char *group,
         const char *channel,
         util::types::ChannelLimitMessages *limitMessages
@@ -439,11 +407,11 @@ namespace simq::core::server {
         return _buildChannelChange( CH_UPDATE_CHANNEL_SETTINGS, group, channel, limitMessages );
     }
 
-    Changes::Change *Changes::removeChannel( const char *group, const char *channel ) {
+    std::unique_ptr<Changes::Change> Changes::removeChannel( const char *group, const char *channel ) {
         return _buildChannelChange( CH_REMOVE_CHANNEL, group, channel, nullptr );
     }
     
-    Changes::Change *Changes::addConsumer(
+    std::unique_ptr<Changes::Change> Changes::addConsumer(
         const char *group,
         const char *channel,
         const char *login,
@@ -452,7 +420,7 @@ namespace simq::core::server {
         return _buildUserChange( CH_ADD_CONSUMER, group, channel, login, password );
     }
 
-    Changes::Change *Changes::updateConsumerPassword(
+    std::unique_ptr<Changes::Change> Changes::updateConsumerPassword(
         const char *group,
         const char *channel,
         const char *login,
@@ -461,7 +429,7 @@ namespace simq::core::server {
         return _buildUserChange( CH_UPDATE_CONSUMER_PASSWORD, group, channel, login, password );
     }
 
-    Changes::Change *Changes::removeConsumer(
+    std::unique_ptr<Changes::Change> Changes::removeConsumer(
         const char *group,
         const char *channel,
         const char *login
@@ -469,7 +437,7 @@ namespace simq::core::server {
         return _buildUserChange( CH_REMOVE_CONSUMER, group, channel, login, nullptr );
     }
 
-    Changes::Change *Changes::addProducer(
+    std::unique_ptr<Changes::Change> Changes::addProducer(
         const char *group,
         const char *channel,
         const char *login,
@@ -478,7 +446,7 @@ namespace simq::core::server {
         return _buildUserChange( CH_ADD_PRODUCER, group, channel, login, password );
     }
 
-    Changes::Change *Changes::updateProducerPassword(
+    std::unique_ptr<Changes::Change> Changes::updateProducerPassword(
         const char *group,
         const char *channel,
         const char *login,
@@ -487,7 +455,7 @@ namespace simq::core::server {
         return _buildUserChange( CH_UPDATE_PRODUCER_PASSWORD, group, channel, login, password );
     }
 
-    Changes::Change *Changes::removeProducer(
+    std::unique_ptr<Changes::Change> Changes::removeProducer(
         const char *group,
         const char *channel,
         const char *login
@@ -495,38 +463,26 @@ namespace simq::core::server {
         return _buildUserChange( CH_REMOVE_PRODUCER, group, channel, login, nullptr );
     }
 
-    const char *Changes::getGroup( Change *change ) {
-        return change->data;
+    const char *Changes::getGroup( std::unique_ptr<Change> &change ) {
+        return change->data.get();
     }
 
-    const char *Changes::getChannel( Change *change ) {
+    const char *Changes::getChannel( std::unique_ptr<Change> &change ) {
         auto offset = change->values[0] + 1;
         return &change->data[offset];
     }
 
-    const char *Changes::getLogin( Change *change ) {
+    const char *Changes::getLogin( std::unique_ptr<Change> &change ) {
         auto offset = change->values[0] + change->values[1] + 2;
         return &change->data[offset];
     }
 
-    const util::types::ChannelLimitMessages *Changes::getChannelLimitMessages( Change *change ) {
+    const util::types::ChannelLimitMessages *Changes::getChannelLimitMessages( std::unique_ptr<Change> &change ) {
         auto offset = change->values[0] + change->values[1] + 2;
         return (util::types::ChannelLimitMessages *)&change->data[offset];
     }
 
-    unsigned short int Changes::getPort( Change *change ) {
-        unsigned short int port;
-        memcpy( &port, change->data, change->values[0] );
-        return port;
-    }
-
-    unsigned short int Changes::getCountThreads( Change *change ) {
-        unsigned short int count;
-        memcpy( &count, change->data, change->values[0] );
-        return count;
-    }
-
-    void Changes::getPassword( Change *change, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Changes::getPassword( std::unique_ptr<Change> &change, unsigned char password[crypto::HASH_LENGTH] ) {
         unsigned int offset = 0;
 
         switch( change->type ) {
@@ -549,76 +505,56 @@ namespace simq::core::server {
         memcpy( password, &change->data[offset], crypto::HASH_LENGTH );
     }
 
-    bool Changes::isAddGroup( Change *change ) {
+    bool Changes::isAddGroup( std::unique_ptr<Change> &change ) {
         return change->type == CH_ADD_GROUP;
     }
 
-    bool Changes::isUpdateGroupPassword( Change *change ) {
+    bool Changes::isUpdateGroupPassword( std::unique_ptr<Change> &change ) {
         return change->type == CH_UPDATE_GROUP_PASSWORD;
     }
 
-    bool Changes::isRemoveGroup( Change *change ) {
+    bool Changes::isRemoveGroup( std::unique_ptr<Change> &change ) {
         return change->type == CH_REMOVE_GROUP;
     }
 
-    bool Changes::isAddChannel( Change *change ) {
+    bool Changes::isAddChannel( std::unique_ptr<Change> &change ) {
         return change->type == CH_ADD_CHANNEL;
     }
 
-    bool Changes::isUpdateChannelLimitMessages( Change *change ) {
+    bool Changes::isUpdateChannelLimitMessages( std::unique_ptr<Change> &change ) {
         return change->type == CH_UPDATE_CHANNEL_SETTINGS;
     }
 
-    bool Changes::isRemoveChannel( Change *change ) {
+    bool Changes::isRemoveChannel( std::unique_ptr<Change> &change ) {
         return change->type == CH_REMOVE_CHANNEL;
     }
 
-    bool Changes::isAddConsumer( Change *change ) {
+    bool Changes::isAddConsumer( std::unique_ptr<Change> &change ) {
         return change->type == CH_ADD_CONSUMER;
     }
 
-    bool Changes::isUpdateConsumerPassword( Change *change ) {
+    bool Changes::isUpdateConsumerPassword( std::unique_ptr<Change> &change ) {
         return change->type == CH_UPDATE_CONSUMER_PASSWORD;
     }
 
-    bool Changes::isRemoveConsumer( Change *change ) {
+    bool Changes::isRemoveConsumer( std::unique_ptr<Change> &change ) {
         return change->type == CH_REMOVE_CONSUMER;
     }
 
-    bool Changes::isAddProducer( Change *change ) {
+    bool Changes::isAddProducer( std::unique_ptr<Change> &change ) {
         return change->type == CH_ADD_PRODUCER;
     }
 
-    bool Changes::isUpdateProducerPassword( Change *change ) {
+    bool Changes::isUpdateProducerPassword( std::unique_ptr<Change> &change ) {
         return change->type == CH_UPDATE_PRODUCER_PASSWORD;
     }
 
-    bool Changes::isRemoveProducer( Change *change ) {
+    bool Changes::isRemoveProducer( std::unique_ptr<Change> &change ) {
         return change->type == CH_REMOVE_PRODUCER;
     }
 
-    void Changes::free( Change *change ) {
-        if( change->data != nullptr ) {
-            delete[] change->data;
-        }
-
-        switch( change->initiator ) {
-            case util::types::Initiator::I_GROUP:
-                delete[] change->group;
-                break;
-            case util::types::Initiator::I_CONSUMER:
-            case util::types::Initiator::I_PRODUCER:
-                delete[] change->group;
-                delete[] change->channel;
-                delete[] change->login;
-                break;
-        }
-
-        delete change;
-    }
-
     void Changes::push(
-        Change *change,
+        std::unique_ptr<Change> change,
         unsigned int ip,
         util::types::Initiator initiator,
         const char *group,
@@ -627,20 +563,18 @@ namespace simq::core::server {
     ) {
         std::lock_guard<std::mutex> lock( m );
 
-        auto ch = new Change{};
-        memcpy( ch, change, sizeof( Change ) );
-        ch->initiator = initiator;
-        ch->ip = ip;
+        change->ip = ip;
+        change->initiator = initiator;
 
-        switch( ch->initiator ) {
+        switch( change->initiator ) {
             case util::types::Initiator::I_GROUP:
-                ch->group = util::String::copy( group );
+                change->group = group;
                 break;
             case util::types::Initiator::I_CONSUMER:
             case util::types::Initiator::I_PRODUCER:
-                ch->group = util::String::copy( group );
-                ch->channel = util::String::copy( channel );
-                ch->login = util::String::copy( login );
+                change->group = group;
+                change->channel = channel;
+                change->login = login;
                 break;
         }
 
@@ -652,20 +586,17 @@ namespace simq::core::server {
             }
         }
 
-        ch->data = new char[length]{};
-        memcpy( ch->data, change->data, length );
-
-        listMemory.push_back( ch );
+        listMemory.push_back( std::move( change ) );
     }
 
-    char *Changes::_convertChannelLimitMessagesDataToFile( Change *change ) {
+    std::unique_ptr<char[]> Changes::_convertChannelLimitMessagesDataToFile( Change *change ) {
         unsigned int length = 0;
         length += change->values[0] + 1;
         length += change->values[1] + 1;
         length += crypto::HASH_LENGTH + 1;
 
-        auto data = new char[length]{};
-        memcpy( data, change->data, length );
+        auto data = std::make_unique<char[]>(length);
+        memcpy( data.get(), change->data.get(), length );
 
         auto offset = change->values[0] + 1;
         offset += change->values[1] + 1;
@@ -682,14 +613,14 @@ namespace simq::core::server {
         return data;
     }
 
-    char *Changes::_convertChannelLimitMessagesDataFromFile( Change *change ) {
+    std::unique_ptr<char[]> Changes::_convertChannelLimitMessagesDataFromFile( Change *change ) {
         unsigned int length = 0;
         length += change->values[0] + 1;
         length += change->values[1] + 1;
         length += crypto::HASH_LENGTH + 1;
 
-        auto data = new char[length]{};
-        memcpy( data, change->data, length );
+        auto data = std::make_unique<char[]>(length);
+        memcpy( data.get(), change->data.get(), length );
 
         auto offset = change->values[0] + 1;
         offset += change->values[1] + 1;
@@ -723,7 +654,7 @@ namespace simq::core::server {
             return false;
         }
 
-        return util::Validation::isGroupName( change->data );
+        return util::Validation::isGroupName( change->data.get() );
     }
 
     bool Changes::_isValidChannel( Change *change, unsigned int length ) {
@@ -758,11 +689,11 @@ namespace simq::core::server {
             return false;
         }
 
-        if( !util::Validation::isGroupName( change->data ) ) {
+        if( !util::Validation::isGroupName( change->data.get() ) ) {
             return false;
         }
 
-        return util::Validation::isChannelName( &change->data[change->values[0]+1] );
+        return util::Validation::isChannelName( &change->data.get()[change->values[0]+1] );
     }
 
     bool Changes::_isValidUser( Change *change, unsigned int length ) {
@@ -785,7 +716,7 @@ namespace simq::core::server {
             return false;
         }
 
-        if( !util::Validation::isGroupName( change->data ) ) {
+        if( !util::Validation::isGroupName( change->data.get() ) ) {
             return false;
         }
 
@@ -829,7 +760,7 @@ namespace simq::core::server {
         return false;
     }
 
-    void Changes::pushDefered( Change *change ) {
+    void Changes::pushDefered( std::unique_ptr<Change> change ) {
 
         ChangeFile ch;
 
@@ -850,20 +781,19 @@ namespace simq::core::server {
 
         _generateUniqFileName( uuid );
 
-        std::string tmpPath = _path;
+        std::string tmpPath = _path.get();
 
         tmpPath += "_";
         tmpPath += uuid;
 
-        auto file = util::File( tmpPath.c_str(), true );
+        util::File file( tmpPath.c_str(), true );
         file.write( &ch, sizeof( ChangeFile ) );
 
         if( isUpdateChannelLimitMessages( change ) || isAddChannel( change ) ) {
-            auto data = _convertChannelLimitMessagesDataToFile( change );
-            file.write( data, length );
-            delete[] data;
+            auto data = _convertChannelLimitMessagesDataToFile( change.get() );
+            file.write( data.get(), length );
         } else {
-            file.write( change->data, length );
+            file.write( change->data.get(), length );
         }
         file.rename( uuid );
     }
@@ -893,11 +823,11 @@ namespace simq::core::server {
             memset( uuid, 0, util::UUID::LENGTH+1 );
             util::UUID::generate( uuid );
 
-            std::string _tmpDev = _path;
+            std::string _tmpDev = _path.get();
             _tmpDev += "_";
             _tmpDev += uuid;
 
-            std::string _tmp = _path;
+            std::string _tmp = _path.get();
             _tmp += uuid;
 
             if( !util::FS::fileExists( _tmpDev.c_str() ) && !util::FS::fileExists( _tmp.c_str() ) ) {
@@ -930,7 +860,7 @@ namespace simq::core::server {
             return;
         }
 
-        Change *ch = new Change{};
+        auto ch = std::make_unique<Change>();
 
         ch->type = cf.type;
         ch->initiator = util::types::Initiator::I_ROOT;
@@ -941,43 +871,40 @@ namespace simq::core::server {
 
         auto length = file.size() - sizeof( ChangeFile );
         if( length != 0 ) {
-            ch->data = new char[length]{};
-            file.read( ch->data, length );
+            ch->data = std::make_unique<char[]>( length );
+            file.read( ch->data.get(), length );
         }
 
-        if( !_isValidChangeFromFile( ch, length ) ) {
+        if( !_isValidChangeFromFile( ch.get(), length ) ) {
             failedFiles.push_back( name );
-            free( ch );
             return;
         }
 
         if( isUpdateChannelLimitMessages( ch ) || isAddChannel( ch ) ) {
-            auto _tmpData = ch->data;
-            ch->data = _convertChannelLimitMessagesDataFromFile( ch );
-            delete[] _tmpData;
+            ch->data = _convertChannelLimitMessagesDataFromFile( ch.get() );
         }
 
         passedFiles[name] = true;
 
 
-        ChangeDisk cd;
-        cd.change = ch;
-        memcpy( cd.uuid, name, util::UUID::LENGTH );
+        auto cd = std::make_unique<ChangeDisk>();
+        cd->change = std::move( ch );
+        memcpy( cd->uuid, name, util::UUID::LENGTH );
 
-        listDisk.push_back( cd );
+        listDisk.push_back( std::move( cd ) );
     }
 
     void Changes::_addChangesFromFiles() {
         std::vector<std::string> files;
 
-        util::FS::files( _path, files, util::FS::SortAsc, util::FS::SortByDate );
+        util::FS::files( _path.get(), files, util::FS::SortAsc, util::FS::SortByDate );
 
         for( auto it = files.begin(); it != files.end(); it++ ) {
             if( !util::Validation::isUUID( (*it).c_str() ) ) {
                 continue;
             }
 
-            std::string p = _path;
+            std::string p = _path.get();
             p += *it;
 
             util::File file( p.c_str() );
@@ -988,9 +915,9 @@ namespace simq::core::server {
     }
 
     void Changes::_popFile() {
-        std::string p = _path;
+        std::string p = _path.get();
 
-        auto name = listDisk.front().uuid;
+        auto name = listDisk.front()->uuid;
 
         auto fileName = std::string( name, util::UUID::LENGTH );
 
@@ -1005,11 +932,9 @@ namespace simq::core::server {
         }
     }
 
-    Changes::Change *Changes::pop() {
+    std::unique_ptr<Changes::Change> Changes::pop() {
         std::lock_guard<std::mutex> lock( m );
         _clearFailedFiles();
-
-        Change *change = nullptr;
 
         if( listDisk.empty() ) {
 
@@ -1018,14 +943,14 @@ namespace simq::core::server {
 
 
         if( !listDisk.empty() ) {
-            change = listDisk.front().change;
+            auto change = std::move(listDisk.front()->change);
 
             _popFile();
             listDisk.pop_front();
 
             return change;
         } else if( !listMemory.empty() ) {
-            change = listMemory.front();
+            auto change = std::move(listMemory.front());
 
             listMemory.pop_front();
 
@@ -1036,24 +961,24 @@ namespace simq::core::server {
         return nullptr;
     }
 
-    util::types::Initiator Changes::getInitiator( Change *change ) {
+    util::types::Initiator Changes::getInitiator( std::unique_ptr<Change> &change ) {
         return change->initiator;
     }
 
-    unsigned int Changes::getIP( Change *change ) {
+    unsigned int Changes::getIP( std::unique_ptr<Change> &change ) {
         return change->ip;
     }
 
-    const char *Changes::getInitiatorGroup( Change *change ) {
-        return change->group;
+    const char *Changes::getInitiatorGroup( std::unique_ptr<Change> &change ) {
+        return change->group.c_str();
     }
 
-    const char *Changes::getInitiatorChannel( Change *change ) {
-        return change->channel;
+    const char *Changes::getInitiatorChannel( std::unique_ptr<Change> &change ) {
+        return change->channel.c_str();
     }
 
-    const char *Changes::getInitiatorLogin( Change *change ) {
-        return change->login;
+    const char *Changes::getInitiatorLogin( std::unique_ptr<Change> &change ) {
+        return change->login.c_str();
     }
 }
 
