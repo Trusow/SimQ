@@ -24,54 +24,50 @@
 #include <algorithm>
 #include <iostream>
 #include <map>
+#include <memory>
 
 namespace simq::core::server::CLI {
     class Manager: public util::ConsoleCallbacks {
         private:
             Callbacks *_cb = nullptr;
-            util::Console *_console = nullptr;
-            CLI::Navigation *_nav = nullptr;
+            std::unique_ptr<util::Console>_console;
+            std::unique_ptr<Navigation> _nav;
 
             std::string _scen = "";
             bool _isScenario = false;
 
-            std::map<std::string, Scenario *> _listScenario;
-            std::map<std::string, Cmd *> _listCmd;
+            std::map<std::string, std::unique_ptr<Scenario>> _listScenario;
+            std::map<std::string, std::unique_ptr<Cmd>> _listCmd;
 
             void _getAllowedCommands( std::vector<std::string> &list );
         public:
             Manager( Callbacks *cb );
-            ~Manager();
             void input( std::vector<std::string> &list );
             void inputPassword( const char *password );
             void confirm( bool value );
     };
 
     Manager::Manager( Callbacks *cb ) {
-        _console = new util::Console( this );
-        _nav = new Navigation( _console, cb );
+        _console = std::make_unique<util::Console>( this );
+        _nav = std::make_unique<Navigation>( _console.get(), cb );
         _cb = cb;
 
-        _listCmd[Ini::cmdLs] = new CmdLs( _console, _nav, cb );
-        _listCmd[Ini::cmdH] = new CmdH( _console, _nav );
-        _listCmd[Ini::cmdInfo] = new CmdInfo( _console, _nav, cb );
-        _listCmd[Ini::cmdSet] = new CmdSet( _console, _nav, cb );
-        _listCmd[Ini::cmdCd] = new CmdCd( _console, _nav, cb );
+        _listCmd[Ini::cmdLs] = std::make_unique<CmdLs>( _console.get(), _nav.get(), cb );
+        _listCmd[Ini::cmdH] = std::make_unique<CmdH>( _console.get(), _nav.get() );
+        _listCmd[Ini::cmdInfo] = std::make_unique<CmdInfo>( _console.get(), _nav.get(), cb );
+        _listCmd[Ini::cmdSet] = std::make_unique<CmdSet>( _console.get(), _nav.get(), cb );
+        _listCmd[Ini::cmdCd] = std::make_unique<CmdCd>( _console.get(), _nav.get(), cb );
 
-        _listScenario[Ini::cmdAuth] = new ScenarioAuth( _console, _nav, _cb );
-        _listScenario[Ini::cmdPswd] = new ScenarioPassword( _console, _nav, _cb );
-        _listScenario[Ini::cmdRemove] = new ScenarioRemove( _console, _nav, _cb );
-        _listScenario[Ini::cmdAdd] = new ScenarioAdd( _console, _nav, _cb );
+        _listScenario[Ini::cmdAuth] = std::make_unique<ScenarioAuth>( _console.get(), _nav.get(), _cb );
+        _listScenario[Ini::cmdPswd] = std::make_unique<ScenarioPassword>( _console.get(), _nav.get(), _cb );
+        _listScenario[Ini::cmdRemove] = std::make_unique<ScenarioRemove>( _console.get(), _nav.get(), _cb );
+        _listScenario[Ini::cmdAdd] = std::make_unique<ScenarioAdd>( _console.get(), _nav.get(), _cb );
 
         _listScenario[Ini::cmdAuth]->start();
         _scen = Ini::cmdAuth;
         _isScenario = !_listScenario[_scen]->isEnd();
 
         _console->run();
-    }
-
-    Manager::~Manager() {
-        delete this->_console;
     }
 
     void Manager::_getAllowedCommands( std::vector<std::string> &list ) {
@@ -132,7 +128,7 @@ namespace simq::core::server::CLI {
             } else if( cmd[0] == '.' || cmd[0] == '/' ) {
                 _listCmd[Ini::cmdCd]->run( list );
             } else {
-                Ini::printDanger( _console, "Unknown command" );
+                Ini::printDanger( _console.get(), "Unknown command" );
             }
         } else {
             _listScenario[_scen]->input( list );
