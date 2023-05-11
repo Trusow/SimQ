@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <sys/sendfile.h>
+#include <memory>
 #include "file.hpp"
 #include "error.h"
 #include "constants.h"
@@ -22,7 +23,7 @@
 namespace simq::util {
     class Buffer {
         private:
-            File *file = nullptr;
+            std::unique_ptr<File> file;
             const unsigned int MESSAGE_PACKET_SIZE = util::constants::MESSAGE_PACKET_SIZE;
             const unsigned int MIN_FILE_SIZE = 50 * MESSAGE_PACKET_SIZE;
             const unsigned int SIZE_ITEM_PACKET = 10'000;
@@ -116,7 +117,7 @@ namespace simq::util {
     };
 
     Buffer::Buffer( const char *path ) {
-        file = new File( path, true );
+        file = std::make_unique<File>( path, true );
 
         fileFD = file->fd();
 
@@ -125,9 +126,6 @@ namespace simq::util {
     }
 
     Buffer::~Buffer() {
-        if( file ) {
-            delete file;
-        }
 
         for( int i = 0; i < countItemsPackets; i++ ) {
             for( int b = 0; b < SIZE_ITEM_PACKET; b++ ) {
