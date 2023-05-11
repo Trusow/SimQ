@@ -6,7 +6,6 @@
 #include "changes.hpp"
 #include "q/manager.hpp"
 #include "logger.hpp"
-#include "../../util/string.hpp"
 #include "../../util/types.h"
 #include <memory>
 
@@ -17,7 +16,7 @@ namespace simq::core::server {
             Access *_access = nullptr;
             std::unique_ptr<Changes> _changes;
             q::Manager *_q = nullptr;
-            char *_path = nullptr;
+            std::unique_ptr<char[]> _path;
 
             void _initGroups();
             void _initChannels( const char *group );
@@ -171,7 +170,7 @@ namespace simq::core::server {
                 std::string pathToLimitMessages;
                 util::constants::buildPathToChannelLimitMessages(
                     pathToLimitMessages,
-                    _path,
+                    _path.get(),
                     group,
                     channel
                 );
@@ -254,15 +253,17 @@ namespace simq::core::server {
     }
 
     Initialization::Initialization( const char *path, Access &access, q::Manager &q ) {
-        _path = util::String::copy( path );
+        auto l = strlen( path );
+        _path = std::make_unique<char[]>( l + 1 );
+        memcpy( _path.get(), path, l );
         _access = &access;
         _q = &q;
 
         std::list<Logger::Detail> details;
 
         try {
-            _store = std::make_unique<Store>( _path );
-            _changes = std::make_unique<Changes>( _path );
+            _store = std::make_unique<Store>( _path.get() );
+            _changes = std::make_unique<Changes>( _path.get() );
 
             Logger::success(
                 Logger::OP_INITIALIZATION_SETTINGS,
@@ -335,7 +336,7 @@ namespace simq::core::server {
 
         _store->addChannel( group, channel, l );
         std::string path;
-        util::constants::buildPathToChannelData( path, _path, group, channel );
+        util::constants::buildPathToChannelData( path, _path.get(), group, channel );
         _q->addChannel( group, channel, path.c_str(), l );
         _access->addChannel( group, channel );
     }
@@ -352,7 +353,7 @@ namespace simq::core::server {
 
         _store->updateChannelLimitMessages( group, channel, l );
         std::string path;
-        util::constants::buildPathToChannelData( path, _path, group, channel );
+        util::constants::buildPathToChannelData( path, _path.get(), group, channel );
         _q->updateChannelLimitMessages( group, channel, l );
     }
 
