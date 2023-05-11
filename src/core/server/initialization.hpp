@@ -13,9 +13,9 @@
 namespace simq::core::server {
     class Initialization {
         private:
-            Store *_store = nullptr;
+            std::unique_ptr<Store> _store;
             Access *_access = nullptr;
-            Changes *_changes = nullptr;
+            std::unique_ptr<Changes> _changes;
             q::Manager *_q = nullptr;
             char *_path = nullptr;
 
@@ -261,8 +261,8 @@ namespace simq::core::server {
         std::list<Logger::Detail> details;
 
         try {
-            _store = new Store( _path );
-            _changes = new Changes( _path );
+            _store = std::make_unique<Store>( _path );
+            _changes = std::make_unique<Changes>( _path );
 
             Logger::success(
                 Logger::OP_INITIALIZATION_SETTINGS,
@@ -293,7 +293,7 @@ namespace simq::core::server {
     }
 
     Changes *Initialization::getChanges() {
-        return _changes;
+        return _changes.get();
     }
 
     void Initialization::_addGroup( std::unique_ptr<Changes::Change> &change ) {
