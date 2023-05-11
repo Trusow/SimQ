@@ -8,6 +8,7 @@
 #include "logger.hpp"
 #include "../../util/string.hpp"
 #include "../../util/types.h"
+#include <memory>
 
 namespace simq::core::server {
     class Initialization {
@@ -23,21 +24,21 @@ namespace simq::core::server {
             void _initConsumers( const char *group, const char *channel );
             void _initProducers( const char *group, const char *channel );
 
-            void _addGroup( Changes::Change *change );
-            void _updateGroupPassword( Changes::Change *change );
-            void _removeGroup( Changes::Change *change );
+            void _addGroup( std::unique_ptr<Changes::Change> &change );
+            void _updateGroupPassword( std::unique_ptr<Changes::Change> &change );
+            void _removeGroup( std::unique_ptr<Changes::Change> &change );
 
-            void _addChannel( Changes::Change *change );
-            void _updateChannelLimitMessagess( Changes::Change *change );
-            void _removeChannel( Changes::Change *change );
+            void _addChannel( std::unique_ptr<Changes::Change> &change );
+            void _updateChannelLimitMessagess( std::unique_ptr<Changes::Change> &change );
+            void _removeChannel( std::unique_ptr<Changes::Change> &change );
 
-            void _addConsumer( Changes::Change *change );
-            void _updateConsumerPassword( Changes::Change *change );
-            void _removeConsumer( Changes::Change *change );
+            void _addConsumer( std::unique_ptr<Changes::Change> &change );
+            void _updateConsumerPassword( std::unique_ptr<Changes::Change> &change );
+            void _removeConsumer( std::unique_ptr<Changes::Change> &change );
 
-            void _addProducer( Changes::Change *change );
-            void _updateProducerPassword( Changes::Change *change );
-            void _removeProducer( Changes::Change *change );
+            void _addProducer( std::unique_ptr<Changes::Change> &change );
+            void _updateProducerPassword( std::unique_ptr<Changes::Change> &change );
+            void _removeProducer( std::unique_ptr<Changes::Change> &change );
 
         public:
             Initialization( const char *path, Access &access, q::Manager &q );
@@ -295,7 +296,7 @@ namespace simq::core::server {
         return _changes;
     }
 
-    void Initialization::_addGroup( Changes::Change *change ) {
+    void Initialization::_addGroup( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         unsigned char password[crypto::HASH_LENGTH];
         _changes->getPassword( change, password );
@@ -305,7 +306,7 @@ namespace simq::core::server {
         _access->addGroup( group, password );
     }
 
-    void Initialization::_updateGroupPassword( Changes::Change *change ) {
+    void Initialization::_updateGroupPassword( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         unsigned char password[crypto::HASH_LENGTH];
         _changes->getPassword( change, password );
@@ -314,7 +315,7 @@ namespace simq::core::server {
         _access->updateGroupPassword( group, password );
     }
 
-    void Initialization::_removeGroup( Changes::Change *change ) {
+    void Initialization::_removeGroup( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
 
         _access->removeGroup( group );
@@ -322,7 +323,7 @@ namespace simq::core::server {
         _store->removeGroup( group );
     }
 
-    void Initialization::_addChannel( Changes::Change *change ) {
+    void Initialization::_addChannel( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto limits = _changes->getChannelLimitMessages( change );
@@ -339,7 +340,7 @@ namespace simq::core::server {
         _access->addChannel( group, channel );
     }
 
-    void Initialization::_updateChannelLimitMessagess( Changes::Change *change ) {
+    void Initialization::_updateChannelLimitMessagess( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto limits = _changes->getChannelLimitMessages( change );
@@ -355,7 +356,7 @@ namespace simq::core::server {
         _q->updateChannelLimitMessages( group, channel, l );
     }
 
-    void Initialization::_removeChannel( Changes::Change *change ) {
+    void Initialization::_removeChannel( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
 
@@ -364,7 +365,7 @@ namespace simq::core::server {
         _store->removeChannel( group, channel );
     }
 
-    void Initialization::_addConsumer( Changes::Change *change ) {
+    void Initialization::_addConsumer( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
@@ -375,7 +376,7 @@ namespace simq::core::server {
         _access->addConsumer( group, channel, login, password );
     }
 
-    void Initialization::_updateConsumerPassword( Changes::Change *change ) {
+    void Initialization::_updateConsumerPassword( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
@@ -386,7 +387,7 @@ namespace simq::core::server {
         _access->updateConsumerPassword( group, channel, login, password );
     }
 
-    void Initialization::_removeConsumer( Changes::Change *change ) {
+    void Initialization::_removeConsumer( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
@@ -395,7 +396,7 @@ namespace simq::core::server {
         _store->removeConsumer( group, channel, login );
     }
 
-    void Initialization::_addProducer( Changes::Change *change ) {
+    void Initialization::_addProducer( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
@@ -406,7 +407,7 @@ namespace simq::core::server {
         _access->addProducer( group, channel, login, password );
     }
 
-    void Initialization::_updateProducerPassword( Changes::Change *change ) {
+    void Initialization::_updateProducerPassword( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
@@ -417,7 +418,7 @@ namespace simq::core::server {
         _access->updateProducerPassword( group, channel, login, password );
     }
 
-    void Initialization::_removeProducer( Changes::Change *change ) {
+    void Initialization::_removeProducer( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
@@ -569,10 +570,7 @@ namespace simq::core::server {
                     initiator,
                     iGroup, iChannel, iLogin
                 );
-
-                _changes->free( change );
             } catch( util::Error::Err err ) {
-                _changes->free( change );
                 Logger::fail(
                     operation,
                     err,
@@ -582,8 +580,6 @@ namespace simq::core::server {
                     iGroup, iChannel, iLogin
                 );
             } catch( ... ) {
-
-                _changes->free( change );
                 Logger::fail(
                     operation,
                     util::Error::UNKNOWN,
