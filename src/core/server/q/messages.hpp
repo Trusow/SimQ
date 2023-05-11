@@ -8,6 +8,7 @@
 #include <string>
 #include <memory>
 #include <string.h>
+#include <vector>
 #include "../../../util/uuid.hpp"
 #include "../../../util/lock_atomic.hpp"
 #include "../../../util/buffer.hpp"
@@ -43,10 +44,9 @@ namespace simq::core::server::q {
 
             unsigned int _totalInMemory = 0;
             unsigned int _totalOnDisk = 0;
-            unsigned int _total = MESSAGES_IN_PACKET;
             util::types::ChannelLimitMessages _limits;
 
-            Message **_messages = nullptr;
+            std::vector<std::unique_ptr<Message>> _messages;
 
             void _wait( std::atomic_uint &atom );
             unsigned int _allocateMessage( unsigned int length, bool &isMemory );
@@ -55,7 +55,6 @@ namespace simq::core::server::q {
             void _validateAdd( unsigned int length );
         public:
             Messages( const char *path, util::types::ChannelLimitMessages &limits );
-            ~Messages();
 
             void updateLimits( util::types::ChannelLimitMessages &limits );
 
@@ -74,18 +73,8 @@ namespace simq::core::server::q {
 
     Messages::Messages( const char *path, util::types::ChannelLimitMessages &limits ) {
         _buffer = std::make_unique<util::Buffer>( path );
-        _messages = new Message*[MESSAGES_IN_PACKET];
+        _messages.resize( MESSAGES_IN_PACKET );
         _limits = limits;
-    }
-
-    Messages::~Messages() {
-        for( unsigned int i = 0; i < _total; i++ ) {
-            if( _messages[i] != nullptr ) {
-                delete _messages[i];
-            }
-        }
-
-        delete[] _messages;
     }
 
     void Messages::_wait( std::atomic_uint &atom ) {
@@ -131,7 +120,7 @@ namespace simq::core::server::q {
         _wait( _countWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _m );
 
-        if( id >= _total ) {
+        if( id >= _messages.size() ) {
             throw util::Error::UNKNOWN;
         }
 
@@ -139,12 +128,7 @@ namespace simq::core::server::q {
     }
 
     void Messages::_expandMessages() {
-        auto tmp = new Message*[_total + MESSAGES_IN_PACKET]{};
-        memcpy( tmp, _messages, _total * sizeof( Message * ) );
-        delete[] _messages;
-
-        _messages = tmp;
-        _total += MESSAGES_IN_PACKET;
+        _messages.resize( _messages.size() + MESSAGES_IN_PACKET );
     }
 
     void Messages::_validateAdd( unsigned int length ) {
@@ -165,14 +149,12 @@ namespace simq::core::server::q {
         bool isMemory = false;
         auto id = _allocateMessage( length, isMemory );
 
-        auto msg = new Message{};
-        msg->isMemory = isMemory;
-
-        if( id >= _total ) {
+        if( id >= _messages.size() ) {
             _expandMessages();
         }
 
-        _messages[id] = msg;
+        _messages[id] = std::make_unique<Message>();
+        _messages[id]->isMemory = isMemory;
 
         wrData.length = length;
         wrData.wrLength = 0;
@@ -208,14 +190,12 @@ namespace simq::core::server::q {
             throw util::Error::DUPLICATE_UUID;
         }
 
-        auto msg = new Message{};
-        msg->isMemory = isMemory;
-
-        if( id >= _total ) {
+        if( id >= _messages.size() ) {
             _expandMessages();
         }
 
-        _messages[id] = msg;
+        _messages[id] = std::make_unique<Message>();
+        _messages[id]->isMemory = isMemory;
 
         wrData.length = length;
         wrData.wrLength = 0;
@@ -234,14 +214,12 @@ namespace simq::core::server::q {
         bool isMemory = false;
         auto id = _allocateMessage( length, isMemory );
 
-        auto msg = new Message{};
-        msg->isMemory = isMemory;
-
-        if( id >= _total ) {
+        if( id >= _messages.size() ) {
             _expandMessages();
         }
 
-        _messages[id] = msg;
+        _messages[id] = std::make_unique<Message>();
+        _messages[id]->isMemory = isMemory;
 
         wrData.length = length;
         wrData.wrLength = 0;
@@ -253,7 +231,7 @@ namespace simq::core::server::q {
         util::LockAtomic lockAtomic( _countWrited );
         std::lock_guard<std::shared_timed_mutex> lock( _m );
 
-        if( id >= _total || _messages[id] == nullptr ) {
+        if( id >= _messages.size() || _messages[id] == nullptr ) {
             return;
         }
 
@@ -265,9 +243,6 @@ namespace simq::core::server::q {
                 _uuid.erase( itUUID );
             }
         }
-
-        delete _messages[id];
-        _messages[id] = nullptr;
     }
 
     void Messages::free( const char *uuid ) {
@@ -286,9 +261,6 @@ namespace simq::core::server::q {
         _uuid.erase( it );
 
         _buffer->free( id );
-
-        delete _messages[id];
-        _messages[id] = nullptr;
     }
 
     unsigned int Messages::_calculateWRLength( WRData &wrData ) {
@@ -314,7 +286,7 @@ namespace simq::core::server::q {
         _wait( _countWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _m );
 
-        if( id >= _total || _messages[id] == nullptr ) {
+        if( id >= _messages.size() || _messages[id] == nullptr ) {
             throw util::Error::UNKNOWN;
         }
 
@@ -325,7 +297,7 @@ namespace simq::core::server::q {
         _wait( _countWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _m );
 
-        if( id >= _total || _messages[id] == nullptr ) {
+        if( id >= _messages.size() || _messages[id] == nullptr ) {
             throw util::Error::UNKNOWN;
         }
 
