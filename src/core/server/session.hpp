@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <vector>
 #include <time.h>
+#include <memory>
 
 // NO SAFE THREAD!!!
 
@@ -17,17 +18,20 @@ namespace simq::core::server {
 
             struct Item {
                 util::types::Initiator initiator;
-                char *group;
-                char *channel;
-                char *login;
+                std::unique_ptr<char[]> group;
+                std::unique_ptr<char[]> channel;
+                std::unique_ptr<char[]> login;
                 unsigned int ip;
                 unsigned int lastTS;
                 bool watchTS;
             };
 
-            std::unordered_map<unsigned int, Item> _items;
+            std::unordered_map<unsigned int, std::unique_ptr<Item>> _items;
             void _checkDuplicate( unsigned int fd );
             void _checkIsset( unsigned int fd );
+            void _copyGroup( Item *item, const char *name );
+            void _copyChannel( Item *item, const char *name );
+            void _copyLogin( Item *item, const char *name );
 
         public:
             void join( unsigned int fd, unsigned int ip );
@@ -73,11 +77,29 @@ namespace simq::core::server {
     void Session::join( unsigned int fd, unsigned int ip ) {
         _checkDuplicate( fd );
 
-        Item item{};
-        item.lastTS = time( NULL );
-        item.ip = ip;
+        auto item = std::unique_ptr<Item>();
+        item->lastTS = time( NULL );
+        item->ip = ip;
 
-        _items[fd] = item;
+        _items[fd] = std::move( item );
+    }
+
+    void Session::_copyGroup( Item *item, const char *name ) {
+        auto l = strlen( name );
+        item->group = std::make_unique<char[]>( l + 1 );
+        memcpy( item->group.get(), name, l );
+    }
+
+    void Session::_copyChannel( Item *item, const char *name ) {
+        auto l = strlen( name );
+        item->channel = std::make_unique<char[]>( l + 1 );
+        memcpy( item->channel.get(), name, l );
+    }
+
+    void Session::_copyLogin( Item *item, const char *name ) {
+        auto l = strlen( name );
+        item->login = std::make_unique<char[]>( l + 1 );
+        memcpy( item->login.get(), name, l );
     }
 
     void Session::setGroupInfo(
@@ -85,13 +107,12 @@ namespace simq::core::server {
         const char *groupName
     ) {
         _checkIsset( fd );
+        auto item = _items[fd].get();
 
-        Item item{};
-        item.lastTS = time( NULL );
-        item.initiator = util::types::I_GROUP;
-        item.group = util::String::copy( groupName );
+        item->lastTS = time( NULL );
+        item->initiator = util::types::I_GROUP;
 
-        _items[fd] = item;
+        _copyGroup( item, groupName );
     }
 
     void Session::setConsumerInfo(
@@ -99,15 +120,14 @@ namespace simq::core::server {
         const char *groupName, const char *channelName, const char *login
     ) {
         _checkIsset( fd );
+        auto item = _items[fd].get();
 
-        Item item{};
-        item.lastTS = time( NULL );
-        item.initiator = util::types::I_CONSUMER;
-        item.group = util::String::copy( groupName );
-        item.channel = util::String::copy( channelName );
-        item.login = util::String::copy( login );
+        item->lastTS = time( NULL );
+        item->initiator = util::types::I_CONSUMER;
 
-        _items[fd] = item;
+        _copyGroup( item, groupName );
+        _copyChannel( item, channelName );
+        _copyLogin( item, login );
     }
 
     void Session::setProducerInfo(
@@ -115,15 +135,14 @@ namespace simq::core::server {
         const char *groupName, const char *channelName, const char *login
     ) {
         _checkDuplicate( fd );
+        auto item = _items[fd].get();
 
-        Item item{};
-        item.lastTS = time( NULL );
-        item.initiator = util::types::I_PRODUCER;
-        item.group = util::String::copy( groupName );
-        item.channel = util::String::copy( channelName );
-        item.login = util::String::copy( login );
+        item->lastTS = time( NULL );
+        item->initiator = util::types::I_PRODUCER;
 
-        _items[fd] = item;
+        _copyGroup( item, groupName );
+        _copyChannel( item, channelName );
+        _copyLogin( item, login );
     }
 
     void Session::leave( unsigned int fd ) {
@@ -133,77 +152,63 @@ namespace simq::core::server {
             return;
         }
 
-        auto item = _items[fd];
-        
-        if( item.group != nullptr ) {
-            delete[] item.group;
-        }
-
-        if( item.channel != nullptr ) {
-            delete[] item.channel;
-        }
-
-        if( item.login != nullptr ) {
-            delete[] item.login;
-        }
-
         _items.erase( it );
     }
 
     const char *Session::getGroup( unsigned int fd ) {
         _checkIsset( fd );
 
-        return _items[fd].group;
+        return _items[fd]->group.get();
     }
 
     const char *Session::getChannel( unsigned int fd ) {
         _checkIsset( fd );
 
-        return _items[fd].channel;
+        return _items[fd]->channel.get();
     }
 
     const char *Session::getLogin( unsigned int fd ) {
         _checkIsset( fd );
 
-        return _items[fd].login;
+        return _items[fd]->login.get();
     }
 
     unsigned int Session::getIP( unsigned int fd ) {
         _checkIsset( fd );
 
-        return _items[fd].ip;
+        return _items[fd]->ip;
     }
 
     util::types::Initiator Session::getInitiator( unsigned int fd ) {
         _checkIsset( fd );
 
-        return _items[fd].initiator;
+        return _items[fd]->initiator;
     }
 
     void Session::updateLastTS( unsigned int fd ) {
         _checkIsset( fd );
 
-        _items[fd].lastTS = time( NULL );
+        _items[fd]->lastTS = time( NULL );
     }
 
     void Session::watchTS( unsigned int fd ) {
         _checkIsset( fd );
 
-        _items[fd].watchTS = true;
+        _items[fd]->watchTS = true;
     }
 
     void Session::unwatchTS( unsigned int fd ) {
         _checkIsset( fd );
 
-        _items[fd].watchTS = false;
+        _items[fd]->watchTS = false;
     }
 
     void Session::getNoActiveList( std::vector<unsigned int> &list ) {
         auto curTime = time( NULL );
         for( auto it = _items.begin(); it != _items.end(); it++ ) {
-            auto item = it->second;
+            auto item = it->second.get();
 
-            if( item.watchTS && curTime - item.lastTS > DELAY_NO_ACTIVE_SEC ) {
+            if( item->watchTS && curTime - item->lastTS > DELAY_NO_ACTIVE_SEC ) {
                 list.push_back( it->first );
             }
         }
