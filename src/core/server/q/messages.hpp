@@ -241,6 +241,7 @@ namespace simq::core::server::q {
             auto itUUID = _uuid.find( _messages[id]->uuid );
             if( itUUID != _uuid.end() ) {
                 _uuid.erase( itUUID );
+                _messages[id].reset();
             }
         }
     }
@@ -261,6 +262,7 @@ namespace simq::core::server::q {
         _uuid.erase( it );
 
         _buffer->free( id );
+        _messages[id].reset();
     }
 
     unsigned int Messages::_calculateWRLength( WRData &wrData ) {
