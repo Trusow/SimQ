@@ -289,6 +289,10 @@ namespace simq::util {
             if( data.endSize ) {
                 data.sizes++;
             }
+
+            if( fullLength % partSize == 0 ) {
+                data.endSize = partSize;
+            }
         }
     }
      
@@ -317,6 +321,10 @@ namespace simq::util {
             data.endSize = readLength - data.sizes * partSize;
             if( data.endSize ) {
                 data.sizes++;
+            }
+
+            if( fullLength % partSize == 0 ) {
+                data.endSize = partSize;
             }
         }
     }
