@@ -40,7 +40,7 @@ namespace simq::util {
                 unsigned int lengthEnd;
                 unsigned int length;
                 unsigned int packetSize;
-                char **buffer;
+                std::unique_ptr<std::unique_ptr<char[]>[]> buffer;
                 unsigned long int *fileOffsets;
             };
 
@@ -105,8 +105,8 @@ namespace simq::util {
             Buffer( const char *path );
             ~Buffer();
 
-            unsigned int allocate( unsigned int packetSize = 1024 );
             unsigned int allocateOnDisk();
+            unsigned int allocate( unsigned int length, unsigned int packetSize = 1024 );
             void free( unsigned int id );
 
             void write( unsigned int id, const char *data, unsigned int length );
@@ -130,12 +130,7 @@ namespace simq::util {
         for( int i = 0; i < countItemsPackets; i++ ) {
             for( int b = 0; b < SIZE_ITEM_PACKET; b++ ) {
                 if( items[i][b] != nullptr ) {
-                    if( items[i][b]->buffer != nullptr ) {
-                        for( int c = 0; c < items[i][b]->length; c++ ) {
-                            delete[] items[i][b]->buffer[c];
-                        }
-                        delete[] items[i][b]->buffer;
-                    } else {
+                    if( items[i][b]->fileOffsets != nullptr ) {
                         delete[] items[i][b]->fileOffsets;
                     }
                     delete items[i][b];
@@ -181,7 +176,7 @@ namespace simq::util {
         return id;
     }
 
-    unsigned int Buffer::allocate( unsigned int packetSize ) {
+    unsigned int Buffer::allocate( unsigned int length, unsigned int packetSize ) {
         if( packetSize == 0 ) {
             throw util::Error::WRONG_PARAM;
         }
@@ -194,11 +189,14 @@ namespace simq::util {
         auto offsetPacket = id / SIZE_ITEM_PACKET;
         auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
 
+        auto l = length / packetSize;
+        l += length - l * packetSize == 0 ? 0 : 1;
+
 
         auto item = new Item{};
         item->length++;
-        item->buffer = new char*[item->length]{};
-        item->buffer[0] = new char[packetSize]{};
+        item->buffer = std::make_unique<std::unique_ptr<char[]>[]>( l );
+        item->buffer[0] = std::make_unique<char[]>( packetSize );
         item->packetSize = packetSize;
         items[offsetPacket][offset] = item;
 
@@ -239,12 +237,7 @@ namespace simq::util {
             return;
         }
 
-        if( item->buffer ) {
-            for( int i = 0; i < item->length; i++ ) {
-                delete[] item->buffer[i];
-            }
-            delete[] item->buffer;
-        } else {
+        if( item->fileOffsets != nullptr ) {
             std::lock_guard<std::mutex> lockFile( mFile );
 
             for( int i = 0; i < item->length; i++ ) {
@@ -653,12 +646,6 @@ namespace simq::util {
             item->length++;
             item->lengthEnd = 0;
 
-            auto tmpBuffer = new char*[item->length]{};
-            memcpy( tmpBuffer, item->buffer, ( item->length - 1 ) * sizeof( char * ) );
-
-            delete[] item->buffer;
-            item->buffer = tmpBuffer;
-
             auto size = ::recv(
                 fd,
                 &item->buffer[wrData.startPartOffset+1][0],
@@ -690,7 +677,7 @@ namespace simq::util {
 
         if( wrData.startSize ) {
             memcpy(
-                &item->buffer[wrData.startPartOffset][wrData.startOffset],
+                &item->buffer[wrData.startPartOffset].get()[wrData.startOffset],
                 data,
                 wrData.startSize
             );
@@ -698,11 +685,6 @@ namespace simq::util {
 
 
         if( wrData.sizes ) {
-            auto tmpBuffer = new char*[wrData.sizes+item->length]{};
-            memcpy( tmpBuffer, item->buffer, item->length * sizeof( char * ) );
-
-            delete[] item->buffer;
-            item->buffer = tmpBuffer;
             item->lengthEnd = wrData.endSize;
         } else {
             item->lengthEnd = wrData.startSize;
@@ -711,9 +693,9 @@ namespace simq::util {
         for( unsigned int i = 0; i < wrData.sizes; i++ ) {
             wrData.startPartOffset++;
             item->length++;
-            item->buffer[wrData.startPartOffset] = new char[packetSize]{};
+            item->buffer[wrData.startPartOffset] = std::make_unique<char[]>( packetSize );
             memcpy(
-                &item->buffer[wrData.startPartOffset][0],
+                item->buffer[wrData.startPartOffset].get(),
                 &data[wrData.startSize + packetSize * i],
                 i == wrData.sizes - 1 ? wrData.endSize : packetSize
             );
@@ -732,7 +714,7 @@ namespace simq::util {
             return;
         }
 
-        if( item->buffer ) {
+        if( item->buffer.get() ) {
             _writeBuffer( item, data, length );
         } else {
             _writeFile( item, data, length );
@@ -749,7 +731,7 @@ namespace simq::util {
             return;
         }
 
-        if( item->buffer ) {
+        if( item->buffer.get() ) {
             _readBuffer( item, data, length, offset );
         } else {
             _readFile( item, data, length, offset );
@@ -766,7 +748,7 @@ namespace simq::util {
             return 0;
         }
 
-        if( item->buffer ) {
+        if( item->buffer.get() ) {
             return _recvToBuffer( item, fd, length );
         } else {
             return _recvToFile( item, fd, length );
@@ -788,7 +770,7 @@ namespace simq::util {
             return 0;
         }
 
-        if( item->buffer ) {
+        if( item->buffer.get() ) {
             return _sendFromBuffer( item, fd, length, offset );
         } else {
             return _sendFromFile( item, fd, length, offset );
