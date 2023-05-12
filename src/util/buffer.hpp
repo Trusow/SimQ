@@ -41,7 +41,7 @@ namespace simq::util {
                 unsigned int length;
                 unsigned int packetSize;
                 std::unique_ptr<std::unique_ptr<char[]>[]> buffer;
-                unsigned long int *fileOffsets;
+                std::unique_ptr<unsigned long int[]> fileOffsets;
             };
 
             unsigned int fileFD = 0;
@@ -105,8 +105,8 @@ namespace simq::util {
             Buffer( const char *path );
             ~Buffer();
 
-            unsigned int allocateOnDisk();
             unsigned int allocate( unsigned int length, unsigned int packetSize = 1024 );
+            unsigned int allocateOnDisk( unsigned int length );
             void free( unsigned int id );
 
             void write( unsigned int id, const char *data, unsigned int length );
@@ -130,9 +130,6 @@ namespace simq::util {
         for( int i = 0; i < countItemsPackets; i++ ) {
             for( int b = 0; b < SIZE_ITEM_PACKET; b++ ) {
                 if( items[i][b] != nullptr ) {
-                    if( items[i][b]->fileOffsets != nullptr ) {
-                        delete[] items[i][b]->fileOffsets;
-                    }
                     delete items[i][b];
                 }
             }
@@ -148,7 +145,7 @@ namespace simq::util {
         }
     }
 
-    unsigned int Buffer::allocateOnDisk() {
+    unsigned int Buffer::allocateOnDisk( unsigned int length ) {
         util::LockAtomic lockAtomicGroup( countItemsWrited );
         std::lock_guard<std::shared_timed_mutex> lockItems( mItems );
 
@@ -156,11 +153,13 @@ namespace simq::util {
 
         auto offsetPacket = id / SIZE_ITEM_PACKET;
         auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
+        auto l = length / MESSAGE_PACKET_SIZE;
+        l += length - l * MESSAGE_PACKET_SIZE == 0 ? 0 : 1;
 
         auto item = new Item{};
         item->packetSize = MESSAGE_PACKET_SIZE;
         item->length++;
-        item->fileOffsets = new unsigned long int[1]{};
+        item->fileOffsets = std::make_unique<unsigned long int[]>( l );
 
         items[offsetPacket][offset] = item;
 
@@ -244,7 +243,7 @@ namespace simq::util {
                 freeFileOffsets.push( item->fileOffsets[i] );
             }
 
-            delete[] item->fileOffsets;
+            item->fileOffsets.reset();
         }
 
         delete item;
@@ -448,12 +447,6 @@ namespace simq::util {
             item->length++;
             item->lengthEnd = 0;
 
-            auto tmpItemsDisk = new unsigned long int[item->length]{};
-            memcpy( tmpItemsDisk, item->fileOffsets, ( item->length - 1 ) * sizeof( unsigned long int ) );
-
-            delete[] item->fileOffsets;
-            item->fileOffsets = tmpItemsDisk;
-
             if( freeFileOffsets.empty() ) {
                 expandFile();
             }
@@ -509,11 +502,6 @@ namespace simq::util {
         }
 
         if( wrData.sizes ) {
-            auto tmpItemsDisk = new unsigned long int[item->length + wrData.sizes]{};
-            memcpy( tmpItemsDisk, item->fileOffsets, item->length * sizeof( unsigned long int ) );
-
-            delete[] item->fileOffsets;
-            item->fileOffsets = tmpItemsDisk;
             item->lengthEnd = wrData.endSize;
         } else {
             item->lengthEnd += wrData.startSize;
