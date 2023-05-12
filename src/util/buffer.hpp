@@ -49,7 +49,7 @@ namespace simq::util {
 
             std::shared_timed_mutex mItems;
             std::atomic_uint countItemsWrited {0};
-            Item ***items = nullptr;
+            std::vector<std::unique_ptr<Item>> items;
             unsigned int countItemsPackets = 0;
             std::queue<unsigned int> freeIDs;
             unsigned int uniqID = 0;
@@ -62,7 +62,6 @@ namespace simq::util {
             unsigned long int fileOffset = 0;
 
             void initFileSize();
-            void initItems();
             void expandItems();
             void expandFile();
             void wait( std::atomic_uint &atom );
@@ -103,7 +102,6 @@ namespace simq::util {
 
         public:
             Buffer( const char *path );
-            ~Buffer();
 
             unsigned int allocate( unsigned int length, unsigned int packetSize = 1024 );
             unsigned int allocateOnDisk( unsigned int length );
@@ -122,21 +120,7 @@ namespace simq::util {
         fileFD = file->fd();
 
         initFileSize();
-        initItems();
-    }
-
-    Buffer::~Buffer() {
-
-        for( int i = 0; i < countItemsPackets; i++ ) {
-            for( int b = 0; b < SIZE_ITEM_PACKET; b++ ) {
-                if( items[i][b] != nullptr ) {
-                    delete items[i][b];
-                }
-            }
-            delete[] items[i];
-        }
-
-        delete[] items;
+        expandItems();
     }
 
     void Buffer::wait( std::atomic_uint &atom ) {
@@ -151,17 +135,13 @@ namespace simq::util {
 
         auto id = getUniqID();
 
-        auto offsetPacket = id / SIZE_ITEM_PACKET;
-        auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
         auto l = length / MESSAGE_PACKET_SIZE;
         l += length - l * MESSAGE_PACKET_SIZE == 0 ? 0 : 1;
 
-        auto item = new Item{};
+        auto item = std::make_unique<Item>();
         item->packetSize = MESSAGE_PACKET_SIZE;
         item->length++;
         item->fileOffsets = std::make_unique<unsigned long int[]>( l );
-
-        items[offsetPacket][offset] = item;
 
         std::lock_guard<std::mutex> lockFile( mFile );
 
@@ -171,6 +151,8 @@ namespace simq::util {
 
         item->fileOffsets[0] = freeFileOffsets.front();
         freeFileOffsets.pop();
+
+        items[id] = std::move( item );
 
         return id;
     }
@@ -185,19 +167,16 @@ namespace simq::util {
 
         auto id = getUniqID();
 
-        auto offsetPacket = id / SIZE_ITEM_PACKET;
-        auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
-
         auto l = length / packetSize;
         l += length - l * packetSize == 0 ? 0 : 1;
 
 
-        auto item = new Item{};
+        auto item = std::make_unique<Item>();
         item->length++;
         item->buffer = std::make_unique<std::unique_ptr<char[]>[]>( l );
         item->buffer[0] = std::make_unique<char[]>( packetSize );
         item->packetSize = packetSize;
-        items[offsetPacket][offset] = item;
+        items[id] = std::move( item );
 
         return id;
     }
@@ -207,10 +186,7 @@ namespace simq::util {
             return nullptr;
         }
 
-        auto offsetPacket = id / SIZE_ITEM_PACKET;
-        auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
-
-        return items[offsetPacket][offset];
+        return items[id].get();
     }
 
     unsigned int Buffer::getLength( unsigned int id ) {
@@ -246,12 +222,7 @@ namespace simq::util {
             item->fileOffsets.reset();
         }
 
-        delete item;
-
-        auto offsetPacket = id / SIZE_ITEM_PACKET;
-        auto offset = id - offsetPacket * SIZE_ITEM_PACKET;
-
-        items[offsetPacket][offset] = nullptr;
+        items[id].reset();
         freeUniqID( id );
     }
 
@@ -796,17 +767,7 @@ namespace simq::util {
 
     void Buffer::expandItems() {
         countItemsPackets++;
-        auto tmpItems = new Item **[countItemsPackets]{};
-        memcpy( tmpItems, items, sizeof( Item ** ) * ( countItemsPackets - 1 ) );
-        delete items;
-        items = tmpItems;
-        items[countItemsPackets-1] = new Item*[SIZE_ITEM_PACKET]{};
-    }
-
-    void Buffer::initItems() {
-        countItemsPackets++;
-        items = new Item **[countItemsPackets]{};
-        items[0] = new Item*[SIZE_ITEM_PACKET]{};
+        items.reserve( countItemsPackets + SIZE_ITEM_PACKET );
     }
 
     void Buffer::expandFile() {
