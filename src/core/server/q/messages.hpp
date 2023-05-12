@@ -89,11 +89,11 @@ namespace simq::core::server::q {
         unsigned int id;
 
         if( _totalInMemory < _limits.maxMessagesInMemory ) {
-            id = _buffer->allocate( length < MESSAGE_PACKET_SIZE ? length : MESSAGE_PACKET_SIZE );
+            id = _buffer->allocate( length, length < MESSAGE_PACKET_SIZE ? length : MESSAGE_PACKET_SIZE );
             isMemory = true;
             _totalInMemory++;
         } else if( _totalOnDisk < _limits.maxMessagesOnDisk ) {
-            id = _buffer->allocateOnDisk();
+            id = _buffer->allocateOnDisk( length );
             isMemory = false;
             _totalOnDisk++;
         } else {
