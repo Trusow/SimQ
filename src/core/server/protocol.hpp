@@ -190,8 +190,8 @@ namespace simq::core::server {
     bool Protocol::_send( unsigned int fd, Packet *packet ) {
         auto l = ::send(
             fd,
-            packet->values.get(),
-            packet->length,
+            &packet->values.get()[packet->wrLength],
+            packet->length - packet->wrLength,
             MSG_NOSIGNAL
         );
 
