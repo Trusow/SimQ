@@ -74,8 +74,9 @@ namespace simq::core::server {
             struct Packet {
                 Cmd cmd;
                 unsigned int length;
-                unsigned int metaLength;
                 unsigned int wrLength;
+
+                bool isRecvMode;
 
                 unsigned int countValues;
                 std::unique_ptr<unsigned int[]> valuesLength;
@@ -87,6 +88,7 @@ namespace simq::core::server {
             void _checkNoIsset( unsigned int fd );
             void _checkIsset( unsigned int fd );
             bool _send( unsigned int fd, Packet *packet );
+            bool _recv( unsigned int fd, Packet *packet );
             unsigned int _calculateLengthBodyMessage( unsigned int value, ... );
 
             void _marsh( Packet *packet, unsigned int value );
@@ -189,6 +191,27 @@ namespace simq::core::server {
 
     bool Protocol::_send( unsigned int fd, Packet *packet ) {
         auto l = ::send(
+            fd,
+            &packet->values.get()[packet->wrLength],
+            packet->length - packet->wrLength,
+            MSG_NOSIGNAL
+        );
+
+        if( l == -1 ) {
+            if( errno != EAGAIN ) {
+                throw util::Error::SOCKET;
+            }
+
+            return false;
+        }
+
+        packet->wrLength += l;
+
+        return packet->wrLength == packet->length;
+    }
+
+    bool Protocol::_recv( unsigned int fd, Packet *packet ) {
+        auto l = ::recv(
             fd,
             &packet->values.get()[packet->wrLength],
             packet->length - packet->wrLength,
@@ -448,6 +471,27 @@ namespace simq::core::server {
         _marsh( packet, length );
 
         return _send( fd, packet );
+    }
+
+    void Protocol::recv( unsigned int fd ) {
+        _checkIsset( fd );
+
+        auto packet = _packets[fd].get();
+
+        if( !packet->isRecvMode ) {
+            _packets[fd].reset();
+            packet->values = std::make_unique<char[]>( LENGTH_META );
+            packet->isRecvMode = true;
+            packet->length = LENGTH_META;
+
+            if( !_recv( fd, packet ) ) {
+                return;
+            }
+        }
+
+        if( !_recv( fd, packet ) ) {
+            return;
+        }
     }
 }
 
