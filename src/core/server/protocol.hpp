@@ -106,7 +106,7 @@ namespace simq::core::server {
             bool sendOk( unsigned int fd );
             bool sendError( unsigned int fd, const char *description );
             bool sendStringList( unsigned int fd, std::list<std::string> &list );
-            bool sendChannelSettings(
+            bool sendChannelLimitMessages(
                 unsigned int fd,
                 util::types::ChannelLimitMessages &limitMessages
             );
@@ -349,7 +349,7 @@ namespace simq::core::server {
         return _send( fd, packet );
     }
 
-    bool Protocol::sendChannelSettings(
+    bool Protocol::sendChannelLimitMessages(
         unsigned int fd,
         util::types::ChannelLimitMessages &limitMessages
     ) {

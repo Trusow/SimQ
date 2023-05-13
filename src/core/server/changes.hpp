@@ -25,7 +25,7 @@ namespace simq::core::server {
                 CH_REMOVE_GROUP,
 
                 CH_ADD_CHANNEL = 2000,
-                CH_UPDATE_CHANNEL_SETTINGS,
+                CH_UPDATE_CHANNEL_LIMIT_MESSAGES,
                 CH_REMOVE_CHANNEL,
 
                 CH_ADD_CONSUMER = 3000,
@@ -404,7 +404,7 @@ namespace simq::core::server {
         const char *channel,
         util::types::ChannelLimitMessages *limitMessages
     ) {
-        return _buildChannelChange( CH_UPDATE_CHANNEL_SETTINGS, group, channel, limitMessages );
+        return _buildChannelChange( CH_UPDATE_CHANNEL_LIMIT_MESSAGES, group, channel, limitMessages );
     }
 
     std::unique_ptr<Changes::Change> Changes::removeChannel( const char *group, const char *channel ) {
@@ -522,7 +522,7 @@ namespace simq::core::server {
     }
 
     bool Changes::isUpdateChannelLimitMessages( std::unique_ptr<Change> &change ) {
-        return change->type == CH_UPDATE_CHANNEL_SETTINGS;
+        return change->type == CH_UPDATE_CHANNEL_LIMIT_MESSAGES;
     }
 
     bool Changes::isRemoveChannel( std::unique_ptr<Change> &change ) {
@@ -745,7 +745,7 @@ namespace simq::core::server {
             case CH_REMOVE_GROUP:
                 return _isValidGroup( change, length );
             case CH_ADD_CHANNEL:
-            case CH_UPDATE_CHANNEL_SETTINGS:
+            case CH_UPDATE_CHANNEL_LIMIT_MESSAGES:
             case CH_REMOVE_CHANNEL:
                 return _isValidChannel( change, length );
             case CH_ADD_CONSUMER:
@@ -804,7 +804,7 @@ namespace simq::core::server {
             case CH_UPDATE_GROUP_PASSWORD:
             case CH_REMOVE_GROUP:
             case CH_ADD_CHANNEL:
-            case CH_UPDATE_CHANNEL_SETTINGS:
+            case CH_UPDATE_CHANNEL_LIMIT_MESSAGES:
             case CH_REMOVE_CHANNEL:
             case CH_ADD_CONSUMER:
             case CH_UPDATE_CONSUMER_PASSWORD:
