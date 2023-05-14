@@ -102,8 +102,6 @@ namespace simq::core::server {
             void _marsh( Packet *packet, const char *value );
 
             void _demarsh( const char *data, unsigned int &value );
-            void _demarsh( const char *data, Cmd &value );
-            void _demarsh( const char *data, char *value );
 
             void _checkMeta( Packet *packet );
             void _checkBody( Packet *packet );
@@ -343,6 +341,11 @@ namespace simq::core::server {
         packet->length += strlen( value );
         memcpy( &packet->values[packet->length], value, l );
         packet->length += l;
+    }
+
+    void Protocol::_demarsh( const char *data, unsigned int &value ) {
+        memcpy( &value, data, SIZE_UINT );
+        value = ntohl( value );
     }
 
     bool Protocol::sendNoSecure( unsigned int fd ) {
@@ -803,15 +806,10 @@ namespace simq::core::server {
         auto values = packet->values.get();
         auto offsets = packet->valuesOffsets.get();
 
-        memcpy( &limitMessages.minMessageSize, &values[offsets[1]], SIZE_UINT );
-        memcpy( &limitMessages.maxMessageSize, &values[offsets[2]], SIZE_UINT );
-        memcpy( &limitMessages.maxMessagesInMemory, &values[offsets[3]], SIZE_UINT );
-        memcpy( &limitMessages.maxMessagesOnDisk, &values[offsets[4]], SIZE_UINT );
-
-        limitMessages.minMessageSize = ntohl( limitMessages.minMessageSize );
-        limitMessages.maxMessageSize = ntohl( limitMessages.maxMessageSize );
-        limitMessages.maxMessagesInMemory = ntohl( limitMessages.maxMessagesInMemory );
-        limitMessages.maxMessagesOnDisk = ntohl( limitMessages.maxMessagesOnDisk );
+        _demarsh( &values[offsets[1]], limitMessages.minMessageSize );
+        _demarsh( &values[offsets[2]], limitMessages.maxMessageSize );
+        _demarsh( &values[offsets[3]], limitMessages.maxMessagesInMemory );
+        _demarsh( &values[offsets[4]], limitMessages.maxMessagesOnDisk );
 
         if( !util::Validation::isChannelLimitMessages( limitMessages ) ) {
             throw util::Error::WRONG_CMD;
