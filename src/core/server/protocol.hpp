@@ -791,13 +791,31 @@ namespace simq::core::server {
     void Protocol::_checkCmdAddChannel( Packet *packet ) {
         auto offset = SIZE_UINT;
         offset += _checkParamCmdChannelName( packet, offset, 0 );
-        offset += _checkParamCmdPassword( packet, offset, 1 );
+        offset += _checkParamCmdUInt( packet, offset, 1 );
         offset += _checkParamCmdUInt( packet, offset, 2 );
         offset += _checkParamCmdUInt( packet, offset, 3 );
         offset += _checkParamCmdUInt( packet, offset, 4 );
-        offset += _checkParamCmdUInt( packet, offset, 5 );
 
         _checkControlLength( offset, packet->length );
+
+        util::types::ChannelLimitMessages limitMessages{};
+
+        auto values = packet->values.get();
+        auto offsets = packet->valuesOffsets.get();
+
+        memcpy( &limitMessages.minMessageSize, &values[offsets[1]], SIZE_UINT );
+        memcpy( &limitMessages.maxMessageSize, &values[offsets[2]], SIZE_UINT );
+        memcpy( &limitMessages.maxMessagesInMemory, &values[offsets[3]], SIZE_UINT );
+        memcpy( &limitMessages.maxMessagesOnDisk, &values[offsets[4]], SIZE_UINT );
+
+        limitMessages.minMessageSize = ntohl( limitMessages.minMessageSize );
+        limitMessages.maxMessageSize = ntohl( limitMessages.maxMessageSize );
+        limitMessages.maxMessagesInMemory = ntohl( limitMessages.maxMessagesInMemory );
+        limitMessages.maxMessagesOnDisk = ntohl( limitMessages.maxMessagesOnDisk );
+
+        if( !util::Validation::isChannelLimitMessages( limitMessages ) ) {
+            throw util::Error::WRONG_CMD;
+        }
     }
 
     void Protocol::_checkCmdUpdateChannelLimitMessages( Packet *packet ) {
