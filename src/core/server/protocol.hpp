@@ -194,13 +194,13 @@ namespace simq::core::server {
 
             bool isOk( Packet *packet );
 
-            bool isCmdCheckSecure( Packet *packet );
-            bool isCmdCheckNoSecure( Packet *packet );
-            bool isCmdCheckVersion( Packet *packet );
+            bool isCheckSecure( Packet *packet );
+            bool isCheckNoSecure( Packet *packet );
+            bool isCheckVersion( Packet *packet );
 
-            bool isCmdAuthGroup( Packet *packet );
-            bool isCmdAuthConsumer( Packet *packet );
-            bool isCmdAuthProducer( Packet *packet );
+            bool isAuthGroup( Packet *packet );
+            bool isAuthConsumer( Packet *packet );
+            bool isAuthProducer( Packet *packet );
 
             bool isAddChannel( Packet *packet );
             bool isUpdateChannelLimitMessages( Packet *packet );
@@ -1034,27 +1034,27 @@ namespace simq::core::server {
         return packet->cmd == CMD_OK;
     }
 
-    bool Protocol::isCmdCheckSecure( Packet *packet ) {
+    bool Protocol::isCheckSecure( Packet *packet ) {
         return packet->cmd == CMD_CHECK_SECURE;
     }
 
-    bool Protocol::isCmdCheckNoSecure( Packet *packet ) {
+    bool Protocol::isCheckNoSecure( Packet *packet ) {
         return packet->cmd == CMD_CHECK_NOSECURE;
     }
 
-    bool Protocol::isCmdCheckVersion( Packet *packet ) {
+    bool Protocol::isCheckVersion( Packet *packet ) {
         return packet->cmd == CMD_CHECK_VERSION;
     }
 
-    bool Protocol::isCmdAuthGroup( Packet *packet ) {
+    bool Protocol::isAuthGroup( Packet *packet ) {
         return packet->cmd == CMD_AUTH_GROUP;
     }
 
-    bool Protocol::isCmdAuthConsumer( Packet *packet ) {
+    bool Protocol::isAuthConsumer( Packet *packet ) {
         return packet->cmd == CMD_AUTH_CONSUMER;
     }
 
-    bool Protocol::isCmdAuthProducer( Packet *packet ) {
+    bool Protocol::isAuthProducer( Packet *packet ) {
         return packet->cmd == CMD_AUTH_PRODUCER;
     }
 
