@@ -16,6 +16,7 @@ namespace simq::util {
                 WRONG_CHANNEL_LIMIT_MESSAGES,
                 WRONG_CONSUMER,
                 WRONG_PRODUCER,
+                WRONG_UUID,
                 WRONG_CMD,
                 EXCEED_LIMIT,
                 IS_EXISTS,
@@ -60,6 +61,8 @@ namespace simq::util {
                         return "Wrong consumer";
                     case WRONG_PRODUCER:
                         return "Wrong producer";
+                    case WRONG_UUID:
+                        return "Wrong UUID";
                     case WRONG_SETTINGS:
                         return "Wrong settings";
                     case WRONG_CMD:
