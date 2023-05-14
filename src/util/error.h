@@ -13,6 +13,9 @@ namespace simq::util {
                 WRONG_LOGIN,
                 WRONG_MESSAGE_SIZE,
                 WRONG_SETTINGS,
+                WRONG_CHANNEL_LIMIT_MESSAGES,
+                WRONG_CONSUMER,
+                WRONG_PRODUCER,
                 WRONG_CMD,
                 EXCEED_LIMIT,
                 IS_EXISTS,
@@ -51,6 +54,12 @@ namespace simq::util {
                         return "Wrong login";
                     case WRONG_MESSAGE_SIZE:
                         return "Wrong message size";
+                    case WRONG_CHANNEL_LIMIT_MESSAGES:
+                        return "Wrong channel limit messages";
+                    case WRONG_CONSUMER:
+                        return "Wrong consumer";
+                    case WRONG_PRODUCER:
+                        return "Wrong producer";
                     case WRONG_SETTINGS:
                         return "Wrong settings";
                     case WRONG_CMD:
