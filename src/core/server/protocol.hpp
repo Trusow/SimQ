@@ -1119,23 +1119,23 @@ namespace simq::core::server {
     }
 
     const char *Protocol::getGroup( Packet *packet ) {
-        return nullptr;
+        throw util::Error::WRONG_CMD;
     }
 
     const char *Protocol::getChannel( Packet *packet ) {
-        return nullptr;
+        throw util::Error::WRONG_CMD;
     }
 
     const char *Protocol::getLogin( Packet *packet ) {
-        return nullptr;
+        throw util::Error::WRONG_CMD;
     }
 
     const char *Protocol::getOldPassword( Packet *packet ) {
-        return nullptr;
+        throw util::Error::WRONG_CMD;
     }
 
     const char *Protocol::getNewPassword( Packet *packet ) {
-        return nullptr;
+        throw util::Error::WRONG_CMD;
     }
 
     unsigned int Protocol::getVersion( Packet *packet ) {
@@ -1161,7 +1161,7 @@ namespace simq::core::server {
     }
 
     const char *Protocol::getUUID( Packet *packet ) {
-        return nullptr;
+        throw util::Error::WRONG_CMD;
     }
 }
 
