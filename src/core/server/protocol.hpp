@@ -198,6 +198,13 @@ namespace simq::core::server {
             bool isCheckNoSecure( Packet *packet );
             bool isCheckVersion( Packet *packet );
 
+            bool isUpdatePassword( Packet *packet );
+
+            bool isGetChannels( Packet *packet );
+            bool isGetChannelLimitMessages( Packet *packet );
+            bool isGetConsumers( Packet *packet );
+            bool isGetProducers( Packet *packet );
+
             bool isAuthGroup( Packet *packet );
             bool isAuthConsumer( Packet *packet );
             bool isAuthProducer( Packet *packet );
@@ -225,14 +232,20 @@ namespace simq::core::server {
 
             const char *getGroup( Packet *packet );
             const char *getChannel( Packet *packet );
-            const char *getLogin( Packet *packet );
-            const char *getOldPassword( Packet *packet );
+            const char *getConsumer( Packet *packet );
+            const char *getProducer( Packet *packet );
+
+            const char *getPassword( Packet *packet );
             const char *getNewPassword( Packet *packet );
 
             unsigned int getVersion( Packet *packet );
 
             unsigned int getLength( Packet *packet );
             const char *getUUID( Packet *packet );
+            void getChannelLimitMessages(
+                Packet *packet,
+                util::types::ChannelLimitMessages &limitMessages
+            );
     };
 
     void Protocol::_checkNoIsset( unsigned int fd ) {
@@ -885,7 +898,7 @@ namespace simq::core::server {
         auto offset = SIZE_UINT;
 
         offset += _checkParamCmdUInt( packet, offset, 0 );
-        offset += _checkParamCmdUUID( packet, offset, 0 );
+        offset += _checkParamCmdUUID( packet, offset, 1 );
 
         _checkControlLength( offset, packet->length );
     }
@@ -1046,6 +1059,26 @@ namespace simq::core::server {
         return packet->cmd == CMD_CHECK_VERSION;
     }
 
+    bool Protocol::isUpdatePassword( Packet *packet ) {
+        return packet->cmd == CMD_UPDATE_PASSWORD;
+    }
+
+    bool Protocol::isGetChannels( Packet *packet ) {
+        return packet->cmd == CMD_GET_CHANNELS;
+    }
+
+    bool Protocol::isGetChannelLimitMessages( Packet *packet ) {
+        return packet->cmd == CMD_GET_CHANNEL_LIMIT_MESSSAGES;
+    }
+
+    bool Protocol::isGetConsumers( Packet *packet ) {
+        return packet->cmd == CMD_GET_CONUMERS;
+    }
+
+    bool Protocol::isGetProducers( Packet *packet ) {
+        return packet->cmd == CMD_GET_PRODUCERS;
+    }
+
     bool Protocol::isAuthGroup( Packet *packet ) {
         return packet->cmd == CMD_AUTH_GROUP;
     }
@@ -1119,22 +1152,125 @@ namespace simq::core::server {
     }
 
     const char *Protocol::getGroup( Packet *packet ) {
+        auto values = packet->values.get();
+        auto offsets = packet->valuesOffsets.get();
+
+        if( isAuthGroup( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isAuthConsumer( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isAuthProducer( packet ) ) {
+            return &values[offsets[0]];
+        }
+
         throw util::Error::WRONG_CMD;
     }
 
     const char *Protocol::getChannel( Packet *packet ) {
+        auto values = packet->values.get();
+        auto offsets = packet->valuesOffsets.get();
+
+        if( isAuthGroup( packet ) ) {
+            return &values[offsets[1]];
+        } else if( isAuthConsumer( packet ) ) {
+            return &values[offsets[1]];
+        } else if( isAuthProducer( packet ) ) {
+            return &values[offsets[1]];
+        } else if( isGetConsumers( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isGetProducers( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isAddChannel( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isUpdateChannelLimitMessages( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isRemoveChannel( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isAddConsumer( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isUpdateConsumerPassword( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isRemoveConsumer( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isAddProducer( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isUpdateProducerPassword( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isRemoveProducer( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isGetChannelLimitMessages( packet ) ) {
+            return &values[offsets[0]];
+        }
+
         throw util::Error::WRONG_CMD;
     }
 
-    const char *Protocol::getLogin( Packet *packet ) {
+    const char *Protocol::getConsumer( Packet *packet ) {
+        auto values = packet->values.get();
+        auto offsets = packet->valuesOffsets.get();
+
+        if( isAuthConsumer( packet ) ) {
+            return &values[offsets[2]];
+        } else if( isAddConsumer( packet ) ) {
+            return &values[offsets[1]];
+        } else if( isUpdateConsumerPassword( packet ) ) {
+            return &values[offsets[1]];
+        } else if( isRemoveConsumer( packet ) ) {
+            return &values[offsets[1]];
+        }
+
         throw util::Error::WRONG_CMD;
     }
 
-    const char *Protocol::getOldPassword( Packet *packet ) {
+    const char *Protocol::getProducer( Packet *packet ) {
+        auto values = packet->values.get();
+        auto offsets = packet->valuesOffsets.get();
+
+        if( isAuthProducer( packet ) ) {
+            return &values[offsets[2]];
+        } else if( isAddProducer( packet ) ) {
+            return &values[offsets[1]];
+        } else if( isUpdateProducerPassword( packet ) ) {
+            return &values[offsets[1]];
+        } else if( isRemoveProducer( packet ) ) {
+            return &values[offsets[1]];
+        }
+
+        throw util::Error::WRONG_CMD;
+    }
+
+    const char *Protocol::getPassword( Packet *packet ) {
+        auto values = packet->values.get();
+        auto offsets = packet->valuesOffsets.get();
+
+        if( isAuthGroup( packet ) ) {
+            return &values[offsets[1]];
+        } else if( isAuthConsumer( packet ) ) {
+            return &values[offsets[3]];
+        } else if( isAuthProducer( packet ) ) {
+            return &values[offsets[3]];
+        } else if( isUpdatePassword( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isAddConsumer( packet ) ) {
+            return &values[offsets[2]];
+        } else if( isAddProducer( packet ) ) {
+            return &values[offsets[2]];
+        } else if( isUpdateConsumerPassword( packet ) ) {
+            return &values[offsets[2]];
+        } else if( isUpdateProducerPassword( packet ) ) {
+            return &values[offsets[2]];
+        }
         throw util::Error::WRONG_CMD;
     }
 
     const char *Protocol::getNewPassword( Packet *packet ) {
+        auto values = packet->values.get();
+        auto offsets = packet->valuesOffsets.get();
+
+        if( isUpdatePassword( packet ) ) {
+            return &values[offsets[1]];
+        }
+
         throw util::Error::WRONG_CMD;
     }
 
@@ -1161,6 +1297,34 @@ namespace simq::core::server {
     }
 
     const char *Protocol::getUUID( Packet *packet ) {
+        auto values = packet->values.get();
+        auto offsets = packet->valuesOffsets.get();
+
+        if( isPushReplicaMessage( packet ) ) {
+            return &values[offsets[1]];
+        } else if( isRemoveMessageByUUID( packet ) ) {
+            return &values[offsets[0]];
+        }
+
+        throw util::Error::WRONG_CMD;
+    }
+
+    void Protocol::getChannelLimitMessages(
+        Packet *packet,
+        util::types::ChannelLimitMessages &limitMessages
+    ) {
+        auto values = packet->values.get();
+        auto offsets = packet->valuesOffsets.get();
+
+        if( isUpdateChannelLimitMessages( packet ) || isAddChannel( packet ) ) {
+            _demarsh( &values[offsets[1]], limitMessages.minMessageSize );
+            _demarsh( &values[offsets[2]], limitMessages.maxMessageSize );
+            _demarsh( &values[offsets[3]], limitMessages.maxMessagesInMemory );
+            _demarsh( &values[offsets[4]], limitMessages.maxMessagesOnDisk );
+
+            return;
+        }
+
         throw util::Error::WRONG_CMD;
     }
 }
