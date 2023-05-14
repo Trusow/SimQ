@@ -13,6 +13,7 @@ namespace simq::util {
                 WRONG_LOGIN,
                 WRONG_MESSAGE_SIZE,
                 WRONG_SETTINGS,
+                WRONG_CMD,
                 EXCEED_LIMIT,
                 IS_EXISTS,
                 ACCESS_DENY,
@@ -52,6 +53,8 @@ namespace simq::util {
                         return "Wrong message size";
                     case WRONG_SETTINGS:
                         return "Wrong settings";
+                    case WRONG_CMD:
+                        return "Wrong command";
                     case EXCEED_LIMIT:
                         return "Exceed limit";
                     case IS_EXISTS:
