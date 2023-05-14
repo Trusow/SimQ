@@ -1139,11 +1139,25 @@ namespace simq::core::server {
     }
 
     unsigned int Protocol::getVersion( Packet *packet ) {
-        return 0;
+        if( isCheckVersion( packet ) ) {
+            unsigned int value = 0;
+            _demarsh( &packet->values[packet->valuesOffsets[0]], value );
+
+            return value;
+        }
+
+        throw util::Error::WRONG_CMD;
     }
 
     unsigned int Protocol::getLength( Packet *packet ) {
-        return 0;
+        if( isPushMessage( packet ) || isPushPublicMessage( packet ) || isPushReplicaMessage ( packet ) ) {
+            unsigned int value = 0;
+            _demarsh( &packet->values[packet->valuesOffsets[0]], value );
+
+            return value;
+        }
+
+        throw util::Error::WRONG_CMD;
     }
 
     const char *Protocol::getUUID( Packet *packet ) {
