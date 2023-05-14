@@ -1042,6 +1042,10 @@ namespace simq::core::server {
         return packet->cmd == CMD_CHECK_NOSECURE;
     }
 
+    bool Protocol::isCmdCheckVersion( Packet *packet ) {
+        return packet->cmd == CMD_CHECK_VERSION;
+    }
+
     bool Protocol::isCmdAuthGroup( Packet *packet ) {
         return packet->cmd == CMD_AUTH_GROUP;
     }
