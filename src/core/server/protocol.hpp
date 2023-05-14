@@ -614,7 +614,7 @@ namespace simq::core::server {
         auto l = _getLengthByOffset( packet, offset );
 
         if( l != SIZE_UINT ) {
-            throw util::Error::WRONG_CMD;
+            throw util::Error::WRONG_PARAM;
         }
 
         packet->valuesOffsets[iterator] = l;
@@ -630,7 +630,7 @@ namespace simq::core::server {
         auto l = _getLengthByOffset( packet, offset );
 
         if( l != PASSWORD_LENGTH ) {
-            throw util::Error::WRONG_CMD;
+            throw util::Error::WRONG_PASSWORD;
         }
 
         packet->valuesOffsets[iterator] = l;
@@ -648,7 +648,7 @@ namespace simq::core::server {
         auto name = &packet->values[offset+SIZE_UINT];
 
         if( !util::Validation::isGroupName( name ) || strlen( name ) != l-1 ) {
-            throw util::Error::WRONG_CMD;
+            throw util::Error::WRONG_GROUP;
         }
 
         packet->valuesOffsets[iterator] = l;
@@ -666,7 +666,7 @@ namespace simq::core::server {
         auto name = &packet->values[offset+SIZE_UINT];
 
         if( !util::Validation::isChannelName( name ) || strlen( name ) != l-1 ) {
-            throw util::Error::WRONG_CMD;
+            throw util::Error::WRONG_CHANNEL;
         }
 
         packet->valuesOffsets[iterator] = l;
@@ -684,7 +684,7 @@ namespace simq::core::server {
         auto name = &packet->values[offset+SIZE_UINT];
 
         if( !util::Validation::isConsumerName( name ) || strlen( name ) != l-1 ) {
-            throw util::Error::WRONG_CMD;
+            throw util::Error::WRONG_CONSUMER;
         }
 
         packet->valuesOffsets[iterator] = l;
@@ -702,7 +702,7 @@ namespace simq::core::server {
         auto name = &packet->values[offset+SIZE_UINT];
 
         if( !util::Validation::isProducerName( name ) || strlen( name ) != l-1 ) {
-            throw util::Error::WRONG_CMD;
+            throw util::Error::WRONG_PRODUCER;
         }
 
         packet->valuesOffsets[iterator] = l;
@@ -720,7 +720,7 @@ namespace simq::core::server {
         auto name = &packet->values[offset+SIZE_UINT];
 
         if( !util::Validation::isUUID( name ) || strlen( name ) != l-1 ) {
-            throw util::Error::WRONG_CMD;
+            throw util::Error::WRONG_UUID;
         }
 
         packet->valuesOffsets[iterator] = l;
@@ -812,7 +812,7 @@ namespace simq::core::server {
         _demarsh( &values[offsets[4]], limitMessages.maxMessagesOnDisk );
 
         if( !util::Validation::isChannelLimitMessages( limitMessages ) ) {
-            throw util::Error::WRONG_CMD;
+            throw util::Error::WRONG_CHANNEL_LIMIT_MESSAGES;
         }
     }
 
