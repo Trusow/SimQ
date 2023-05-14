@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include "../../util/types.h"
 #include "../../util/error.h"
+#include "../../util/validation.hpp"
 #include "../../crypto/hash.hpp"
 
 // NO SAFE THREAD!!!
@@ -20,9 +21,11 @@ namespace simq::core::server {
     class Protocol {
         private:
             const unsigned int VERSION = 101;
+            const unsigned int SIZE_UINT = sizeof( unsigned int );
+            const unsigned int PASSWORD_LENGTH = crypto::HASH_LENGTH;
 
         public:
-            const unsigned int LENGTH_META = 8;
+            const unsigned int LENGTH_META = SIZE_UINT * 2;
 
             enum Cmd {
                 CMD_OK = 10,
@@ -52,15 +55,16 @@ namespace simq::core::server {
 
                 CMD_ADD_CONSUMER = 4'001,
                 CMD_UPDATE_CONSUMER_PASSWORD = 4'002,
-                CMD_REMOVE_CONSUMER = 4'002,
+                CMD_REMOVE_CONSUMER = 4'003,
 
                 CMD_ADD_PRODUCER = 5'001,
                 CMD_UPDATE_PRODUCER_PASSWORD = 5'002,
-                CMD_REMOVE_PRODUCER = 5'002,
+                CMD_REMOVE_PRODUCER = 5'003,
 
                 CMD_PUSH_MESSAGE = 6'001,
-                CMD_PUSH_PUBLIC_MESSAGE = 6'002,
-                CMD_SEND_UUID_MESSAGE = 6'003,
+                CMD_PUSH_REPLICA_MESSAGE = 6'002,
+                CMD_PUSH_PUBLIC_MESSAGE = 6'003,
+                CMD_SEND_UUID_MESSAGE = 6'004,
 
                 CMD_REMOVE_MESSAGE = 6'101,
                 CMD_REMOVE_MESSAGE_BY_UUID = 6'102,
@@ -76,13 +80,15 @@ namespace simq::core::server {
                 unsigned int length;
                 unsigned int wrLength;
 
-                bool isRecvMode;
+                bool isRecvMeta;
+                bool isRecvBody;
 
                 unsigned int countValues;
-                std::unique_ptr<unsigned int[]> valuesLength;
+                std::unique_ptr<unsigned int[]> valuesOffsets;
                 std::unique_ptr<char[]> values;
             };
         private:
+            const unsigned int SIZE_CMD = sizeof( Cmd );
 
             std::map<unsigned int, std::unique_ptr<Packet>> _packets;
             void _checkNoIsset( unsigned int fd );
@@ -98,6 +104,70 @@ namespace simq::core::server {
             void _demarsh( const char *data, unsigned int &value );
             void _demarsh( const char *data, Cmd &value );
             void _demarsh( const char *data, char *value );
+
+            void _checkMeta( Packet *packet );
+            void _checkBody( Packet *packet );
+
+            unsigned int _getLengthByOffset( Packet *packet, unsigned int offset );
+
+            unsigned int _checkParamCmdUInt(
+                Packet *packet,
+                unsigned int offset,
+                unsigned int iterator
+            );
+            unsigned int _checkParamCmdPassword(
+                Packet *packet,
+                unsigned int offset,
+                unsigned int iterator
+            );
+            unsigned int _checkParamCmdGroupName(
+                Packet *packet,
+                unsigned int offset,
+                unsigned int iterator
+            );
+            unsigned int _checkParamCmdChannelName(
+                Packet *packet,
+                unsigned int offset,
+                unsigned int iterator
+            );
+            unsigned int _checkParamCmdConsumerName(
+                Packet *packet,
+                unsigned int offset,
+                unsigned int iterator
+            );
+            unsigned int _checkParamCmdProducerName(
+                Packet *packet,
+                unsigned int offset,
+                unsigned int iterator
+            );
+            unsigned int _checkParamCmdUUID(
+                Packet *packet,
+                unsigned int offset,
+                unsigned int iterator
+            );
+
+            void _checkControlLength( unsigned int calculateLength, unsigned int length );
+
+            void _checkCmdCheckVersion( Packet *packet );
+            void _checkCmdUpdatePassword( Packet *packet );
+            void _checkCmdAuthGroup( Packet *packet );
+            void _checkCmdAuthConsumer( Packet *packet );
+            void _checkCmdAuthProducer( Packet *packet );
+            void _checkCmdGetUsers( Packet *packet );
+            void _checkCmdGetChannelLimitMessages( Packet *packet );
+            void _checkCmdAddChannel( Packet *packet );
+            void _checkCmdUpdateChannelLimitMessages( Packet *packet );
+            void _checkCmdRemoveChannel( Packet *packet );
+            void _checkCmdAddConsumer( Packet *packet );
+            void _checkCmdUpdateConsumerPassword( Packet *packet );
+            void _checkCmdRemoveConsumer( Packet *packet );
+            void _checkCmdAddProducer( Packet *packet );
+            void _checkCmdUpdateProducerPassword( Packet *packet );
+            void _checkCmdRemoveProducer( Packet *packet );
+            void _checkCmdPushMessage( Packet *packet );
+            void _checkCmdPushReplicaMessage( Packet *packet );
+            void _checkCmdPushPublicMessage( Packet *packet );
+            void _checkCmdRemoveMessageByUUID( Packet *packet );
 
         public:
             void join( unsigned int fd );
@@ -126,7 +196,8 @@ namespace simq::core::server {
 
             bool isOk( Packet *packet );
 
-            bool isCmdCheckSevuce( Packet *packet );
+            bool isCmdCheckSecure( Packet *packet );
+            bool isCmdCheckNoSecure( Packet *packet );
             bool isCmdCheckVersion( Packet *packet );
 
             bool isCmdAuthGroup( Packet *packet );
@@ -157,10 +228,9 @@ namespace simq::core::server {
             const char *getGroup( Packet *packet );
             const char *getChannel( Packet *packet );
             const char *getLogin( Packet *packet );
-            void getOldPassword( Packet *packet, unsigned char password[crypto::HASH_LENGTH] );
-            void getNewPassword( Packet *packet, unsigned char password[crypto::HASH_LENGTH] );
+            const char *getOldPassword( Packet *packet );
+            const char *getNewPassword( Packet *packet );
 
-            bool getSecure( Packet *packet );
             unsigned int getVersion( Packet *packet );
 
             unsigned int getLength( Packet *packet );
@@ -237,7 +307,7 @@ namespace simq::core::server {
     };
 
     unsigned int Protocol::_calculateLengthBodyMessage( unsigned int value, ... ) {
-        unsigned int total = sizeof( unsigned int );
+        unsigned int total = SIZE_UINT;
         va_list args;
         va_start( args, value );
  
@@ -247,7 +317,7 @@ namespace simq::core::server {
                 break;
             }
 
-            total += sizeof( unsigned int );
+            total += SIZE_UINT;
             total += item;
         }
 
@@ -256,16 +326,16 @@ namespace simq::core::server {
 
     void Protocol::_marsh( Packet *packet, unsigned int value ) {
         auto v = htonl( value );
-        auto size = sizeof( value );
+        auto size = SIZE_UINT;
         memcpy( &packet->values[packet->length], &v, size );
         packet->length += size;
     }
 
     void Protocol::_marsh( Packet *packet, Cmd value ) {
         auto v = htonl( value );
-        auto size = sizeof( value );
+        auto size = SIZE_CMD;
         memcpy( &packet->values[packet->length], &v, size );
-        packet->length += sizeof( Cmd );
+        packet->length += SIZE_CMD;
     }
 
     void Protocol::_marsh( Packet *packet, const char *value ) {
@@ -295,7 +365,7 @@ namespace simq::core::server {
 
         auto packet = _packets[fd].get();
 
-        auto lengthBody = _calculateLengthBodyMessage( sizeof( unsigned int ), 0 );
+        auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, 0 );
 
         packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
 
@@ -303,7 +373,7 @@ namespace simq::core::server {
         _marsh( packet, lengthBody );
 
         _marsh( packet, 1 );
-        _marsh( packet, sizeof( unsigned int ) );
+        _marsh( packet, SIZE_UINT );
         _marsh( packet, VERSION );
 
         return _send( fd, packet );
@@ -351,10 +421,10 @@ namespace simq::core::server {
 
         auto packet = _packets[fd].get();
 
-        auto lengthBody = sizeof( unsigned int );
+        auto lengthBody = SIZE_UINT;
 
         for( auto it = list.begin(); it != list.end(); it++ ) {
-            lengthBody += sizeof( unsigned int );
+            lengthBody += SIZE_UINT;
             lengthBody += strlen( (*it).c_str() ) + 1;
         }
 
@@ -382,10 +452,10 @@ namespace simq::core::server {
         auto packet = _packets[fd].get();
 
         auto lengthBody = _calculateLengthBodyMessage(
-            sizeof( unsigned int ),
-            sizeof( unsigned int ),
-            sizeof( unsigned int ),
-            sizeof( unsigned int ),
+            SIZE_UINT,
+            SIZE_UINT,
+            SIZE_UINT,
+            SIZE_UINT,
             0
         );
 
@@ -394,13 +464,13 @@ namespace simq::core::server {
         _marsh( packet, CMD_SEND_CHANNEL_LIMIT_MESSSAGES );
         _marsh( packet, lengthBody );
         _marsh( packet, 4 );
-        _marsh( packet, sizeof( unsigned int ) );
+        _marsh( packet, SIZE_UINT );
         _marsh( packet, limitMessages.minMessageSize );
-        _marsh( packet, sizeof( unsigned int ) );
+        _marsh( packet, SIZE_UINT );
         _marsh( packet, limitMessages.maxMessageSize );
-        _marsh( packet, sizeof( unsigned int ) );
+        _marsh( packet, SIZE_UINT );
         _marsh( packet, limitMessages.maxMessagesInMemory );
-        _marsh( packet, sizeof( unsigned int ) );
+        _marsh( packet, SIZE_UINT );
         _marsh( packet, limitMessages.maxMessagesOnDisk );
 
         return _send( fd, packet );
@@ -439,14 +509,14 @@ namespace simq::core::server {
 
         auto lengthUUID = strlen( uuid ) + 1;
 
-        auto lengthBody = _calculateLengthBodyMessage( sizeof( unsigned int ), lengthUUID, 0 );
+        auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, lengthUUID, 0 );
 
         packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
 
         _marsh( packet, CMD_SEND_MESSAGE_META );
         _marsh( packet, lengthBody );
         _marsh( packet, 2 );
-        _marsh( packet, sizeof( unsigned int ) );
+        _marsh( packet, SIZE_UINT );
         _marsh( packet, length );
         _marsh( packet, lengthUUID );
         _marsh( packet, uuid );
@@ -460,17 +530,437 @@ namespace simq::core::server {
 
         auto packet = _packets[fd].get();
 
-        auto lengthBody = _calculateLengthBodyMessage( sizeof( unsigned int ), 0 );
+        auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, 0 );
 
         packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
 
         _marsh( packet, CMD_SEND_MESSAGE_META );
         _marsh( packet, lengthBody );
         _marsh( packet, 1 );
-        _marsh( packet, sizeof( unsigned int ) );
+        _marsh( packet, SIZE_UINT );
         _marsh( packet, length );
 
         return _send( fd, packet );
+    }
+
+    void Protocol::_checkMeta( Packet *packet ) {
+        memcpy( &packet->cmd, packet->values.get(), SIZE_CMD );
+        memcpy( &packet->length, &packet->values.get()[SIZE_CMD], SIZE_UINT );
+        packet->cmd = ( Cmd )ntohl( packet->cmd );
+        packet->length = ntohl( packet->length );
+
+        switch( packet->cmd ) {
+            case CMD_OK:
+            case CMD_CHECK_SECURE:
+            case CMD_CHECK_NOSECURE:
+            case CMD_REMOVE_MESSAGE:
+            case CMD_GET_CHANNELS:
+                if( packet->length != 0 ) {
+                    throw util::Error::WRONG_CMD;
+                }
+                break;
+            case CMD_CHECK_VERSION:
+            case CMD_UPDATE_PASSWORD:
+            case CMD_AUTH_GROUP:
+            case CMD_AUTH_CONSUMER:
+            case CMD_AUTH_PRODUCER:
+            case CMD_GET_CONUMERS:
+            case CMD_GET_PRODUCERS:
+            case CMD_GET_CHANNEL_LIMIT_MESSSAGES:
+            case CMD_ADD_CHANNEL:
+            case CMD_UPDATE_CHANNEL_LIMIT_MESSAGES:
+            case CMD_REMOVE_CHANNEL:
+            case CMD_ADD_CONSUMER:
+            case CMD_UPDATE_CONSUMER_PASSWORD:
+            case CMD_REMOVE_CONSUMER:
+            case CMD_ADD_PRODUCER:
+            case CMD_UPDATE_PRODUCER_PASSWORD:
+            case CMD_REMOVE_PRODUCER:
+            case CMD_PUSH_MESSAGE:
+            case CMD_PUSH_PUBLIC_MESSAGE:
+            case CMD_PUSH_REPLICA_MESSAGE:
+            case CMD_REMOVE_MESSAGE_BY_UUID:
+                if( packet->length > 4096 ) {
+                    throw util::Error::WRONG_CMD;
+                }
+                break;
+            default:
+                throw util::Error::WRONG_CMD;
+                break;
+        }
+    }
+
+    unsigned int Protocol::_getLengthByOffset( Packet *packet, unsigned int offset ) {
+        unsigned int length = 0;
+        memcpy( &length, &packet->values[offset], SIZE_UINT );
+
+        length = ntohl( length );
+
+        if( length == 0 || offset + SIZE_UINT + length > packet->length ) {
+            throw util::Error::WRONG_CMD;
+        }
+
+        return length;
+    }
+
+    unsigned int Protocol::_checkParamCmdUInt(
+        Packet *packet,
+        unsigned int offset,
+        unsigned int iterator
+    ) {
+        auto l = _getLengthByOffset( packet, offset );
+
+        if( l != SIZE_UINT ) {
+            throw util::Error::WRONG_CMD;
+        }
+
+        packet->valuesOffsets[iterator] = l;
+
+        return SIZE_UINT + l;
+    }
+
+    unsigned int Protocol::_checkParamCmdPassword(
+        Packet *packet,
+        unsigned int offset,
+        unsigned int iterator
+    ) {
+        auto l = _getLengthByOffset( packet, offset );
+
+        if( l != PASSWORD_LENGTH ) {
+            throw util::Error::WRONG_CMD;
+        }
+
+        packet->valuesOffsets[iterator] = l;
+
+        return SIZE_UINT + l;
+    }
+
+    unsigned int Protocol::_checkParamCmdGroupName(
+        Packet *packet,
+        unsigned int offset,
+        unsigned int iterator
+    ) {
+        auto l = _getLengthByOffset( packet, offset );
+
+        auto name = &packet->values[offset+SIZE_UINT];
+
+        if( !util::Validation::isGroupName( name ) || strlen( name ) != l-1 ) {
+            throw util::Error::WRONG_CMD;
+        }
+
+        packet->valuesOffsets[iterator] = l;
+
+        return SIZE_UINT + l;
+    }
+
+    unsigned int Protocol::_checkParamCmdChannelName(
+        Packet *packet,
+        unsigned int offset,
+        unsigned int iterator
+    ) {
+        auto l = _getLengthByOffset( packet, offset );
+
+        auto name = &packet->values[offset+SIZE_UINT];
+
+        if( !util::Validation::isChannelName( name ) || strlen( name ) != l-1 ) {
+            throw util::Error::WRONG_CMD;
+        }
+
+        packet->valuesOffsets[iterator] = l;
+
+        return SIZE_UINT + l;
+    }
+
+    unsigned int Protocol::_checkParamCmdConsumerName(
+        Packet *packet,
+        unsigned int offset,
+        unsigned int iterator
+    ) {
+        auto l = _getLengthByOffset( packet, offset );
+
+        auto name = &packet->values[offset+SIZE_UINT];
+
+        if( !util::Validation::isConsumerName( name ) || strlen( name ) != l-1 ) {
+            throw util::Error::WRONG_CMD;
+        }
+
+        packet->valuesOffsets[iterator] = l;
+
+        return SIZE_UINT + l;
+    }
+
+    unsigned int Protocol::_checkParamCmdProducerName(
+        Packet *packet,
+        unsigned int offset,
+        unsigned int iterator
+    ) {
+        auto l = _getLengthByOffset( packet, offset );
+
+        auto name = &packet->values[offset+SIZE_UINT];
+
+        if( !util::Validation::isProducerName( name ) || strlen( name ) != l-1 ) {
+            throw util::Error::WRONG_CMD;
+        }
+
+        packet->valuesOffsets[iterator] = l;
+
+        return SIZE_UINT + l;
+    }
+
+    unsigned int Protocol::_checkParamCmdUUID(
+        Packet *packet,
+        unsigned int offset,
+        unsigned int iterator
+    ) {
+        auto l = _getLengthByOffset( packet, offset );
+
+        auto name = &packet->values[offset+SIZE_UINT];
+
+        if( !util::Validation::isUUID( name ) || strlen( name ) != l-1 ) {
+            throw util::Error::WRONG_CMD;
+        }
+
+        packet->valuesOffsets[iterator] = l;
+
+        return SIZE_UINT + l;
+    }
+
+    void Protocol::_checkControlLength( unsigned int calculateLength, unsigned int length ) {
+        if( calculateLength != length ) {
+            throw util::Error::WRONG_CMD;
+        }
+    }
+
+    void Protocol::_checkCmdCheckVersion( Packet *packet ) {
+        auto offset = SIZE_UINT;
+        offset += _checkParamCmdUInt( packet, offset, 0 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdUpdatePassword( Packet *packet ) {
+        auto offset = SIZE_UINT;
+        offset += _checkParamCmdPassword( packet, offset, 0 );
+        offset += _checkParamCmdPassword( packet, offset, 1 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdAuthGroup( Packet *packet ) {
+        auto offset = SIZE_UINT;
+        offset += _checkParamCmdGroupName( packet, offset, 0 );
+        offset += _checkParamCmdPassword( packet, offset, 1 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdAuthConsumer( Packet *packet ) {
+        auto offset = SIZE_UINT;
+        offset += _checkParamCmdGroupName( packet, offset, 0 );
+        offset += _checkParamCmdChannelName( packet, offset, 1 );
+        offset += _checkParamCmdConsumerName( packet, offset, 2 );
+        offset += _checkParamCmdPassword( packet, offset, 3 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdAuthProducer( Packet *packet ) {
+        auto offset = SIZE_UINT;
+        offset += _checkParamCmdGroupName( packet, offset, 0 );
+        offset += _checkParamCmdChannelName( packet, offset, 1 );
+        offset += _checkParamCmdProducerName( packet, offset, 2 );
+        offset += _checkParamCmdPassword( packet, offset, 3 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdGetUsers( Packet *packet ) {
+        auto offset = SIZE_UINT;
+        offset += _checkParamCmdChannelName( packet, offset, 0 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdGetChannelLimitMessages( Packet *packet ) {
+        auto offset = SIZE_UINT;
+        offset += _checkParamCmdChannelName( packet, offset, 0 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdAddChannel( Packet *packet ) {
+        auto offset = SIZE_UINT;
+        offset += _checkParamCmdChannelName( packet, offset, 0 );
+        offset += _checkParamCmdPassword( packet, offset, 1 );
+        offset += _checkParamCmdUInt( packet, offset, 2 );
+        offset += _checkParamCmdUInt( packet, offset, 3 );
+        offset += _checkParamCmdUInt( packet, offset, 4 );
+        offset += _checkParamCmdUInt( packet, offset, 5 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdUpdateChannelLimitMessages( Packet *packet ) {
+        _checkCmdAddChannel( packet );
+    }
+
+    void Protocol::_checkCmdRemoveChannel( Packet *packet ) {
+        auto offset = SIZE_UINT;
+        offset += _checkParamCmdChannelName( packet, offset, 0 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdAddConsumer( Packet *packet ) {
+        auto offset = SIZE_UINT;
+
+        offset += _checkParamCmdChannelName( packet, offset, 0 );
+        offset += _checkParamCmdConsumerName( packet, offset, 1 );
+        offset += _checkParamCmdPassword( packet, offset, 2 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdUpdateConsumerPassword( Packet *packet ) {
+        _checkCmdAddConsumer( packet );
+    }
+
+    void Protocol::_checkCmdRemoveConsumer( Packet *packet ) {
+        auto offset = SIZE_UINT;
+
+        offset += _checkParamCmdChannelName( packet, offset, 0 );
+        offset += _checkParamCmdConsumerName( packet, offset, 1 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdAddProducer( Packet *packet ) {
+        auto offset = SIZE_UINT;
+
+        offset += _checkParamCmdChannelName( packet, offset, 0 );
+        offset += _checkParamCmdProducerName( packet, offset, 1 );
+        offset += _checkParamCmdPassword( packet, offset, 2 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdUpdateProducerPassword( Packet *packet ) {
+        _checkCmdAddProducer( packet );
+    }
+
+    void Protocol::_checkCmdRemoveProducer( Packet *packet ) {
+        auto offset = SIZE_UINT;
+
+        offset += _checkParamCmdChannelName( packet, offset, 0 );
+        offset += _checkParamCmdProducerName( packet, offset, 1 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdPushMessage( Packet *packet ) {
+        auto offset = SIZE_UINT;
+
+        offset += _checkParamCmdUInt( packet, offset, 0 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdPushReplicaMessage( Packet *packet ) {
+        auto offset = SIZE_UINT;
+
+        offset += _checkParamCmdUInt( packet, offset, 0 );
+        offset += _checkParamCmdUUID( packet, offset, 0 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkCmdPushPublicMessage( Packet *packet ) {
+        _checkCmdPushMessage( packet );
+    }
+
+    void Protocol::_checkCmdRemoveMessageByUUID( Packet *packet ) {
+        auto offset = SIZE_UINT;
+
+        offset += _checkParamCmdUUID( packet, offset, 0 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
+    void Protocol::_checkBody( Packet *packet ) {
+        memcpy( &packet->countValues, packet->values.get(), SIZE_UINT );
+        packet->countValues = ntohl( packet->countValues );
+
+        if( packet->countValues == 0 || packet->countValues > 16 ) {
+            throw util::Error::WRONG_CMD;
+        }
+
+        packet->valuesOffsets = std::make_unique<unsigned int[]>( packet->countValues );
+
+        switch( packet->cmd ) {
+            case CMD_CHECK_VERSION:
+                _checkCmdCheckVersion( packet );
+                break;
+            case CMD_UPDATE_PASSWORD:
+                _checkCmdUpdatePassword( packet );
+                break;
+            case CMD_AUTH_GROUP:
+                _checkCmdAuthGroup( packet );
+                break;
+            case CMD_AUTH_CONSUMER:
+                _checkCmdAuthConsumer( packet );
+                break;
+            case CMD_AUTH_PRODUCER:
+                _checkCmdAuthProducer( packet );
+                break;
+                break;
+            case CMD_GET_CONUMERS:
+            case CMD_GET_PRODUCERS:
+                _checkCmdGetUsers( packet );
+                break;
+                break;
+            case CMD_GET_CHANNEL_LIMIT_MESSSAGES:
+                _checkCmdGetChannelLimitMessages( packet );
+                break;
+            case CMD_ADD_CHANNEL:
+                _checkCmdAddChannel( packet );
+                break;
+            case CMD_UPDATE_CHANNEL_LIMIT_MESSAGES:
+                _checkCmdUpdateChannelLimitMessages( packet );
+                break;
+            case CMD_REMOVE_CHANNEL:
+                _checkCmdRemoveChannel( packet );
+                break;
+            case CMD_ADD_CONSUMER:
+                _checkCmdAddConsumer( packet );
+                break;
+            case CMD_ADD_PRODUCER:
+                _checkCmdAddProducer( packet );
+                break;
+            case CMD_UPDATE_CONSUMER_PASSWORD:
+                _checkCmdUpdateConsumerPassword( packet );
+                break;
+            case CMD_UPDATE_PRODUCER_PASSWORD:
+                _checkCmdUpdateProducerPassword( packet );
+                break;
+            case CMD_REMOVE_CONSUMER:
+                _checkCmdRemoveConsumer( packet );
+                break;
+            case CMD_REMOVE_PRODUCER:
+                _checkCmdRemoveProducer( packet );
+                break;
+            case CMD_PUSH_MESSAGE:
+                _checkCmdPushMessage( packet );
+                break;
+            case CMD_PUSH_REPLICA_MESSAGE:
+                _checkCmdPushReplicaMessage( packet );
+                break;
+            case CMD_PUSH_PUBLIC_MESSAGE:
+                _checkCmdPushPublicMessage( packet );
+                break;
+            case CMD_REMOVE_MESSAGE_BY_UUID:
+                _checkCmdRemoveMessageByUUID( packet );
+                break;
+        }
     }
 
     void Protocol::recv( unsigned int fd ) {
@@ -478,20 +968,166 @@ namespace simq::core::server {
 
         auto packet = _packets[fd].get();
 
-        if( !packet->isRecvMode ) {
+        if( !packet->isRecvMeta && !packet->isRecvBody ) {
             _packets[fd].reset();
             packet->values = std::make_unique<char[]>( LENGTH_META );
-            packet->isRecvMode = true;
+            packet->isRecvMeta = true;
             packet->length = LENGTH_META;
+        }
 
+        if( packet->isRecvMeta ) {
             if( !_recv( fd, packet ) ) {
+                return;
+            }
+
+            packet->isRecvMeta = false;
+            packet->isRecvBody = true;
+            _checkMeta( packet );
+            packet->wrLength = 0;
+            packet->values = std::make_unique<char[]>( packet->length );
+
+            if( !packet->length ) {
                 return;
             }
         }
 
-        if( !_recv( fd, packet ) ) {
-            return;
+        if( packet->isRecvBody && packet->length != packet->wrLength ) {
+            if( !_recv( fd, packet ) ) {
+                return;
+            }
+
+            _checkBody( packet );
+
+            packet->isRecvMeta = false;
+            packet->isRecvBody = false;
         }
+    }
+
+    const Protocol::Packet *Protocol::getPacket( unsigned fd ) {
+        _checkIsset( fd );
+
+        auto packet = _packets[fd].get();
+
+        bool isPassedMeta = !packet->isRecvMeta && packet->isRecvBody;
+        bool isPassedLength = packet->length == 0 || packet->length == packet->wrLength;
+
+        return isPassedMeta && isPassedLength ? packet : nullptr;
+    }
+
+    bool Protocol::isOk( Packet *packet ) {
+        return packet->cmd == CMD_OK;
+    }
+
+    bool Protocol::isCmdCheckSecure( Packet *packet ) {
+        return packet->cmd == CMD_CHECK_SECURE;
+    }
+
+    bool Protocol::isCmdCheckNoSecure( Packet *packet ) {
+        return packet->cmd == CMD_CHECK_NOSECURE;
+    }
+
+    bool Protocol::isCmdAuthGroup( Packet *packet ) {
+        return packet->cmd == CMD_AUTH_GROUP;
+    }
+
+    bool Protocol::isCmdAuthConsumer( Packet *packet ) {
+        return packet->cmd == CMD_AUTH_CONSUMER;
+    }
+
+    bool Protocol::isCmdAuthProducer( Packet *packet ) {
+        return packet->cmd == CMD_AUTH_PRODUCER;
+    }
+
+    bool Protocol::isAddChannel( Packet *packet ) {
+        return packet->cmd == CMD_ADD_CHANNEL;
+    }
+
+    bool Protocol::isUpdateChannelLimitMessages( Packet *packet ) {
+        return packet->cmd == CMD_UPDATE_CHANNEL_LIMIT_MESSAGES;
+    }
+
+    bool Protocol::isRemoveChannel( Packet *packet ) {
+        return packet->cmd == CMD_REMOVE_CHANNEL;
+    }
+
+    bool Protocol::isAddConsumer( Packet *packet ) {
+        return packet->cmd == CMD_ADD_CONSUMER;
+    }
+
+    bool Protocol::isUpdateConsumerPassword( Packet *packet ) {
+        return packet->cmd == CMD_UPDATE_CONSUMER_PASSWORD;
+    }
+
+    bool Protocol::isRemoveConsumer( Packet *packet ) {
+        return packet->cmd == CMD_REMOVE_CONSUMER;
+    }
+
+    bool Protocol::isAddProducer( Packet *packet ) {
+        return packet->cmd == CMD_ADD_PRODUCER;
+    }
+
+    bool Protocol::isUpdateProducerPassword( Packet *packet ) {
+        return packet->cmd == CMD_UPDATE_PRODUCER_PASSWORD;
+    }
+
+    bool Protocol::isRemoveProducer( Packet *packet ) {
+        return packet->cmd == CMD_REMOVE_PRODUCER;
+    }
+
+    bool Protocol::isPopMessage( Packet *packet ) {
+        return packet->cmd == CMD_POP_MESSAGE;
+    }
+
+    bool Protocol::isPushMessage( Packet *packet ) {
+        return packet->cmd == CMD_PUSH_MESSAGE;
+    }
+
+    bool Protocol::isPushPublicMessage( Packet *packet ) {
+        return packet->cmd == CMD_PUSH_PUBLIC_MESSAGE;
+    }
+
+    bool Protocol::isPushReplicaMessage( Packet *packet ) {
+        return packet->cmd == CMD_PUSH_REPLICA_MESSAGE;
+    }
+
+    bool Protocol::isRemoveMessage( Packet *packet ) {
+        return packet->cmd == CMD_REMOVE_MESSAGE;
+    }
+
+    bool Protocol::isRemoveMessageByUUID( Packet *packet ) {
+        return packet->cmd == CMD_REMOVE_MESSAGE_BY_UUID;
+    }
+
+    const char *Protocol::getGroup( Packet *packet ) {
+        return nullptr;
+    }
+
+    const char *Protocol::getChannel( Packet *packet ) {
+        return nullptr;
+    }
+
+    const char *Protocol::getLogin( Packet *packet ) {
+        return nullptr;
+    }
+
+    const char *Protocol::getOldPassword( Packet *packet ) {
+        return nullptr;
+    }
+
+    const char *Protocol::getNewPassword( Packet *packet ) {
+        return nullptr;
+    }
+
+    unsigned int Protocol::getVersion( Packet *packet ) {
+        return 0;
+    }
+
+    unsigned int Protocol::getLength( Packet *packet ) {
+        return 0;
+    }
+
+    const char *Protocol::getUUID( Packet *packet ) {
+        return nullptr;
     }
 }
 
