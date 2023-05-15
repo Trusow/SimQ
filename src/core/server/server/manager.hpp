@@ -109,7 +109,7 @@ namespace simq::core::server::server {
     bool Manager::_accept( int &cfd, unsigned int &ip ) {
         struct sockaddr_in addr_client;
         socklen_t size = sizeof( addr_client );
-        ::accept(
+        cfd = ::accept(
             _sfd,
             ( struct sockaddr * )&addr_client,
             &size
