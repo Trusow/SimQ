@@ -187,7 +187,8 @@ namespace simq::util {
     }
 
     bool Validation::isChannelLimitMessages( util::types::ChannelLimitMessages &limitMessages ) {
-        unsigned long int _size = limitMessages.maxMessagesOnDisk + limitMessages.maxMessagesInMemory;
+        unsigned long int _size = limitMessages.maxMessagesOnDisk;
+        _size += limitMessages.maxMessagesInMemory;
 
         if( _size > 0xFF'FF'FF'FF || _size == 0 ) {
             return false;
