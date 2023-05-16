@@ -77,7 +77,7 @@ namespace simq::core::server {
     void Session::join( unsigned int fd, unsigned int ip ) {
         _checkDuplicate( fd );
 
-        auto item = std::unique_ptr<Item>();
+        auto item = std::make_unique<Item>();
         item->lastTS = time( NULL );
         item->ip = ip;
 
