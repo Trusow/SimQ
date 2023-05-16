@@ -1,17 +1,17 @@
-#ifndef SIMQ_CORE_SERVER_BINDING_CALLBACKS_CLI
-#define SIMQ_CORE_SERVER_BINDING_CALLBACKS_CLI
+#ifndef SIMQ_CORE_SERVER_CLI_CONTROLLER
+#define SIMQ_CORE_SERVER_CLI_CONTROLLER
 
 #include "./cli/callbacks.hpp"
 #include "store.hpp"
 #include "changes.hpp"
 
 namespace simq::core::server {
-    class BindingCallbacksCLI: public CLI::Callbacks {
+    class CLIController: public CLI::Callbacks {
         private:
             Store *_store = nullptr;
             Changes *_changes = nullptr;
         public:
-            BindingCallbacksCLI( Store *store, Changes *changes );
+            CLIController( Store *store, Changes *changes );
             void getGroups( std::vector<std::string> &list );
             void getChannels( const char *group, std::vector<std::string> &list );
             void getConsumers(
@@ -102,20 +102,20 @@ namespace simq::core::server {
             void updateCountThreads( unsigned short int count );
     };
 
-    BindingCallbacksCLI::BindingCallbacksCLI( Store *store, Changes *changes ) {
+    CLIController::CLIController( Store *store, Changes *changes ) {
         _store = store;
         _changes = changes;
     }
 
-    void BindingCallbacksCLI::getGroups( std::vector<std::string> &list ) {
+    void CLIController::getGroups( std::vector<std::string> &list ) {
         _store->getDirectGroups( list );
     }
 
-    void BindingCallbacksCLI::getChannels( const char *group, std::vector<std::string> &list ) {
+    void CLIController::getChannels( const char *group, std::vector<std::string> &list ) {
         _store->getDirectChannels( group, list );
     }
 
-    void BindingCallbacksCLI::getConsumers(
+    void CLIController::getConsumers(
         const char *group,
         const char *channel,
         std::vector<std::string> &list
@@ -123,7 +123,7 @@ namespace simq::core::server {
         _store->getDirectConsumers( group, channel, list );
     }
 
-    void BindingCallbacksCLI::getProducers(
+    void CLIController::getProducers(
         const char *group,
         const char *channel,
         std::vector<std::string> &list
@@ -131,7 +131,7 @@ namespace simq::core::server {
         _store->getDirectProducers( group, channel, list );
     }
 
-    void BindingCallbacksCLI::getChannelLimitMessages(
+    void CLIController::getChannelLimitMessages(
         const char *group,
         const char *channel,
         util::types::ChannelLimitMessages &limitMessages
@@ -139,21 +139,21 @@ namespace simq::core::server {
         _store->getDirectChannelLimitMessages( group, channel, limitMessages );
     }
 
-    unsigned short int BindingCallbacksCLI::getPort() {
+    unsigned short int CLIController::getPort() {
         return _store->getDirectPort();
     }
 
-    unsigned short int BindingCallbacksCLI::getCountThreads() {
+    unsigned short int CLIController::getCountThreads() {
         return _store->getDirectCountThreads();
     }
 
-    void BindingCallbacksCLI::getMasterPassword(
+    void CLIController::getMasterPassword(
         unsigned char password[crypto::HASH_LENGTH]
     ) {
         return _store->getDirectMasterPassword( password );
     }
 
-    void BindingCallbacksCLI::addGroup(
+    void CLIController::addGroup(
         const char *group,
         unsigned char password[crypto::HASH_LENGTH]
     ) {
@@ -161,7 +161,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::updateGroupPassword(
+    void CLIController::updateGroupPassword(
         const char *group,
         unsigned char password[crypto::HASH_LENGTH]
     ) {
@@ -169,12 +169,12 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::removeGroup( const char *group ) {
+    void CLIController::removeGroup( const char *group ) {
         auto ch = _changes->removeGroup( group );
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::addChannel(
+    void CLIController::addChannel(
         const char *group,
         const char *channel,
         util::types::ChannelLimitMessages *limitMessages
@@ -183,7 +183,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::updateChannelLimitMessages(
+    void CLIController::updateChannelLimitMessages(
         const char *group,
         const char *channel,
         util::types::ChannelLimitMessages *limitMessages
@@ -192,7 +192,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::removeChannel(
+    void CLIController::removeChannel(
         const char *group,
         const char *channel
     ) {
@@ -200,7 +200,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::addConsumer(
+    void CLIController::addConsumer(
         const char *group,
         const char *channel,
         const char *login,
@@ -210,7 +210,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::updateConsumerPassword(
+    void CLIController::updateConsumerPassword(
         const char *group,
         const char *channel,
         const char *login,
@@ -220,7 +220,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::removeConsumer(
+    void CLIController::removeConsumer(
         const char *group,
         const char *channel,
         const char *login
@@ -229,7 +229,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::addProducer(
+    void CLIController::addProducer(
         const char *group,
         const char *channel,
         const char *login,
@@ -239,7 +239,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::updateProducerPassword(
+    void CLIController::updateProducerPassword(
         const char *group,
         const char *channel,
         const char *login,
@@ -249,7 +249,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::removeProducer(
+    void CLIController::removeProducer(
         const char *group,
         const char *channel,
         const char *login
@@ -258,15 +258,15 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void BindingCallbacksCLI::updateMasterPassword( unsigned char password[crypto::HASH_LENGTH] ) {
+    void CLIController::updateMasterPassword( unsigned char password[crypto::HASH_LENGTH] ) {
         _store->updateMasterPassword( password );
     }
 
-    void BindingCallbacksCLI::updatePort( unsigned short int port ) {
+    void CLIController::updatePort( unsigned short int port ) {
         _store->updatePort( port );
     }
 
-    void BindingCallbacksCLI::updateCountThreads( unsigned short int count ) {
+    void CLIController::updateCountThreads( unsigned short int count ) {
         _store->updateCountThreads( count );
     }
 }
