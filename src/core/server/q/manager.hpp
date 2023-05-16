@@ -15,7 +15,6 @@
 #include "../../../util/error.h"
 #include "../../../util/types.h"
 #include "../../../util/uuid.hpp"
-#include "../../../util/buffer.hpp"
 #include "messages.hpp"
 
 namespace simq::core::server::q {
@@ -85,7 +84,6 @@ namespace simq::core::server::q {
                 const char *channelName,
                 unsigned int fd,
                 unsigned int length,
-                Messages::WRData &wrData,
                 char *uuid
             );
 
@@ -93,8 +91,7 @@ namespace simq::core::server::q {
                 const char *groupName,
                 const char *channelName,
                 unsigned int fd,
-                unsigned int length,
-                Messages::WRData &wrData
+                unsigned int length
             );
 
             unsigned int createMessageForReplication(
@@ -102,7 +99,6 @@ namespace simq::core::server::q {
                 const char *channelName,
                 unsigned int fd,
                 unsigned int length,
-                Messages::WRData &wrData,
                 const char *uuid
             );
 
@@ -119,19 +115,17 @@ namespace simq::core::server::q {
                 const char *uuid
             );
 
-            void recv(
+            unsigned int recv(
                 const char *groupName,
                 const char *channelName,
                 unsigned int fd,
-                unsigned int id,
-                Messages::WRData &wrData
+                unsigned int id
             );
-            void send(
+            unsigned int send(
                 const char *groupName,
                 const char *channelName,
                 unsigned int fd,
-                unsigned int id,
-                Messages::WRData &wrData
+                unsigned int id
             );
 
             void pushMessage(
@@ -429,7 +423,6 @@ namespace simq::core::server::q {
         const char *channelName,
         unsigned int fd,
         unsigned int length,
-        Messages::WRData &wrData,
         char *uuid
     ) {
         _wait( _countGroupsWrited );
@@ -455,7 +448,7 @@ namespace simq::core::server::q {
 
         _checkProducer( channel->producers, fd );
 
-        auto id = channel->messages->addForQ( length, uuid, wrData );
+        auto id = channel->messages->addForQ( length, uuid );
 
         return id;
     }
@@ -464,8 +457,7 @@ namespace simq::core::server::q {
         const char *groupName,
         const char *channelName,
         unsigned int fd,
-        unsigned int length,
-        Messages::WRData &wrData
+        unsigned int length
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
@@ -490,7 +482,7 @@ namespace simq::core::server::q {
 
         _checkProducer( channel->producers, fd );
 
-        return channel->messages->addForBroadcast( length, wrData );
+        return channel->messages->addForBroadcast( length );
     }
 
     unsigned int Manager::createMessageForReplication(
@@ -498,7 +490,6 @@ namespace simq::core::server::q {
         const char *channelName,
         unsigned int fd,
         unsigned int length,
-        Messages::WRData &wrData,
         const char *uuid
     ) {
         _wait( _countGroupsWrited );
@@ -524,7 +515,7 @@ namespace simq::core::server::q {
 
         _checkProducer( channel->producers, fd );
 
-        auto id = channel->messages->addForReplication( length, uuid, wrData );
+        auto id = channel->messages->addForReplication( length, uuid );
 
         return id;
     }
@@ -617,12 +608,11 @@ namespace simq::core::server::q {
         channel->messages->free( uuid );
     }
 
-    void Manager::recv(
+    unsigned int Manager::recv(
         const char *groupName,
         const char *channelName,
         unsigned int fd,
-        unsigned int id,
-        Messages::WRData &wrData
+        unsigned int id
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
@@ -647,15 +637,14 @@ namespace simq::core::server::q {
 
         _checkProducer( channel->producers, fd );
 
-        channel->messages->recv( id, fd, wrData );
+        return channel->messages->recv( id, fd );
     }
 
-    void Manager::send(
+    unsigned int Manager::send(
         const char *groupName,
         const char *channelName,
         unsigned int fd,
-        unsigned int id,
-        Messages::WRData &wrData
+        unsigned int id
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
@@ -680,7 +669,7 @@ namespace simq::core::server::q {
 
         _checkConsumer( channel->consumers, fd );
 
-        channel->messages->send( id, fd, wrData );
+        return channel->messages->send( id, fd );
     }
 
     void Manager::pushMessage(
@@ -827,6 +816,7 @@ namespace simq::core::server::q {
             return;
         }
 
+        channel->messages->resetSend( id );
         channel->QList.push_front( id );
     }
 }

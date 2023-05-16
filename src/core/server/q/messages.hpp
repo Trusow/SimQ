@@ -11,22 +11,17 @@
 #include <vector>
 #include "../../../util/uuid.hpp"
 #include "../../../util/lock_atomic.hpp"
-#include "../../../util/buffer.hpp"
+#include "buffer.hpp"
 #include "../../../util/types.h"
 #include "../../../util/error.h"
 #include "../../../util/constants.h"
 
 namespace simq::core::server::q {
     class Messages {
-        public:
-            struct WRData {
-                unsigned int length;
-                unsigned int wrLength;
-            };
         private:
             const unsigned int MESSAGES_IN_PACKET = 10'000;
             const unsigned int MESSAGE_PACKET_SIZE = util::constants::MESSAGE_PACKET_SIZE;
-            std::unique_ptr<util::Buffer> _buffer;
+            std::unique_ptr<Buffer> _buffer;
 
             struct Message {
                 char uuid[util::UUID::LENGTH+1];
@@ -51,28 +46,27 @@ namespace simq::core::server::q {
             void _wait( std::atomic_uint &atom );
             unsigned int _allocateMessage( unsigned int length, bool &isMemory );
             void _expandMessages();
-            unsigned int _calculateWRLength( WRData &wrData );
             void _validateAdd( unsigned int length );
         public:
             Messages( const char *path, util::types::ChannelLimitMessages &limits );
 
             void updateLimits( util::types::ChannelLimitMessages &limits );
 
-            unsigned int addForQ( unsigned int length, char *uuid, WRData &wrData );
-            unsigned int addForReplication( unsigned int length, const char *uuid, WRData &wrData );
-            unsigned int addForBroadcast( unsigned int length, WRData &wrData );
+            unsigned int addForQ( unsigned int length, char *uuid );
+            unsigned int addForReplication( unsigned int length, const char *uuid );
+            unsigned int addForBroadcast( unsigned int length );
             void free( unsigned int id );
             void free( const char *uuid );
             void getUUID( unsigned int id, char *uuid );
             unsigned int getID( const char *uuid );
 
-            void recv( unsigned int id, unsigned int fd, WRData &wrData );
-            void send( unsigned int id, unsigned int fd, WRData &wrData );
-            bool isFullPart( WRData &wrData );
+            unsigned int recv( unsigned int id, unsigned int fd );
+            unsigned int send( unsigned int id, unsigned int fd );
+            void resetSend( unsigned int id );
     };
 
     Messages::Messages( const char *path, util::types::ChannelLimitMessages &limits ) {
-        _buffer = std::make_unique<util::Buffer>( path );
+        _buffer = std::make_unique<Buffer>( path );
         _messages.resize( MESSAGES_IN_PACKET );
         _limits = limits;
     }
@@ -89,7 +83,7 @@ namespace simq::core::server::q {
         unsigned int id;
 
         if( _totalInMemory < _limits.maxMessagesInMemory ) {
-            id = _buffer->allocate( length, length < MESSAGE_PACKET_SIZE ? length : MESSAGE_PACKET_SIZE );
+            id = _buffer->allocate( length );
             isMemory = true;
             _totalInMemory++;
         } else if( _totalOnDisk < _limits.maxMessagesOnDisk ) {
@@ -137,7 +131,7 @@ namespace simq::core::server::q {
         }
     }
 
-    unsigned int Messages::addForQ( unsigned int length, char *uuid, WRData &wrData ) {
+    unsigned int Messages::addForQ( unsigned int length, char *uuid ) {
         _validateAdd( length );
 
         util::LockAtomic lockAtomic( _countWrited );
@@ -156,9 +150,6 @@ namespace simq::core::server::q {
         _messages[id] = std::make_unique<Message>();
         _messages[id]->isMemory = isMemory;
 
-        wrData.length = length;
-        wrData.wrLength = 0;
-
         while( true ) {
             util::UUID::generate( uuid );
             auto it = _uuid.find( uuid );
@@ -173,7 +164,7 @@ namespace simq::core::server::q {
         return id;
     }
 
-    unsigned int Messages::addForReplication( unsigned int length, const char *uuid, WRData &wrData ) {
+    unsigned int Messages::addForReplication( unsigned int length, const char *uuid ) {
         _validateAdd( length );
 
         util::LockAtomic lockAtomic( _countWrited );
@@ -197,15 +188,12 @@ namespace simq::core::server::q {
         _messages[id] = std::make_unique<Message>();
         _messages[id]->isMemory = isMemory;
 
-        wrData.length = length;
-        wrData.wrLength = 0;
-
         memcpy( _messages[id]->uuid, uuid, util::UUID::LENGTH );
 
         return id;
     }
 
-    unsigned int Messages::addForBroadcast( unsigned int length, WRData &wrData ) {
+    unsigned int Messages::addForBroadcast( unsigned int length ) {
         _validateAdd( length );
 
         util::LockAtomic lockAtomic( _countWrited );
@@ -220,9 +208,6 @@ namespace simq::core::server::q {
 
         _messages[id] = std::make_unique<Message>();
         _messages[id]->isMemory = isMemory;
-
-        wrData.length = length;
-        wrData.wrLength = 0;
 
         return id;
     }
@@ -265,26 +250,7 @@ namespace simq::core::server::q {
         _messages[id].reset();
     }
 
-    unsigned int Messages::_calculateWRLength( WRData &wrData ) {
-        auto length = 0;
-
-        if( wrData.length < MESSAGE_PACKET_SIZE ) {
-            length = wrData.length - wrData.wrLength;
-        } else {
-            unsigned int count = wrData.wrLength / MESSAGE_PACKET_SIZE;
-            unsigned int fullCount = wrData.length / MESSAGE_PACKET_SIZE;
-            if( fullCount == count ) {
-                length = wrData.length - wrData.wrLength;
-            } else {
-                unsigned int residue = wrData.wrLength - count * MESSAGE_PACKET_SIZE;
-                length = MESSAGE_PACKET_SIZE - residue;
-            }
-        }
-
-        return length;
-    }
-
-    void Messages::recv( unsigned int id, unsigned int fd, WRData &wrData ) {
+    unsigned int Messages::recv( unsigned int id, unsigned int fd ) {
         _wait( _countWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _m );
 
@@ -292,10 +258,10 @@ namespace simq::core::server::q {
             throw util::Error::UNKNOWN;
         }
 
-        wrData.wrLength += _buffer->recv( id, fd, _calculateWRLength( wrData ) );
+        return _buffer->recv( id, fd );
     }
 
-    void Messages::send( unsigned int id, unsigned int fd, WRData &wrData ) {
+    unsigned int Messages::send( unsigned int id, unsigned int fd ) {
         _wait( _countWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _m );
 
@@ -303,11 +269,14 @@ namespace simq::core::server::q {
             throw util::Error::UNKNOWN;
         }
 
-        wrData.wrLength += _buffer->send( id, fd, _calculateWRLength( wrData ), wrData.wrLength );
+        return _buffer->send( id, fd );
     }
 
-    bool Messages::isFullPart( WRData &wrData ) {
-        return wrData.wrLength % MESSAGE_PACKET_SIZE == 0 || wrData.wrLength == wrData.length;
+    void Messages::resetSend( unsigned int id ) {
+        _wait( _countWrited );
+        std::shared_lock<std::shared_timed_mutex> lock( _m );
+
+        _buffer->resetSend( id );
     }
 }
 
