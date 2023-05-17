@@ -168,12 +168,7 @@ namespace simq::core::server::q {
         util::LockAtomic lockAtomic( _countGroupsWrited );
         std::lock_guard<std::shared_timed_mutex> lock( _mGroups );
 
-        auto it = _groups.find( groupName );
-        if( it == _groups.end() ) {
-            return;
-        }
-
-        _groups.erase( it );
+        _groups.erase( groupName );
     }
 
     void Manager::addChannel(
@@ -242,12 +237,7 @@ namespace simq::core::server::q {
         util::LockAtomic lockAtomicChannels( group->countChannelsWrited );
         std::lock_guard<std::shared_timed_mutex> lockChannels( group->mChannels );
 
-        auto itChannel = group->channels.find( channelName );
-        if( itChannel == group->channels.end() ) {
-            return;
-        }
-
-        group->channels.erase( itChannel );
+        group->channels.erase( channelName );
     }
 
     void Manager::joinConsumer( const char *groupName, const char *channelName, unsigned int fd ) {
@@ -386,12 +376,7 @@ namespace simq::core::server::q {
         util::LockAtomic lockAtomicChannels( channel->countProducersWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducer( channel->mProducers );
 
-        auto itProducer = channel->producers.find( fd );
-        if( itProducer == channel->producers.end() ) {
-            return;
-        }
-
-        channel->producers.erase( itProducer );
+        channel->producers.erase( fd );
     }
 
     bool Manager::_isConsumer( std::map<unsigned int, std::list<unsigned int>> &map, unsigned int fd ) {
