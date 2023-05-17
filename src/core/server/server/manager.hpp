@@ -141,9 +141,9 @@ namespace simq::core::server::server {
         }
 
         auto optval = 1;
-        setsockopt( cfd, SOL_SOCKET, TCP_NODELAY, &optval, sizeof( optval ) );
+        setsockopt( cfd, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof( optval ) );
         optval = 0;
-        setsockopt( cfd, SOL_SOCKET, TCP_CORK, &optval, sizeof( optval ) );
+        setsockopt( cfd, IPPROTO_TCP, TCP_CORK, &optval, sizeof( optval ) );
 
         return true;
     }
