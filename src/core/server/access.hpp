@@ -312,12 +312,7 @@ namespace simq::core::server {
         util::LockAtomic lockAtomicGroup( _countGroupsWrited );
         std::lock_guard<std::shared_timed_mutex> lockGroups( _mGroups );
 
-        auto it = _groups.find( groupName );
-        if( it == _groups.end() ) {
-            return;
-        }
-
-        _groups.erase( it );
+        _groups.erase( groupName );
     }
 
     void Access::addChannel( const char *groupName, const char *channelName ) {
@@ -347,12 +342,7 @@ namespace simq::core::server {
         util::LockAtomic lockAtomicChannels( group->countChannelsWrited );
         std::lock_guard<std::shared_timed_mutex> lockChannels( group->mChannels );
 
-        auto itCh = group->channels.find( channelName );
-        if( itCh == group->channels.end() ) {
-            return;
-        }
-
-        group->channels.erase( itCh );
+        group->channels.erase( channelName );
     }
 
     void Access::addConsumer(
@@ -440,12 +430,7 @@ namespace simq::core::server {
         util::LockAtomic lockAtomicConsumers( channel->countConsumersWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumers( channel->mConsumers );
 
-        auto itConsumer = channel->consumers.find( login );
-        if( itConsumer == channel->consumers.end() ) {
-            return;
-        }
-
-        channel->consumers.erase( itConsumer );
+        channel->consumers.erase( login );
     }
 
     void Access::addProducer(
@@ -534,12 +519,7 @@ namespace simq::core::server {
         util::LockAtomic lockAtomicProducers( channel->countProducersWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducers( channel->mProducers );
 
-        auto itProducer = channel->producers.find( login );
-        if( itProducer == channel->producers.end() ) {
-            return;
-        }
-
-        channel->producers.erase( itProducer );
+        channel->producers.erase( login );
     }
 
     void Access::authGroup(
@@ -655,13 +635,7 @@ namespace simq::core::server {
         util::LockAtomic lockAtomicGroupSessions( group->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
 
-        auto it = group->sessions.find( fd );
-
-        if( it == group->sessions.end() ) {
-            return;
-        }
-
-        group->sessions.erase( it );
+        group->sessions.erase( fd );
     }
 
     void Access::logoutConsumer(
@@ -700,13 +674,7 @@ namespace simq::core::server {
         util::LockAtomic lockAtomicConsumerSessions( consumer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
 
-        auto it = consumer->sessions.find( fd );
-
-        if( it == consumer->sessions.end() ) {
-            return;
-        }
-
-        consumer->sessions.erase( it );
+        consumer->sessions.erase( fd );
     }
 
     void Access::logoutProducer(
@@ -745,13 +713,7 @@ namespace simq::core::server {
         util::LockAtomic lockAtomicProducerSessions( producer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
 
-        auto it = producer->sessions.find( fd );
-
-        if( it == producer->sessions.end() ) {
-            return;
-        }
-
-        producer->sessions.erase( it );
+        producer->sessions.erase( fd );
     }
 
     void Access::_checkGroupSession( const char *groupName, unsigned int fd ) {
