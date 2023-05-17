@@ -267,7 +267,7 @@ namespace simq::core::server {
 
     void Protocol::leave( unsigned int fd ) {
         _checkIsset( fd );
-        _packets[fd].reset();
+        _packets.erase( fd );
     }
 
     bool Protocol::_send( unsigned int fd, Packet *packet ) {
