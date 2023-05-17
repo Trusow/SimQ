@@ -103,6 +103,8 @@ namespace simq::core::server {
 
             void _demarsh( const char *data, unsigned int &value );
 
+            void _reservePacketValues( Packet *packet, unsigned int length );
+
             void _checkMeta( Packet *packet );
             void _checkBody( Packet *packet );
 
@@ -361,13 +363,18 @@ namespace simq::core::server {
         value = ntohl( value );
     }
 
+    void Protocol::_reservePacketValues( Packet *packet, unsigned int length ){
+        packet->values = std::make_unique<char[]>( length );
+        packet->length = length;
+        packet->wrLength = 0;
+    }
+
     bool Protocol::sendNoSecure( unsigned int fd ) {
         _checkIsset( fd );
-        _packets[fd].reset();
 
         auto packet = _packets[fd].get();
 
-        packet->values = std::make_unique<char[]>( LENGTH_META );
+        _reservePacketValues( packet, LENGTH_META );
 
         _marsh( packet, CMD_CHECK_NOSECURE );
         _marsh( packet, ( unsigned int )0 );
@@ -377,13 +384,12 @@ namespace simq::core::server {
 
     bool Protocol::sendVersion( unsigned int fd ) {
         _checkIsset( fd );
-        _packets[fd].reset();
 
         auto packet = _packets[fd].get();
 
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, 0 );
 
-        packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
+        _reservePacketValues( packet, LENGTH_META + lengthBody );
 
         _marsh( packet, CMD_CHECK_VERSION );
         _marsh( packet, lengthBody );
@@ -397,11 +403,10 @@ namespace simq::core::server {
 
     bool Protocol::sendOk( unsigned int fd ) {
         _checkIsset( fd );
-        _packets[fd].reset();
 
         auto packet = _packets[fd].get();
 
-        packet->values = std::make_unique<char[]>( LENGTH_META );
+        _reservePacketValues( packet, LENGTH_META );
 
         _marsh( packet, CMD_OK );
         _marsh( packet, ( unsigned int )0 );
@@ -411,15 +416,13 @@ namespace simq::core::server {
 
     bool Protocol::sendError( unsigned int fd, const char *description ) {
         _checkIsset( fd );
-        _packets[fd].reset();
 
         auto packet = _packets[fd].get();
 
         auto lengthDescr = strlen( description ) + 1;
-
         auto lengthBody = _calculateLengthBodyMessage( lengthDescr, 0 );
 
-        packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
+        _reservePacketValues( packet, LENGTH_META + lengthBody );
 
         _marsh( packet, CMD_CHECK_VERSION );
         _marsh( packet, lengthBody );
@@ -433,7 +436,6 @@ namespace simq::core::server {
 
     bool Protocol::sendStringList( unsigned int fd, std::list<std::string> &list ) {
         _checkIsset( fd );
-        _packets[fd].reset();
 
         auto packet = _packets[fd].get();
 
@@ -444,7 +446,7 @@ namespace simq::core::server {
             lengthBody += strlen( (*it).c_str() ) + 1;
         }
 
-        packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
+        _reservePacketValues( packet, LENGTH_META + lengthBody );
 
         _marsh( packet, CMD_STRING_LIST );
         _marsh( packet, lengthBody );
@@ -463,7 +465,6 @@ namespace simq::core::server {
         util::types::ChannelLimitMessages &limitMessages
     ) {
         _checkIsset( fd );
-        _packets[fd].reset();
 
         auto packet = _packets[fd].get();
 
@@ -475,7 +476,7 @@ namespace simq::core::server {
             0
         );
 
-        packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
+        _reservePacketValues( packet, LENGTH_META + lengthBody );
 
         _marsh( packet, CMD_SEND_CHANNEL_LIMIT_MESSSAGES );
         _marsh( packet, lengthBody );
@@ -494,15 +495,13 @@ namespace simq::core::server {
 
     bool Protocol::sendMessageMetaPush( unsigned int fd, const char *uuid ) {
         _checkIsset( fd );
-        _packets[fd].reset();
 
         auto packet = _packets[fd].get();
 
         auto lengthUUID = strlen( uuid ) + 1;
-
         auto lengthBody = _calculateLengthBodyMessage( lengthUUID, 0 );
 
-        packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
+        _reservePacketValues( packet, LENGTH_META + lengthBody );
 
         _marsh( packet, CMD_SEND_UUID_MESSAGE );
         _marsh( packet, lengthBody );
@@ -519,15 +518,13 @@ namespace simq::core::server {
 
     bool Protocol::sendMessageMetaPop( unsigned int fd, unsigned int length, const char *uuid ) {
         _checkIsset( fd );
-        _packets[fd].reset();
 
         auto packet = _packets[fd].get();
 
         auto lengthUUID = strlen( uuid ) + 1;
-
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, lengthUUID, 0 );
 
-        packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
+        _reservePacketValues( packet, LENGTH_META + lengthBody );
 
         _marsh( packet, CMD_SEND_MESSAGE_META );
         _marsh( packet, lengthBody );
@@ -542,13 +539,12 @@ namespace simq::core::server {
 
     bool Protocol::sendPublicMessageMetaPop( unsigned int fd, unsigned int length ) {
         _checkIsset( fd );
-        _packets[fd].reset();
 
         auto packet = _packets[fd].get();
 
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, 0 );
 
-        packet->values = std::make_unique<char[]>( LENGTH_META + lengthBody );
+        _reservePacketValues( packet, LENGTH_META + lengthBody );
 
         _marsh( packet, CMD_SEND_MESSAGE_META );
         _marsh( packet, lengthBody );
@@ -998,10 +994,8 @@ namespace simq::core::server {
         auto packet = _packets[fd].get();
 
         if( !packet->isRecvMeta && !packet->isRecvBody ) {
-            _packets[fd].reset();
-            packet->values = std::make_unique<char[]>( LENGTH_META );
+            _reservePacketValues( packet, LENGTH_META );
             packet->isRecvMeta = true;
-            packet->length = LENGTH_META;
         }
 
         if( packet->isRecvMeta ) {
@@ -1012,8 +1006,7 @@ namespace simq::core::server {
             packet->isRecvMeta = false;
             packet->isRecvBody = true;
             _checkMeta( packet );
-            packet->wrLength = 0;
-            packet->values = std::make_unique<char[]>( packet->length );
+            _reservePacketValues( packet, packet->length );
 
             if( !packet->length ) {
                 return;
