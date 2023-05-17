@@ -79,6 +79,7 @@ namespace simq::core::server {
 
         auto item = std::make_unique<Item>();
         item->lastTS = time( NULL );
+        item->watchTS = true;
         item->ip = ip;
 
         _items[fd] = std::move( item );
