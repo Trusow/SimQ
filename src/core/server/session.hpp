@@ -147,13 +147,7 @@ namespace simq::core::server {
     }
 
     void Session::leave( unsigned int fd ) {
-        auto it = _items.find( fd );
-
-        if( it == _items.end() ) {
-            return;
-        }
-
-        _items.erase( it );
+        _items.erase( fd );
     }
 
     const char *Session::getGroup( unsigned int fd ) {
