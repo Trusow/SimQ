@@ -925,11 +925,7 @@ namespace simq::core::server {
 
         util::FS::removeFile( p.c_str() );
 
-        auto it = passedFiles.find( name );
-
-        if( it != passedFiles.end() ) {
-            passedFiles.erase( it );
-        }
+        passedFiles.erase( name );
     }
 
     std::unique_ptr<Changes::Change> Changes::pop() {
