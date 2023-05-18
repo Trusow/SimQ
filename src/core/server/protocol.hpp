@@ -20,12 +20,12 @@
 namespace simq::core::server {
     class Protocol {
         private:
-            const unsigned int VERSION = 101;
-            const unsigned int SIZE_UINT = sizeof( unsigned int );
-            const unsigned int PASSWORD_LENGTH = crypto::HASH_LENGTH;
+            const static unsigned int VERSION = 101;
+            const static unsigned int SIZE_UINT = sizeof( unsigned int );
+            const static unsigned int PASSWORD_LENGTH = crypto::HASH_LENGTH;
 
         public:
-            const unsigned int LENGTH_META = SIZE_UINT * 2;
+            const static unsigned int LENGTH_META = SIZE_UINT * 2;
 
             enum Cmd {
                 CMD_OK = 10,
@@ -88,189 +88,186 @@ namespace simq::core::server {
                 std::unique_ptr<char[]> values;
             };
         private:
-            const unsigned int SIZE_CMD = sizeof( Cmd );
+            static const unsigned int SIZE_CMD = sizeof( Cmd );
 
-            std::map<unsigned int, std::unique_ptr<Packet>> _packets;
-            void _checkNoIsset( unsigned int fd );
-            void _checkIsset( unsigned int fd );
-            bool _send( unsigned int fd, Packet *packet );
-            bool _recv( unsigned int fd, Packet *packet );
-            unsigned int _calculateLengthBodyMessage( unsigned int value, ... );
+            static bool _send( unsigned int fd, Packet *packet );
+            static bool _recv( unsigned int fd, Packet *packet );
+            static unsigned int _calculateLengthBodyMessage( unsigned int value, ... );
 
-            void _marsh( Packet *packet, unsigned int value );
-            void _marsh( Packet *packet, Cmd value );
-            void _marsh( Packet *packet, const char *value );
+            static void _marsh( Packet *packet, unsigned int value );
+            static void _marsh( Packet *packet, Cmd value );
+            static void _marsh( Packet *packet, const char *value );
 
-            void _demarsh( const char *data, unsigned int &value );
+            static void _demarsh( const char *data, unsigned int &value );
 
-            void _reservePacketValues( Packet *packet, unsigned int length );
+            static void _reservePacketValues( Packet *packet, unsigned int length );
 
-            void _checkMeta( Packet *packet );
-            void _checkBody( Packet *packet );
+            static void _checkMeta( Packet *packet );
+            static void _checkBody( Packet *packet );
 
-            unsigned int _getLengthByOffset( Packet *packet, unsigned int offset );
+            static unsigned int _getLengthByOffset( Packet *packet, unsigned int offset );
 
-            unsigned int _checkParamCmdUInt(
+            static unsigned int _checkParamCmdUInt(
                 Packet *packet,
                 unsigned int offset,
                 unsigned int iterator
             );
-            unsigned int _checkParamCmdPassword(
+            static unsigned int _checkParamCmdPassword(
                 Packet *packet,
                 unsigned int offset,
                 unsigned int iterator
             );
-            unsigned int _checkParamCmdGroupName(
+            static unsigned int _checkParamCmdGroupName(
                 Packet *packet,
                 unsigned int offset,
                 unsigned int iterator
             );
-            unsigned int _checkParamCmdChannelName(
+            static unsigned int _checkParamCmdChannelName(
                 Packet *packet,
                 unsigned int offset,
                 unsigned int iterator
             );
-            unsigned int _checkParamCmdConsumerName(
+            static unsigned int _checkParamCmdConsumerName(
                 Packet *packet,
                 unsigned int offset,
                 unsigned int iterator
             );
-            unsigned int _checkParamCmdProducerName(
+            static unsigned int _checkParamCmdProducerName(
                 Packet *packet,
                 unsigned int offset,
                 unsigned int iterator
             );
-            unsigned int _checkParamCmdUUID(
+            static unsigned int _checkParamCmdUUID(
                 Packet *packet,
                 unsigned int offset,
                 unsigned int iterator
             );
 
-            void _checkControlLength( unsigned int calculateLength, unsigned int length );
+            static void _checkControlLength( unsigned int calculateLength, unsigned int length );
 
-            void _checkCmdCheckVersion( Packet *packet );
-            void _checkCmdUpdatePassword( Packet *packet );
-            void _checkCmdAuthGroup( Packet *packet );
-            void _checkCmdAuthConsumer( Packet *packet );
-            void _checkCmdAuthProducer( Packet *packet );
-            void _checkCmdGetUsers( Packet *packet );
-            void _checkCmdGetChannelLimitMessages( Packet *packet );
-            void _checkCmdAddChannel( Packet *packet );
-            void _checkCmdUpdateChannelLimitMessages( Packet *packet );
-            void _checkCmdRemoveChannel( Packet *packet );
-            void _checkCmdAddConsumer( Packet *packet );
-            void _checkCmdUpdateConsumerPassword( Packet *packet );
-            void _checkCmdRemoveConsumer( Packet *packet );
-            void _checkCmdAddProducer( Packet *packet );
-            void _checkCmdUpdateProducerPassword( Packet *packet );
-            void _checkCmdRemoveProducer( Packet *packet );
-            void _checkCmdPushMessage( Packet *packet );
-            void _checkCmdPushReplicaMessage( Packet *packet );
-            void _checkCmdPushPublicMessage( Packet *packet );
-            void _checkCmdRemoveMessageByUUID( Packet *packet );
+            static void _checkCmdCheckVersion( Packet *packet );
+            static void _checkCmdUpdatePassword( Packet *packet );
+            static void _checkCmdAuthGroup( Packet *packet );
+            static void _checkCmdAuthConsumer( Packet *packet );
+            static void _checkCmdAuthProducer( Packet *packet );
+            static void _checkCmdGetUsers( Packet *packet );
+            static void _checkCmdGetChannelLimitMessages( Packet *packet );
+            static void _checkCmdAddChannel( Packet *packet );
+            static void _checkCmdUpdateChannelLimitMessages( Packet *packet );
+            static void _checkCmdRemoveChannel( Packet *packet );
+            static void _checkCmdAddConsumer( Packet *packet );
+            static void _checkCmdUpdateConsumerPassword( Packet *packet );
+            static void _checkCmdRemoveConsumer( Packet *packet );
+            static void _checkCmdAddProducer( Packet *packet );
+            static void _checkCmdUpdateProducerPassword( Packet *packet );
+            static void _checkCmdRemoveProducer( Packet *packet );
+            static void _checkCmdPushMessage( Packet *packet );
+            static void _checkCmdPushReplicaMessage( Packet *packet );
+            static void _checkCmdPushPublicMessage( Packet *packet );
+            static void _checkCmdRemoveMessageByUUID( Packet *packet );
 
         public:
-            void join( unsigned int fd );
-            void leave( unsigned int fd );
-
-            bool sendNoSecure( unsigned int fd );
-            bool sendVersion( unsigned int fd );
-            bool sendOk( unsigned int fd );
-            bool sendError( unsigned int fd, const char *description );
-            bool sendStringList( unsigned int fd, std::list<std::string> &list );
-            bool sendChannelLimitMessages(
+            static bool sendNoSecure( unsigned int fd, Packet *packet );
+            static bool sendVersion( unsigned int fd, Packet *packet );
+            static bool sendOk( unsigned int fd, Packet *packet );
+            static bool sendError(
                 unsigned int fd,
-                util::types::ChannelLimitMessages &limitMessages
+                Packet *packet,
+                const char *description
             );
-
-            bool sendMessageMetaPush( unsigned int fd, const char *uuid );
-            bool sendPublicMessageMetaPush( unsigned int fd );
-            bool sendMessageMetaPop( unsigned int fd, unsigned int length, const char *uuid );
-            bool sendPublicMessageMetaPop( unsigned int fd, unsigned int length );
-
-            bool continueSend( unsigned int fd );
-
-            void recv( unsigned int fd );
-
-            const Packet *getPacket( unsigned fd );
-
-            bool isOk( Packet *packet );
-
-            bool isCheckSecure( Packet *packet );
-            bool isCheckNoSecure( Packet *packet );
-            bool isCheckVersion( Packet *packet );
-
-            bool isUpdatePassword( Packet *packet );
-
-            bool isGetChannels( Packet *packet );
-            bool isGetChannelLimitMessages( Packet *packet );
-            bool isGetConsumers( Packet *packet );
-            bool isGetProducers( Packet *packet );
-
-            bool isAuthGroup( Packet *packet );
-            bool isAuthConsumer( Packet *packet );
-            bool isAuthProducer( Packet *packet );
-
-            bool isAddChannel( Packet *packet );
-            bool isUpdateChannelLimitMessages( Packet *packet );
-            bool isRemoveChannel( Packet *packet );
-
-            bool isAddConsumer( Packet *packet );
-            bool isUpdateConsumerPassword( Packet *packet );
-            bool isRemoveConsumer( Packet *packet );
-
-            bool isAddProducer( Packet *packet );
-            bool isUpdateProducerPassword( Packet *packet );
-            bool isRemoveProducer( Packet *packet );
-
-            bool isPopMessage( Packet *packet );
-
-            bool isPushMessage( Packet *packet );
-            bool isPushPublicMessage( Packet *packet );
-            bool isPushReplicaMessage( Packet *packet );
-
-            bool isRemoveMessage( Packet *packet );
-            bool isRemoveMessageByUUID( Packet *packet );
-
-            const char *getGroup( Packet *packet );
-            const char *getChannel( Packet *packet );
-            const char *getConsumer( Packet *packet );
-            const char *getProducer( Packet *packet );
-
-            const char *getPassword( Packet *packet );
-            const char *getNewPassword( Packet *packet );
-
-            unsigned int getVersion( Packet *packet );
-
-            unsigned int getLength( Packet *packet );
-            const char *getUUID( Packet *packet );
-            void getChannelLimitMessages(
+            static bool sendStringList(
+                unsigned int fd,
+                Packet *packet,
+                std::list<std::string> &list
+            );
+            static bool sendChannelLimitMessages(
+                unsigned int fd,
                 Packet *packet,
                 util::types::ChannelLimitMessages &limitMessages
             );
+
+            static bool sendMessageMetaPush(
+                unsigned int fd,
+                Packet *packet,
+                const char *uuid
+            );
+            static bool sendPublicMessageMetaPush(
+                unsigned int fd,
+                Packet *packet
+            );
+            static bool sendMessageMetaPop(
+                unsigned int fd,
+                Packet *packet,
+                unsigned int length,
+                const char *uuid
+            );
+            static bool sendPublicMessageMetaPop(
+                unsigned int fd,
+                Packet *packet,
+                unsigned int length
+            );
+
+            static bool continueSend( unsigned int fd, Packet *packet );
+
+            static void recv( unsigned int fd, Packet *packet );
+
+            static bool isOk( Packet *packet );
+
+            static bool isCheckSecure( Packet *packet );
+            static bool isCheckNoSecure( Packet *packet );
+            static bool isCheckVersion( Packet *packet );
+
+            static bool isUpdatePassword( Packet *packet );
+
+            static bool isGetChannels( Packet *packet );
+            static bool isGetChannelLimitMessages( Packet *packet );
+            static bool isGetConsumers( Packet *packet );
+            static bool isGetProducers( Packet *packet );
+
+            static bool isAuthGroup( Packet *packet );
+            static bool isAuthConsumer( Packet *packet );
+            static bool isAuthProducer( Packet *packet );
+
+            static bool isAddChannel( Packet *packet );
+            static bool isUpdateChannelLimitMessages( Packet *packet );
+            static bool isRemoveChannel( Packet *packet );
+
+            static bool isAddConsumer( Packet *packet );
+            static bool isUpdateConsumerPassword( Packet *packet );
+            static bool isRemoveConsumer( Packet *packet );
+
+            static bool isAddProducer( Packet *packet );
+            static bool isUpdateProducerPassword( Packet *packet );
+            static bool isRemoveProducer( Packet *packet );
+
+            static bool isPopMessage( Packet *packet );
+
+            static bool isPushMessage( Packet *packet );
+            static bool isPushPublicMessage( Packet *packet );
+            static bool isPushReplicaMessage( Packet *packet );
+
+            static bool isRemoveMessage( Packet *packet );
+            static bool isRemoveMessageByUUID( Packet *packet );
+
+            static const char *getGroup( Packet *packet );
+            static const char *getChannel( Packet *packet );
+            static const char *getConsumer( Packet *packet );
+            static const char *getProducer( Packet *packet );
+
+            static const char *getPassword( Packet *packet );
+            static const char *getNewPassword( Packet *packet );
+
+            static unsigned int getVersion( Packet *packet );
+
+            static unsigned int getLength( Packet *packet );
+            static const char *getUUID( Packet *packet );
+            static void getChannelLimitMessages(
+                Packet *packet,
+                util::types::ChannelLimitMessages &limitMessages
+            );
+
+            static bool isReceived( Packet *packet );
     };
-
-    void Protocol::_checkNoIsset( unsigned int fd ) {
-        if( _packets.find( fd ) != _packets.end() ) {
-            throw util::Error::DUPLICATE_SESSION;
-        }
-    }
-
-    void Protocol::_checkIsset( unsigned int fd ) {
-        if( _packets.find( fd ) == _packets.end() ) {
-            throw util::Error::NOT_FOUND_SESSION;
-        }
-    }
-
-    void Protocol::join( unsigned int fd ) {
-        _checkNoIsset( fd );
-        _packets[fd] = std::make_unique<Packet>();
-    }
-
-    void Protocol::leave( unsigned int fd ) {
-        _checkIsset( fd );
-        _packets.erase( fd );
-    }
 
     bool Protocol::_send( unsigned int fd, Packet *packet ) {
         auto l = ::send(
@@ -314,9 +311,8 @@ namespace simq::core::server {
         return packet->wrLength == packet->length;
     }
 
-    bool Protocol::continueSend( unsigned int fd ) {
-        _checkIsset( fd );
-        return _send( fd, _packets[fd].get() );
+    bool Protocol::continueSend( unsigned int fd, Packet *packet ) {
+        return _send( fd, packet );
     };
 
     unsigned int Protocol::_calculateLengthBodyMessage( unsigned int value, ... ) {
@@ -369,11 +365,7 @@ namespace simq::core::server {
         packet->wrLength = 0;
     }
 
-    bool Protocol::sendNoSecure( unsigned int fd ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
+    bool Protocol::sendNoSecure( unsigned int fd, Packet *packet ) {
         _reservePacketValues( packet, LENGTH_META );
 
         _marsh( packet, CMD_CHECK_NOSECURE );
@@ -382,11 +374,7 @@ namespace simq::core::server {
         return _send( fd, packet );
     }
 
-    bool Protocol::sendVersion( unsigned int fd ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
+    bool Protocol::sendVersion( unsigned int fd, Packet *packet ) {
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, 0 );
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
@@ -401,11 +389,7 @@ namespace simq::core::server {
         return _send( fd, packet );
     }
 
-    bool Protocol::sendOk( unsigned int fd ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
+    bool Protocol::sendOk( unsigned int fd, Packet *packet ) {
         _reservePacketValues( packet, LENGTH_META );
 
         _marsh( packet, CMD_OK );
@@ -414,11 +398,7 @@ namespace simq::core::server {
         return _send( fd, packet );
     }
 
-    bool Protocol::sendError( unsigned int fd, const char *description ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
+    bool Protocol::sendError( unsigned int fd, Packet *packet, const char *description ) {
         auto lengthDescr = strlen( description ) + 1;
         auto lengthBody = _calculateLengthBodyMessage( lengthDescr, 0 );
 
@@ -434,11 +414,11 @@ namespace simq::core::server {
         return _send( fd, packet );
     }
 
-    bool Protocol::sendStringList( unsigned int fd, std::list<std::string> &list ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
+    bool Protocol::sendStringList(
+        unsigned int fd,
+        Packet *packet,
+        std::list<std::string> &list
+    ) {
         auto lengthBody = SIZE_UINT;
 
         for( auto it = list.begin(); it != list.end(); it++ ) {
@@ -462,12 +442,9 @@ namespace simq::core::server {
 
     bool Protocol::sendChannelLimitMessages(
         unsigned int fd,
+        Packet *packet,
         util::types::ChannelLimitMessages &limitMessages
     ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
         auto lengthBody = _calculateLengthBodyMessage(
             SIZE_UINT,
             SIZE_UINT,
@@ -493,11 +470,11 @@ namespace simq::core::server {
         return _send( fd, packet );
     }
 
-    bool Protocol::sendMessageMetaPush( unsigned int fd, const char *uuid ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
+    bool Protocol::sendMessageMetaPush(
+        unsigned int fd,
+        Packet *packet,
+        const char *uuid
+    ) {
         auto lengthUUID = strlen( uuid ) + 1;
         auto lengthBody = _calculateLengthBodyMessage( lengthUUID, 0 );
 
@@ -512,15 +489,16 @@ namespace simq::core::server {
         return _send( fd, packet );
     }
 
-    bool Protocol::sendPublicMessageMetaPush( unsigned int fd ) {
-        return sendOk( fd );
+    bool Protocol::sendPublicMessageMetaPush( unsigned int fd, Packet *packet ) {
+        return sendOk( fd, packet );
     }
 
-    bool Protocol::sendMessageMetaPop( unsigned int fd, unsigned int length, const char *uuid ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
+    bool Protocol::sendMessageMetaPop(
+        unsigned int fd,
+        Packet *packet,
+        unsigned int length,
+        const char *uuid
+    ) {
         auto lengthUUID = strlen( uuid ) + 1;
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, lengthUUID, 0 );
 
@@ -537,11 +515,11 @@ namespace simq::core::server {
         return _send( fd, packet );
     }
 
-    bool Protocol::sendPublicMessageMetaPop( unsigned int fd, unsigned int length ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
+    bool Protocol::sendPublicMessageMetaPop(
+        unsigned int fd,
+        Packet *packet,
+        unsigned int length
+    ) {
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, 0 );
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
@@ -988,11 +966,7 @@ namespace simq::core::server {
         }
     }
 
-    void Protocol::recv( unsigned int fd ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
+    void Protocol::recv( unsigned int fd, Packet *packet ) {
         if( !packet->isRecvMeta && !packet->isRecvBody ) {
             _reservePacketValues( packet, LENGTH_META );
             packet->isRecvMeta = true;
@@ -1023,17 +997,6 @@ namespace simq::core::server {
             packet->isRecvMeta = false;
             packet->isRecvBody = false;
         }
-    }
-
-    const Protocol::Packet *Protocol::getPacket( unsigned fd ) {
-        _checkIsset( fd );
-
-        auto packet = _packets[fd].get();
-
-        bool isPassedMeta = !packet->isRecvMeta && packet->isRecvBody;
-        bool isPassedLength = packet->length == 0 || packet->length == packet->wrLength;
-
-        return isPassedMeta && isPassedLength ? packet : nullptr;
     }
 
     bool Protocol::isOk( Packet *packet ) {
@@ -1319,6 +1282,13 @@ namespace simq::core::server {
         }
 
         throw util::Error::WRONG_CMD;
+    }
+
+    bool Protocol::isReceived( Packet *packet ) {
+        bool isPassedMeta = !packet->isRecvMeta && packet->isRecvBody;
+        bool isPassedLength = packet->length == 0 || packet->length == packet->wrLength;
+
+        return isPassedMeta && isPassedLength;
     }
 }
 
