@@ -50,7 +50,7 @@ namespace simq::core::server {
             void _initUsers( const char *group, const char *channel, TypeUser type );
             void _initGroups();
             bool _issetCorrectPasswordFile( const char *path );
-            void _getPassword( const char *path, unsigned char password[crypto::HASH_LENGTH] );
+            void _getPassword( const char *path, unsigned char *password );
         public:
             Store( const char *path );
 
@@ -66,13 +66,13 @@ namespace simq::core::server {
             unsigned short int getDirectPort();
             unsigned short int getDirectCountThreads();
             void getDirectMasterPassword(
-                unsigned char password[crypto::HASH_LENGTH]
+                unsigned char *password
             );
 
             void getGroups( std::vector<std::string> &groups );
-            void getGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] );
-            void addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] );
-            void updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] );
+            void getGroupPassword( const char *group, unsigned char *password );
+            void addGroup( const char *group, const unsigned char *password );
+            void updateGroupPassword( const char *group, const unsigned char *password );
             void removeGroup( const char *group );
 
             void getChannels( const char *group, std::vector<std::string> &channels );
@@ -94,19 +94,49 @@ namespace simq::core::server {
             void removeChannel( const char *group, const char *channel );
 
             void getConsumers( const char *group, const char *channel, std::vector<std::string> &consumers );
-            void addConsumer( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
-            void getConsumerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
-            void updateConsumerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
+            void addConsumer(
+                const char *group,
+                const char *channel,
+                const char *login,
+                const unsigned char *password
+            );
+            void getConsumerPassword(
+                const char *group,
+                const char *channel,
+                const char *login,
+                unsigned char *password
+            );
+            void updateConsumerPassword(
+                const char *group,
+                const char *channel,
+                const char *login,
+                const unsigned char *password
+            );
             void removeConsumer( const char *group, const char *channel, const char *login );
 
             void getProducers( const char *group, const char *channel, std::vector<std::string> &producers );
-            void addProducer( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
-            void getProducerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
-            void updateProducerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] );
+            void addProducer(
+                const char *group,
+                const char *channel,
+                const char *login,
+                const unsigned char *password
+            );
+            void getProducerPassword(
+                const char *group,
+                const char *channel,
+                const char *login,
+                unsigned char *password
+            );
+            void updateProducerPassword(
+                const char *group,
+                const char *channel,
+                const char *login,
+                const unsigned char *password
+            );
             void removeProducer( const char *group, const char *channel, const char *login );
 
-            void getMasterPassword( unsigned char password[crypto::HASH_LENGTH] );
-            void updateMasterPassword( const unsigned char password[crypto::HASH_LENGTH] );
+            void getMasterPassword( unsigned char *password );
+            void updateMasterPassword( const unsigned char *password );
 
             unsigned short int getCountThreads();
             void updateCountThreads( unsigned short int count );
@@ -442,7 +472,7 @@ namespace simq::core::server {
         file.atomicWrite( &settings, sizeof( Settings ) );
     }
 
-    void Store::getMasterPassword( unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::getMasterPassword( unsigned char *password ) {
         std::lock_guard<std::mutex> lock( m );
         Settings settings;
 
@@ -454,7 +484,7 @@ namespace simq::core::server {
         memcpy( password, settings.password, crypto::HASH_LENGTH );
     }
 
-    void Store::updateMasterPassword( const unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::updateMasterPassword( const unsigned char *password ) {
         std::lock_guard<std::mutex> lock( m );
         Settings settings;
 
@@ -570,7 +600,7 @@ namespace simq::core::server {
     }
 
     void Store::getDirectMasterPassword(
-        unsigned char password[crypto::HASH_LENGTH]
+        unsigned char *password
     ) {
         std::string path;
         util::constants::buildPathToSettings( path, _path.get() );
@@ -592,12 +622,12 @@ namespace simq::core::server {
         }
     }
 
-    void Store::_getPassword( const char *path, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::_getPassword( const char *path, unsigned char *password ) {
         util::File file( path );
         file.read( password, crypto::HASH_LENGTH );
     }
 
-    void Store::getGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::getGroupPassword( const char *group, unsigned char *password ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto it = groups.find( group );
@@ -612,7 +642,7 @@ namespace simq::core::server {
         _getPassword( path.c_str(), password );
     }
 
-    void Store::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::addGroup( const char *group, const unsigned char *password ) {
         std::lock_guard<std::mutex> lock( m );
 
         if( !util::Validation::isGroupName( group ) ) {
@@ -635,13 +665,13 @@ namespace simq::core::server {
         util::constants::buildPathToGroupPassword( path, _path.get(), group );
 
         util::File file( path.c_str(), true );
-        file.write( password, crypto::HASH_LENGTH );
+        file.write( (void *)password, crypto::HASH_LENGTH );
 
         std::map<std::string, Channel> channel;
         groups[group] = channel;
     }
 
-    void Store::updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::updateGroupPassword( const char *group, const unsigned char *password ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto it = groups.find( group );
@@ -654,7 +684,7 @@ namespace simq::core::server {
         util::constants::buildPathToGroupPassword( path, _path.get(), group );
 
         util::File file( path.c_str(), true );
-        file.atomicWrite( password, crypto::HASH_LENGTH );
+        file.atomicWrite( (void *)password, crypto::HASH_LENGTH );
     }
 
     void Store::removeGroup( const char *group ) {
@@ -853,7 +883,12 @@ namespace simq::core::server {
         }
     }
 
-    void Store::addConsumer( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::addConsumer(
+        const char *group,
+        const char *channel,
+        const char *login,
+        const unsigned char *password
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -882,7 +917,7 @@ namespace simq::core::server {
         util::constants::buildPathToConsumerPassword( path, _path.get(), group, channel, login );
 
         util::File file( path.c_str(), true );
-        file.write( password, crypto::HASH_LENGTH );
+        file.write( (void *)password, crypto::HASH_LENGTH );
 
         groups[group][channel].consumers[login] = true;
     }
@@ -914,7 +949,12 @@ namespace simq::core::server {
         groups[group][channel].consumers.erase( itConsumer );
     }
 
-    void Store::getConsumerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::getConsumerPassword(
+        const char *group,
+        const char *channel,
+        const char *login,
+        unsigned char *password
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -940,7 +980,12 @@ namespace simq::core::server {
         filePassword.read( password, crypto::HASH_LENGTH );
     }
 
-    void Store::updateConsumerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::updateConsumerPassword(
+        const char *group,
+        const char *channel,
+        const char *login,
+        const unsigned char *password
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -963,7 +1008,7 @@ namespace simq::core::server {
         util::constants::buildPathToConsumerPassword( path, _path.get(), group, channel, login );
 
         util::File filePassword( path.c_str() );
-        filePassword.atomicWrite( password, crypto::HASH_LENGTH );
+        filePassword.atomicWrite( (void *)password, crypto::HASH_LENGTH );
     }
 
     void Store::getProducers( const char *group, const char *channel, std::vector<std::string> &producers ) {
@@ -989,7 +1034,12 @@ namespace simq::core::server {
         }
     }
 
-    void Store::addProducer( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::addProducer(
+        const char *group,
+        const char *channel,
+        const char *login,
+        const unsigned char *password
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -1018,7 +1068,7 @@ namespace simq::core::server {
         util::constants::buildPathToProducerPassword( path, _path.get(), group, channel, login );
 
         util::File file( path.c_str(), true );
-        file.write( password, crypto::HASH_LENGTH );
+        file.write( (void *)password, crypto::HASH_LENGTH );
 
         groups[group][channel].producers[login] = true;
     }
@@ -1050,7 +1100,12 @@ namespace simq::core::server {
         groups[group][channel].producers.erase( itConsumer );
     }
 
-    void Store::getProducerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::getProducerPassword(
+        const char *group,
+        const char *channel,
+        const char *login,
+        unsigned char *password
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -1076,7 +1131,12 @@ namespace simq::core::server {
         filePassword.read( password, crypto::HASH_LENGTH );
     }
 
-    void Store::updateProducerPassword( const char *group, const char *channel, const char *login, unsigned char password[crypto::HASH_LENGTH] ) {
+    void Store::updateProducerPassword(
+        const char *group,
+        const char *channel,
+        const char *login,
+        const unsigned char *password
+    ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -1099,7 +1159,7 @@ namespace simq::core::server {
         util::constants::buildPathToProducerPassword( path, _path.get(), group, channel, login );
 
         util::File filePassword( path.c_str() );
-        filePassword.atomicWrite( password, crypto::HASH_LENGTH );
+        filePassword.atomicWrite( (void *)password, crypto::HASH_LENGTH );
     }
 }
 

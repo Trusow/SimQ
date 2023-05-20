@@ -254,8 +254,8 @@ namespace simq::core::server {
             static const char *getConsumer( Packet *packet );
             static const char *getProducer( Packet *packet );
 
-            static const char *getPassword( Packet *packet );
-            static const char *getNewPassword( Packet *packet );
+            static const unsigned char *getPassword( Packet *packet );
+            static const unsigned char *getNewPassword( Packet *packet );
 
             static unsigned int getVersion( Packet *packet );
 
@@ -1195,36 +1195,36 @@ namespace simq::core::server {
         throw util::Error::WRONG_CMD;
     }
 
-    const char *Protocol::getPassword( Packet *packet ) {
+    const unsigned char *Protocol::getPassword( Packet *packet ) {
         auto values = packet->values.get();
         auto offsets = packet->valuesOffsets.get();
 
         if( isAuthGroup( packet ) ) {
-            return &values[offsets[1]];
+            return (const unsigned char *)&values[offsets[1]];
         } else if( isAuthConsumer( packet ) ) {
-            return &values[offsets[3]];
+            return (const unsigned char *)&values[offsets[3]];
         } else if( isAuthProducer( packet ) ) {
-            return &values[offsets[3]];
+            return (const unsigned char *)&values[offsets[3]];
         } else if( isUpdatePassword( packet ) ) {
-            return &values[offsets[0]];
+            return (const unsigned char *)&values[offsets[0]];
         } else if( isAddConsumer( packet ) ) {
-            return &values[offsets[2]];
+            return (const unsigned char *)&values[offsets[2]];
         } else if( isAddProducer( packet ) ) {
-            return &values[offsets[2]];
+            return (const unsigned char *)&values[offsets[2]];
         } else if( isUpdateConsumerPassword( packet ) ) {
-            return &values[offsets[2]];
+            return (const unsigned char *)&values[offsets[2]];
         } else if( isUpdateProducerPassword( packet ) ) {
-            return &values[offsets[2]];
+            return (const unsigned char *)&values[offsets[2]];
         }
         throw util::Error::WRONG_CMD;
     }
 
-    const char *Protocol::getNewPassword( Packet *packet ) {
+    const unsigned char *Protocol::getNewPassword( Packet *packet ) {
         auto values = packet->values.get();
         auto offsets = packet->valuesOffsets.get();
 
         if( isUpdatePassword( packet ) ) {
-            return &values[offsets[1]];
+            return (const unsigned char *)&values[offsets[1]];
         }
 
         throw util::Error::WRONG_CMD;

@@ -35,11 +35,11 @@ namespace simq::core::server::CLI {
 
             virtual void addGroup(
                 const char *group,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             ) = 0;
             virtual void updateGroupPassword(
                 const char *group,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             ) = 0;
             virtual void removeGroup(
                 const char *group
@@ -64,13 +64,13 @@ namespace simq::core::server::CLI {
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             ) = 0;
             virtual void updateConsumerPassword(
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             ) = 0;
             virtual void removeConsumer(
                 const char *group,
@@ -82,13 +82,13 @@ namespace simq::core::server::CLI {
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             ) = 0;
             virtual void updateProducerPassword(
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             ) = 0;
             virtual void removeProducer(
                 const char *group,
@@ -97,7 +97,7 @@ namespace simq::core::server::CLI {
             ) = 0;
 
             virtual void updateMasterPassword(
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             ) = 0;
             virtual void updatePort( unsigned short int port ) = 0;
             virtual void updateCountThreads( unsigned short int port ) = 0;

@@ -105,11 +105,11 @@ namespace simq::core::server {
         public:
         void addGroup(
             const char *groupName,
-            const unsigned char password[crypto::HASH_LENGTH]
+            const unsigned char *password
         );
         void updateGroupPassword(
             const char *groupName,
-            const unsigned char newPassword[crypto::HASH_LENGTH]
+            const unsigned char *newPassword
         );
         void removeGroup( const char *groupName );
 
@@ -121,13 +121,13 @@ namespace simq::core::server {
             const char *groupName,
             const char *channelName,
             const char *login,
-            const unsigned char password[crypto::HASH_LENGTH]
+            const unsigned char *password
         );
         void updateConsumerPassword(
             const char *groupName,
             const char *channelName,
             const char *login,
-            const unsigned char newPassword[crypto::HASH_LENGTH]
+            const unsigned char *newPassword
         );
         void removeConsumer(
             const char *groupName,
@@ -139,13 +139,13 @@ namespace simq::core::server {
             const char *groupName,
             const char *channelName,
             const char *login,
-            const unsigned char password[crypto::HASH_LENGTH]
+            const unsigned char *password
         );
         void updateProducerPassword(
             const char *groupName,
             const char *channelName,
             const char *login,
-            const unsigned char newPassword[crypto::HASH_LENGTH]
+            const unsigned char *newPassword
         );
         void removeProducer(
             const char *groupName,
@@ -155,21 +155,21 @@ namespace simq::core::server {
      
         void authGroup(
             const char *groupName,
-            const unsigned char password[crypto::HASH_LENGTH],
+            const unsigned char *password,
             unsigned int fd
         );
         void authConsumer(
             const char *groupName,
             const char *channelName,
             const char *login,
-            const unsigned char password[crypto::HASH_LENGTH],
+            const unsigned char *password,
             unsigned int fd
         );
         void authProducer(
             const char *groupName,
             const char *channelName,
             const char *login,
-            const unsigned char password[crypto::HASH_LENGTH],
+            const unsigned char *password,
             unsigned int fd
         );
 
@@ -280,7 +280,7 @@ namespace simq::core::server {
 
     void Access::addGroup(
         const char *groupName,
-        const unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         util::LockAtomic lockAtomicGroup( _countGroupsWrited );
         std::lock_guard<std::shared_timed_mutex> lockGroups( _mGroups );
@@ -292,7 +292,7 @@ namespace simq::core::server {
 
     void Access::updateGroupPassword(
         const char *groupName,
-        const unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
@@ -349,7 +349,7 @@ namespace simq::core::server {
         const char *groupName,
         const char *channelName,
         const char *login,
-        const unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
@@ -378,7 +378,7 @@ namespace simq::core::server {
         const char *groupName,
         const char *channelName,
         const char *login,
-        const unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
@@ -437,7 +437,7 @@ namespace simq::core::server {
         const char *groupName,
         const char *channelName,
         const char *login,
-        const unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
@@ -466,7 +466,7 @@ namespace simq::core::server {
         const char *groupName,
         const char *channelName,
         const char *login,
-        const unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
@@ -524,7 +524,7 @@ namespace simq::core::server {
 
     void Access::authGroup(
         const char *groupName,
-        const unsigned char password[crypto::HASH_LENGTH],
+        const unsigned char *password,
         unsigned int fd
     ) {
         _wait( _countGroupsWrited );
@@ -554,7 +554,7 @@ namespace simq::core::server {
         const char *groupName,
         const char *channelName,
         const char *login,
-        const unsigned char password[crypto::HASH_LENGTH],
+        const unsigned char *password,
         unsigned int fd
     ) {
         _wait( _countGroupsWrited );
@@ -590,7 +590,7 @@ namespace simq::core::server {
         const char *groupName,
         const char *channelName,
         const char *login,
-        const unsigned char password[crypto::HASH_LENGTH],
+        const unsigned char *password,
         unsigned int fd
     ) {
         _wait( _countGroupsWrited );

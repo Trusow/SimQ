@@ -299,8 +299,7 @@ namespace simq::core::server {
 
     void Initialization::_addGroup( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
-        unsigned char password[crypto::HASH_LENGTH];
-        _changes->getPassword( change, password );
+        auto password = _changes->getPassword( change );
 
         _store->addGroup( group, password );
         _q->addGroup( group );
@@ -309,8 +308,7 @@ namespace simq::core::server {
 
     void Initialization::_updateGroupPassword( std::unique_ptr<Changes::Change> &change ) {
         auto group = _changes->getGroup( change );
-        unsigned char password[crypto::HASH_LENGTH];
-        _changes->getPassword( change, password );
+        auto password = _changes->getPassword( change );
 
         _store->updateGroupPassword( group, password );
         _access->updateGroupPassword( group, password );
@@ -370,8 +368,7 @@ namespace simq::core::server {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
-        unsigned char password[crypto::HASH_LENGTH];
-        _changes->getPassword( change, password );
+        auto password = _changes->getPassword( change );
 
         _store->addConsumer( group, channel, login, password );
         _access->addConsumer( group, channel, login, password );
@@ -381,8 +378,7 @@ namespace simq::core::server {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
-        unsigned char password[crypto::HASH_LENGTH];
-        _changes->getPassword( change, password );
+        auto password = _changes->getPassword( change );
 
         _store->updateConsumerPassword( group, channel, login, password );
         _access->updateConsumerPassword( group, channel, login, password );
@@ -401,8 +397,7 @@ namespace simq::core::server {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
-        unsigned char password[crypto::HASH_LENGTH];
-        _changes->getPassword( change, password );
+        auto password = _changes->getPassword( change );
 
         _store->addProducer( group, channel, login, password );
         _access->addProducer( group, channel, login, password );
@@ -412,8 +407,7 @@ namespace simq::core::server {
         auto group = _changes->getGroup( change );
         auto channel = _changes->getChannel( change );
         auto login = _changes->getLogin( change );
-        unsigned char password[crypto::HASH_LENGTH];
-        _changes->getPassword( change, password );
+        auto password = _changes->getPassword( change );
 
         _store->updateProducerPassword( group, channel, login, password );
         _access->updateProducerPassword( group, channel, login, password );

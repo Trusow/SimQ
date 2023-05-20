@@ -79,7 +79,7 @@ namespace simq::core::server {
             std::unique_ptr<Change> _buildGroupChange(
                 unsigned int type,
                 const char *group,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
 
             std::unique_ptr<Change> _buildChannelChange(
@@ -94,7 +94,7 @@ namespace simq::core::server {
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
 
             std::unique_ptr<char[]> _convertChannelLimitMessagesDataToFile( Change *change );
@@ -112,11 +112,11 @@ namespace simq::core::server {
 
             std::unique_ptr<Change> addGroup(
                 const char *group,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             std::unique_ptr<Change> updateGroupPassword(
                 const char *group,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             std::unique_ptr<Change> removeGroup( const char *group );
 
@@ -136,13 +136,13 @@ namespace simq::core::server {
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             std::unique_ptr<Change> updateConsumerPassword(
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             std::unique_ptr<Change> removeConsumer(
                 const char *group,
@@ -154,13 +154,13 @@ namespace simq::core::server {
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             std::unique_ptr<Change> updateProducerPassword(
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             std::unique_ptr<Change> removeProducer(
                 const char *group,
@@ -188,7 +188,7 @@ namespace simq::core::server {
             const char *getChannel( std::unique_ptr<Change> &change );
             const char *getLogin( std::unique_ptr<Change> &change );
             const util::types::ChannelLimitMessages *getChannelLimitMessages( std::unique_ptr<Change> &change );
-            void getPassword( std::unique_ptr<Change> &change, unsigned char password[crypto::HASH_LENGTH] );
+            const unsigned char *getPassword( std::unique_ptr<Change> &change );
 
             void push(
                 std::unique_ptr<Change> change,
@@ -229,7 +229,7 @@ namespace simq::core::server {
     std::unique_ptr<Changes::Change> Changes::_buildGroupChange(
         unsigned int type,
         const char *group,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         if( !util::Validation::isGroupName( group ) ) {
             throw util::Error::WRONG_GROUP;
@@ -322,7 +322,7 @@ namespace simq::core::server {
         const char *group,
         const char *channel,
         const char *login,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         if( !util::Validation::isGroupName( group ) ) {
             throw util::Error::WRONG_GROUP;
@@ -379,11 +379,14 @@ namespace simq::core::server {
         return change;
     }
 
-    std::unique_ptr<Changes::Change> Changes::addGroup( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+    std::unique_ptr<Changes::Change> Changes::addGroup( const char *group, const unsigned char *password ) {
         return _buildGroupChange( CH_ADD_GROUP, group, password );
     }
 
-    std::unique_ptr<Changes::Change> Changes::updateGroupPassword( const char *group, unsigned char password[crypto::HASH_LENGTH] ) {
+    std::unique_ptr<Changes::Change> Changes::updateGroupPassword(
+        const char *group,
+        const unsigned char *password
+    ) {
         return _buildGroupChange( CH_UPDATE_GROUP_PASSWORD, group, password );
     }
 
@@ -415,7 +418,7 @@ namespace simq::core::server {
         const char *group,
         const char *channel,
         const char *login,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         return _buildUserChange( CH_ADD_CONSUMER, group, channel, login, password );
     }
@@ -424,7 +427,7 @@ namespace simq::core::server {
         const char *group,
         const char *channel,
         const char *login,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         return _buildUserChange( CH_UPDATE_CONSUMER_PASSWORD, group, channel, login, password );
     }
@@ -441,7 +444,7 @@ namespace simq::core::server {
         const char *group,
         const char *channel,
         const char *login,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         return _buildUserChange( CH_ADD_PRODUCER, group, channel, login, password );
     }
@@ -450,7 +453,7 @@ namespace simq::core::server {
         const char *group,
         const char *channel,
         const char *login,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         return _buildUserChange( CH_UPDATE_PRODUCER_PASSWORD, group, channel, login, password );
     }
@@ -482,7 +485,7 @@ namespace simq::core::server {
         return (util::types::ChannelLimitMessages *)&change->data[offset];
     }
 
-    void Changes::getPassword( std::unique_ptr<Change> &change, unsigned char password[crypto::HASH_LENGTH] ) {
+    const unsigned char *Changes::getPassword( std::unique_ptr<Change> &change ) {
         unsigned int offset = 0;
 
         switch( change->type ) {
@@ -499,10 +502,10 @@ namespace simq::core::server {
                 offset += change->values[2]+1;
                 break;
             default:
-                return;
+                return nullptr;
         }
 
-        memcpy( password, &change->data[offset], crypto::HASH_LENGTH );
+        return (const unsigned char *)&change->data[offset];
     }
 
     bool Changes::isAddGroup( std::unique_ptr<Change> &change ) {

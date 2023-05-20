@@ -38,11 +38,11 @@ namespace simq::core::server {
 
             void addGroup(
                 const char *group,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             void updateGroupPassword(
                 const char *group,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             void removeGroup( const char *group );
 
@@ -65,13 +65,13 @@ namespace simq::core::server {
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             void updateConsumerPassword(
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             void removeConsumer(
                 const char *group,
@@ -83,13 +83,13 @@ namespace simq::core::server {
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             void updateProducerPassword(
                 const char *group,
                 const char *channel,
                 const char *login,
-                unsigned char password[crypto::HASH_LENGTH]
+                const unsigned char *password
             );
             void removeProducer(
                 const char *group,
@@ -97,7 +97,7 @@ namespace simq::core::server {
                 const char *login
             );
 
-            void updateMasterPassword( unsigned char password[crypto::HASH_LENGTH] );
+            void updateMasterPassword( const unsigned char *password );
             void updatePort( unsigned short int port );
             void updateCountThreads( unsigned short int count );
     };
@@ -155,7 +155,7 @@ namespace simq::core::server {
 
     void CLIController::addGroup(
         const char *group,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         auto ch = _changes->addGroup( group, password );
         _changes->pushDefered( std::move( ch ) );
@@ -163,7 +163,7 @@ namespace simq::core::server {
 
     void CLIController::updateGroupPassword(
         const char *group,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         auto ch = _changes->updateGroupPassword( group, password );
         _changes->pushDefered( std::move( ch ) );
@@ -204,7 +204,7 @@ namespace simq::core::server {
         const char *group,
         const char *channel,
         const char *login,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         auto ch = _changes->addConsumer( group, channel, login, password );
         _changes->pushDefered( std::move( ch ) );
@@ -214,7 +214,7 @@ namespace simq::core::server {
         const char *group,
         const char *channel,
         const char *login,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         auto ch = _changes->updateConsumerPassword( group, channel, login, password );
         _changes->pushDefered( std::move( ch ) );
@@ -233,7 +233,7 @@ namespace simq::core::server {
         const char *group,
         const char *channel,
         const char *login,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         auto ch = _changes->addProducer( group, channel, login, password );
         _changes->pushDefered( std::move( ch ) );
@@ -243,7 +243,7 @@ namespace simq::core::server {
         const char *group,
         const char *channel,
         const char *login,
-        unsigned char password[crypto::HASH_LENGTH]
+        const unsigned char *password
     ) {
         auto ch = _changes->updateProducerPassword( group, channel, login, password );
         _changes->pushDefered( std::move( ch ) );
@@ -258,7 +258,7 @@ namespace simq::core::server {
         _changes->pushDefered( std::move( ch ) );
     }
 
-    void CLIController::updateMasterPassword( unsigned char password[crypto::HASH_LENGTH] ) {
+    void CLIController::updateMasterPassword( const unsigned char *password ) {
         _store->updateMasterPassword( password );
     }
 
