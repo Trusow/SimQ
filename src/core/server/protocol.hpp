@@ -167,7 +167,6 @@ namespace simq::core::server {
             static void _checkCmdRemoveMessageByUUID( Packet *packet );
 
         public:
-            static bool sendNoSecure( unsigned int fd, Packet *packet );
             static bool sendVersion( unsigned int fd, Packet *packet );
             static bool sendOk( unsigned int fd, Packet *packet );
             static bool sendError(
@@ -363,15 +362,6 @@ namespace simq::core::server {
         packet->values = std::make_unique<char[]>( length );
         packet->length = length;
         packet->wrLength = 0;
-    }
-
-    bool Protocol::sendNoSecure( unsigned int fd, Packet *packet ) {
-        _reservePacketValues( packet, LENGTH_META );
-
-        _marsh( packet, CMD_CHECK_NOSECURE );
-        _marsh( packet, ( unsigned int )0 );
-
-        return _send( fd, packet );
     }
 
     bool Protocol::sendVersion( unsigned int fd, Packet *packet ) {
