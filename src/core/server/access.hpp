@@ -53,18 +53,24 @@ namespace simq::core::server {
         std::map<std::string, std::unique_ptr<Group>> _groups;
 
         void _wait( std::atomic_uint &atom );
-        void _checkGroupSession( const char *groupName, unsigned int fd );
+        void _checkGroupSession(
+            const char *groupName,
+            unsigned int fd,
+            const unsigned char *password = nullptr
+        );
         void _checkConsumerSession(
             const char *groupName,
             const char *channelName,
             const char *login,
-            unsigned int fd
+            unsigned int fd,
+            const unsigned char *password = nullptr
         );
         void _checkProducerSession(
             const char *groupName,
             const char *channelName,
             const char *login,
-            unsigned int fd
+            unsigned int fd,
+            const unsigned char *password = nullptr
         );
 
         void _checkIssetGroup( const char *name );
@@ -203,6 +209,7 @@ namespace simq::core::server {
 
         void checkUpdateMyGroupPassword(
             const char *groupName,
+            const unsigned char *password,
             unsigned int fd
         );
 
@@ -232,6 +239,7 @@ namespace simq::core::server {
             const char *groupName,
             const char *channelName,
             const char *login,
+            const unsigned char *password,
             unsigned int fd
         );
         void checkUpdateConsumerPassword(
@@ -257,6 +265,7 @@ namespace simq::core::server {
             const char *groupName,
             const char *channelName,
             const char *login,
+            const unsigned char *password,
             unsigned int fd
         );
         void checkUpdateProducerPassword(
@@ -716,7 +725,11 @@ namespace simq::core::server {
         producer->sessions.erase( fd );
     }
 
-    void Access::_checkGroupSession( const char *groupName, unsigned int fd ) {
+    void Access::_checkGroupSession(
+        const char *groupName,
+        unsigned int fd,
+        const unsigned char *password
+    ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
 
@@ -728,13 +741,22 @@ namespace simq::core::server {
         std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
 
         _checkIssetSessions( group->sessions, fd );
+
+        if( password != nullptr && strncmp(
+            ( const char * )group->password,
+            (const char *)password,
+            crypto::HASH_LENGTH
+        ) != 0 ) {
+            throw util::Error::WRONG_PASSWORD;
+        }
     }
 
     void Access::_checkConsumerSession(
         const char *groupName,
         const char *channelName,
         const char *login,
-        unsigned int fd
+        unsigned int fd,
+        const unsigned char *password
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
@@ -761,13 +783,22 @@ namespace simq::core::server {
         std::shared_lock<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
 
         _checkIssetSessions( consumer->sessions, fd );
+
+        if( password != nullptr && strncmp(
+            ( const char * )consumer->password,
+            (const char *)password,
+            crypto::HASH_LENGTH
+        ) != 0 ) {
+            throw util::Error::WRONG_PASSWORD;
+        }
     }
 
     void Access::_checkProducerSession(
         const char *groupName,
         const char *channelName,
         const char *login,
-        unsigned int fd
+        unsigned int fd,
+        const unsigned char *password
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
@@ -794,6 +825,14 @@ namespace simq::core::server {
         std::shared_lock<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
 
         _checkIssetSessions( producer->sessions, fd );
+
+        if( password != nullptr && strncmp(
+            ( const char * )producer->password,
+            (const char *)password,
+            crypto::HASH_LENGTH
+        ) != 0 ) {
+            throw util::Error::WRONG_PASSWORD;
+        }
     }
 
     void Access::checkPushMessage(
@@ -816,27 +855,30 @@ namespace simq::core::server {
 
     void Access::checkUpdateMyGroupPassword(
         const char *groupName,
+        const unsigned char *password,
         unsigned int fd
     ) {
-        _checkGroupSession( groupName, fd );
+        _checkGroupSession( groupName, fd, password );
     }
 
     void Access::checkUpdateMyConsumerPassword(
         const char *groupName,
         const char *channelName,
         const char *login,
+        const unsigned char *password,
         unsigned int fd
     ) {
-        _checkConsumerSession( groupName, channelName, login, fd );
+        _checkConsumerSession( groupName, channelName, login, fd, password );
     }
 
     void Access::checkUpdateMyProducerPassword(
         const char *groupName,
         const char *channelName,
         const char *login,
+        const unsigned char *password,
         unsigned int fd
     ) {
-        _checkProducerSession( groupName, channelName, login, fd );
+        _checkProducerSession( groupName, channelName, login, fd, password );
     }
 
     void Access::_checkIssetSessions( std::map<unsigned int, bool> &map, unsigned int fd ) {

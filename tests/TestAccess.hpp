@@ -73,7 +73,7 @@ namespace simq::test {
             core::server::Access access;
             access.addGroup( "123", password );
             access.authGroup( "123", password, 1 );
-            access.checkUpdateMyGroupPassword( "123", 1 );
+            access.checkUpdateMyGroupPassword( "123", password, 1 );
 
             _printPassed();
         } catch( ... ) {
@@ -87,7 +87,7 @@ namespace simq::test {
             access.addGroup( "123", password );
             access.authGroup( "123", password, 1 );
             access.logoutGroup( "123", 1 );
-            access.checkUpdateMyGroupPassword( "123", 1 );
+            access.checkUpdateMyGroupPassword( "123", password, 1 );
 
             _printFailed();
         } catch( util::Error::Err err ) {
@@ -108,7 +108,7 @@ namespace simq::test {
             access.authGroup( "123", password, 1 );
             access.removeGroup( "123" );
             access.addGroup( "123", password );
-            access.checkUpdateMyGroupPassword( "123", 1 );
+            access.checkUpdateMyGroupPassword( "123", password, 1 );
 
             _printFailed();
         } catch( util::Error::Err err ) {
@@ -128,7 +128,7 @@ namespace simq::test {
             access.addGroup( "123", password );
             access.authGroup( "123", password, 1 );
             access.removeGroup( "123" );
-            access.checkUpdateMyGroupPassword( "123", 1 );
+            access.checkUpdateMyGroupPassword( "123", password, 1 );
 
             _printFailed();
         } catch( util::Error::Err err ) {
@@ -148,7 +148,7 @@ namespace simq::test {
             access.addGroup( "123", password );
             access.authGroup( "123", password, 1 );
             access.updateGroupPassword( "123", password );
-            access.checkUpdateMyGroupPassword( "123", 1 );
+            access.checkUpdateMyGroupPassword( "123", password, 1 );
 
             _printFailed();
         } catch( util::Error::Err err ) {
