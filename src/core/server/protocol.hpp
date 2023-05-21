@@ -35,7 +35,7 @@ namespace simq::core::server {
                 CMD_CHECK_SECURE = 101,
                 CMD_CHECK_NOSECURE = 102,
 
-                CMD_CHECK_VERSION = 201,
+                CMD_GET_VERSION = 201,
 
                 CMD_UPDATE_PASSWORD = 301,
 
@@ -208,13 +208,14 @@ namespace simq::core::server {
 
             static bool continueSend( unsigned int fd, Packet *packet );
 
+            static void reset( Packet *packet );
             static void recv( unsigned int fd, Packet *packet );
 
             static bool isOk( Packet *packet );
 
             static bool isCheckSecure( Packet *packet );
             static bool isCheckNoSecure( Packet *packet );
-            static bool isCheckVersion( Packet *packet );
+            static bool isGetVersion( Packet *packet );
 
             static bool isUpdatePassword( Packet *packet );
 
@@ -255,8 +256,6 @@ namespace simq::core::server {
 
             static const unsigned char *getPassword( Packet *packet );
             static const unsigned char *getNewPassword( Packet *packet );
-
-            static unsigned int getVersion( Packet *packet );
 
             static unsigned int getLength( Packet *packet );
             static const char *getUUID( Packet *packet );
@@ -372,7 +371,7 @@ namespace simq::core::server {
         _reservePacketValues( packet, LENGTH_META + lengthBody );
         packet->length = 0;
 
-        _marsh( packet, CMD_CHECK_VERSION );
+        _marsh( packet, CMD_GET_VERSION );
         _marsh( packet, lengthBody );
 
         _marsh( packet, 1 );
@@ -544,11 +543,11 @@ namespace simq::core::server {
             case CMD_CHECK_NOSECURE:
             case CMD_REMOVE_MESSAGE:
             case CMD_GET_CHANNELS:
+            case CMD_GET_VERSION:
                 if( packet->length != 0 ) {
                     throw util::Error::WRONG_CMD;
                 }
                 break;
-            case CMD_CHECK_VERSION:
             case CMD_UPDATE_PASSWORD:
             case CMD_AUTH_GROUP:
             case CMD_AUTH_CONSUMER:
@@ -899,7 +898,7 @@ namespace simq::core::server {
         packet->valuesOffsets = std::make_unique<unsigned int[]>( packet->countValues );
 
         switch( packet->cmd ) {
-            case CMD_CHECK_VERSION:
+            case CMD_GET_VERSION:
                 _checkCmdCheckVersion( packet );
                 break;
             case CMD_UPDATE_PASSWORD:
@@ -965,6 +964,11 @@ namespace simq::core::server {
         }
     }
 
+    void Protocol::reset( Packet *packet ) {
+        packet->isRecvMeta = false;
+        packet->isRecvBody = false;
+    }
+
     void Protocol::recv( unsigned int fd, Packet *packet ) {
         if( !packet->isRecvMeta && !packet->isRecvBody ) {
             _reservePacketValues( packet, LENGTH_META );
@@ -1010,8 +1014,8 @@ namespace simq::core::server {
         return packet->cmd == CMD_CHECK_NOSECURE;
     }
 
-    bool Protocol::isCheckVersion( Packet *packet ) {
-        return packet->cmd == CMD_CHECK_VERSION;
+    bool Protocol::isGetVersion( Packet *packet ) {
+        return packet->cmd == CMD_GET_VERSION;
     }
 
     bool Protocol::isUpdatePassword( Packet *packet ) {
@@ -1224,17 +1228,6 @@ namespace simq::core::server {
 
         if( isUpdatePassword( packet ) ) {
             return (const unsigned char *)&values[offsets[1]];
-        }
-
-        throw util::Error::WRONG_CMD;
-    }
-
-    unsigned int Protocol::getVersion( Packet *packet ) {
-        if( isCheckVersion( packet ) ) {
-            unsigned int value = 0;
-            _demarsh( &packet->values[packet->valuesOffsets[0]], value );
-
-            return value;
         }
 
         throw util::Error::WRONG_CMD;
