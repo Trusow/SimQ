@@ -18,34 +18,47 @@
 namespace simq::core::server {
     class ServerController: public server::Callbacks {
         private:
-            enum TypeRecv {
-                RECV_CHECK_SECURE,
-                RECV_GET_VERSION,
-                RECV_AUTH,
-                RECV_CMD_GROUP,
-                RECV_CMD_CONSUMER,
-                RECV_CMD_PRODUCER,
+            enum FSM {
+                FSM_COMMON_RECV_CMD_CHECK_SECURE,
+                FSM_COMMON_SEND_CMD_SECURE_OK,
 
-                RECV_CMD_CONSUMER_BODY_PART,
-                RECV_CMD_CONSUMER_REMOVE_MESSAGE,
-             
-                RECV_CMD_PRODUCER_BODY_PART,
+                FSM_COMMON_RECV_CMD_GET_VERSION,
+                FSM_COMMON_SEND_CMD_VERSION,
+
+                FSM_COMMON_RECV_CMD_AUTH,
+                FSM_COMMON_SEND_CMD_OK_GROUP,
+                FSM_COMMON_SEND_CMD_OK_CONSUMER,
+                FSM_COMMON_SEND_CMD_OK_PRODUCER,
+
+                FSM_GROUP_RECV,
+                FSM_GROUP_SEND,
+                FSM_GROUP_SEND_ERROR,
+
+                FSM_CONSUMER_RECV,
+                FSM_CONSUMER_SEND,
+                FSM_CONSUMER_SEND_ERROR,
+                FSM_CONSUMER_SEND_PART_MESSAGE,
+                FSM_CONSUMER_SEND_PART_MESSAGE_NULL,
+                FSM_CONSUMER_SEND_PART_MESSAGE_CONFIRM_OK,
+                FSM_CONSUMER_SEND_PART_MESSAGE_CONFIRM_ERROR,
+                FSM_CONSUMER_RECV_REMOVE_MESSAGE,
+
+                FSM_PRODUCER_RECV,
+                FSM_PRODUCER_SEND,
+                FSM_PRODUCER_SEND_ERROR,
+                FSM_PRODUCER_RECV_PART_MESSAGE,
+                FSM_PRODUCER_RECV_PART_MESSAGE_NULL,
+                FSM_PRODUCER_SEND_PART_MESSAGE_CONFIRM_OK,
+                FSM_PRODUCER_SEND_PART_MESSAGE_CONFIRM_ERROR,
+
+                FSM_CLOSE_COMMON,
+                FSM_CLOSE_GROUP,
+                FSM_CLOSE_CONSUMER,
+                FSM_CLOSE_PRODUCER,
             };
-             
-            enum Flag {
-                FLAG_LOCK_RECV = 1,
-                FLAG_CLOSE = 2,
-                FLAG_OBSERVE_INACTIVE = 4,
-                FLAG_CRASHED_MESSAGE = 8,
-                FLAG_SEND = 16,
-                FLAG_RECV_RAW = 32,
-                FLAG_SEND_RAW = 64,
-                FLAG_ERROR = 128,
-            };
-             
+
             struct Session {
-                TypeRecv typeRecv;
-                unsigned int flag;
+                FSM fsm;
              
                 std::unique_ptr<char[]> authData;
                 std::unique_ptr<Protocol::Packet> packet;
@@ -65,29 +78,43 @@ namespace simq::core::server {
             q::Manager *_q = nullptr;
             Changes *_changes = nullptr;
 
-            void _setSendFlag( Session *sess );
-            void _unsetSendFlag( Session *sess );
-
-            void _sendOk( unsigned int fd, Session *sess );
-            void _sendError( unsigned int fd, Session *sess, const char *err );
             void _sendVersion( unsigned int fd, Session *sess );
-            void _continueSend( unsigned int fd, Session *sess );
+            void _sendSecureOk( unsigned int fd, Session *sess );
+            void _sendError(
+                unsigned int fd,
+                Session *sess,
+                const char *err = nullptr,
+                bool isClose = true
+            );
+            void _sendAuthGroupOk( unsigned int fd, Session *sess );
+            void _sendAuthConsumerOk( unsigned int fd, Session *sess );
+            void _sendAuthProducerOk( unsigned int fd, Session *sess );
+            void _sendRemoveMessageOk( unsigned int fd, Session *sess );
+            void _sendGroup( unsigned int fd, Session *sess );
+            void _sendConsumer( unsigned int fd, Session *sess );
+            void _sendProducer( unsigned int fd, Session *sess );
 
-            void _checkCmd( unsigned int fd, Session *sess );
-            void _checkSecureCmd( unsigned int fd, Session *sess );
-            void _checkGetVersionCmd( unsigned int fd, Session *sess );
-            void _checkAuthCmd( unsigned int fd, Session *sess );
-            void _checkAuthGroupCmd( unsigned int fd, Session *sess );
-            void _checkAuthConsumerCmd( unsigned int fd, Session *sess );
-            void _checkAuthProducerCmd( unsigned int fd, Session *sess );
-            void _checkUpdateMyGroupPasswordCmd( unsigned int fd, Session *sess );
-            void _checkUpdateMyConsumerPasswordCmd( unsigned int fd, Session *sess );
-            void _checkUpdateConsumerPasswordCmd( unsigned int fd, Session *sess );
-            void _checkUpdateMyProducerPasswordCmd( unsigned int fd, Session *sess );
-            void _checkUpdateProducerPasswordCmd( unsigned int fd, Session *sess );
-            void _checkGroupCmd( unsigned int fd, Session *sess );
-            void _checkConsumerCmd( unsigned int fd, Session *sess );
-            void _checkProducerCmd( unsigned int fd, Session *sess );
+            bool _recvToPacket( unsigned int fd, Protocol::Packet *packet );
+            FSM _getFSMCloseFlag( FSM fsm );
+            bool _isCloseFSMFlag( FSM fsm );
+
+            void _recvSecure( unsigned int fd, Session *sess );
+            void _recvVersion( unsigned int fd, Session *sess );
+            void _recvAuth( unsigned int fd, Session *sess );
+            void _authGroupCmd( unsigned int fd, Session *sess );
+            void _authConsumerCmd( unsigned int fd, Session *sess );
+            void _authProducerCmd( unsigned int fd, Session *sess );
+            void _updateMyGroupPasswordCmd( unsigned int fd, Session *sess );
+            void _updateMyConsumerPasswordCmd( unsigned int fd, Session *sess );
+            void _updateConsumerPasswordCmd( unsigned int fd, Session *sess );
+            void _updateMyProducerPasswordCmd( unsigned int fd, Session *sess );
+            void _updateProducerPasswordCmd( unsigned int fd, Session *sess );
+            void _recvGroupCmd( unsigned int fd, Session *sess );
+            void _recvConsumerCmd( unsigned int fd, Session *sess );
+            void _recvConsumerRemoveMessage( unsigned int fd, Session *sess );
+            void _recvProducerCmd( unsigned int fd, Session *sess );
+            void _recvProducerPartMessage( unsigned int fd, Session *sess );
+            void _recvProducerPartMessageNull( unsigned int fd, Session *sess );
 
         public:
             void connect( unsigned int fd, unsigned int ip );
@@ -97,57 +124,94 @@ namespace simq::core::server {
             void iteration();
     };
 
-    void ServerController::_setSendFlag( Session *sess ) {
-        sess->flag |= FLAG_LOCK_RECV | FLAG_SEND;
-        sess->typeRecv = RECV_GET_VERSION;
-    }
-
-    void ServerController::_unsetSendFlag( Session *sess ) {
-        sess->flag ^= FLAG_SEND;
-        sess->flag ^= FLAG_LOCK_RECV;
-    }
-
-    void ServerController::_sendOk( unsigned int fd, Session *sess ) {
-        _setSendFlag( sess );
-
-        if( Protocol::sendOk( fd, sess->packet.get() ) ) {
-            _unsetSendFlag( sess );
+    ServerController::FSM ServerController::_getFSMCloseFlag( FSM fsm ) {
+        switch( fsm ) {
+            case FSM_COMMON_RECV_CMD_CHECK_SECURE:
+            case FSM_COMMON_SEND_CMD_SECURE_OK:
+            case FSM_COMMON_RECV_CMD_GET_VERSION:
+            case FSM_COMMON_SEND_CMD_VERSION:
+            case FSM_COMMON_RECV_CMD_AUTH:
+            case FSM_COMMON_SEND_CMD_OK_GROUP:
+            case FSM_COMMON_SEND_CMD_OK_CONSUMER:
+            case FSM_COMMON_SEND_CMD_OK_PRODUCER:
+                return FSM_CLOSE_COMMON;
+            case FSM_GROUP_RECV:
+            case FSM_GROUP_SEND:
+            case FSM_GROUP_SEND_ERROR:
+                return FSM_CLOSE_GROUP;
+            case FSM_CONSUMER_RECV:
+            case FSM_CONSUMER_SEND:
+            case FSM_CONSUMER_SEND_PART_MESSAGE:
+            case FSM_CONSUMER_SEND_PART_MESSAGE_NULL:
+            case FSM_CONSUMER_SEND_PART_MESSAGE_CONFIRM_OK:
+            case FSM_CONSUMER_SEND_PART_MESSAGE_CONFIRM_ERROR:
+            case FSM_CONSUMER_RECV_REMOVE_MESSAGE:
+                return FSM_CLOSE_CONSUMER;
+            case FSM_PRODUCER_RECV:
+            case FSM_PRODUCER_SEND:
+            case FSM_PRODUCER_RECV_PART_MESSAGE:
+            case FSM_PRODUCER_RECV_PART_MESSAGE_NULL:
+            case FSM_PRODUCER_SEND_PART_MESSAGE_CONFIRM_OK:
+            case FSM_PRODUCER_SEND_PART_MESSAGE_CONFIRM_ERROR:
+                return FSM_CLOSE_PRODUCER;
+            case FSM_CLOSE_COMMON:
+            case FSM_CLOSE_GROUP:
+            case FSM_CLOSE_CONSUMER:
+            case FSM_CLOSE_PRODUCER:
+                return fsm;
+            default:
+                return fsm;
         }
     }
 
-    void ServerController::_sendError( unsigned int fd, Session *sess, const char *err ) {
-        _setSendFlag( sess );
-
-        if( Protocol::sendError( fd, sess->packet.get(), err ) ) {
-            _unsetSendFlag( sess );
+    bool ServerController::_isCloseFSMFlag( FSM fsm ) {
+        switch( fsm ) {
+            case FSM_CLOSE_COMMON:
+            case FSM_CLOSE_GROUP:
+            case FSM_CLOSE_CONSUMER:
+            case FSM_CLOSE_PRODUCER:
+                return true;
+            default:
+                return false;
         }
-
-        sess->flag &= FLAG_ERROR;
     }
-    
+
+    bool ServerController::_recvToPacket( unsigned int fd, Protocol::Packet *packet ) {
+        Protocol::recv( fd, packet );
+
+        return Protocol::isReceived( packet );
+    }
+
     void ServerController::_sendVersion( unsigned int fd, Session *sess ) {
-        _setSendFlag( sess );
 
         if( Protocol::sendVersion( fd, sess->packet.get() ) ) {
-            _unsetSendFlag( sess );
+            sess->fsm = FSM_COMMON_RECV_CMD_AUTH;
         }
     }
 
-    void ServerController::_continueSend( unsigned int fd, Session *sess ) {
-        if( Protocol::continueSend( fd, sess->packet.get() ) ) {
-            _unsetSendFlag( sess );
+    void ServerController::_sendSecureOk( unsigned int fd, Session *sess ) {
+        if( Protocol::sendOk( fd, sess->packet.get() ) ) {
+            sess->fsm = FSM_COMMON_RECV_CMD_GET_VERSION;
         }
     }
 
-    void ServerController::_checkSecureCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvSecure( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        if( !_recvToPacket( fd, packet ) ) return;
+
         if( Protocol::isCheckNoSecure( sess->packet.get() ) ) {
-            _sendOk( fd, sess );
+            _sendSecureOk( fd, sess );
         } else {
             throw util::Error::WRONG_CMD;
         }
     }
 
-    void ServerController::_checkGetVersionCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvVersion( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        if( !_recvToPacket( fd, packet ) ) return;
+
         if( Protocol::isCheckVersion( sess->packet.get() ) ) {
             _sendVersion( fd, sess );
         } else {
@@ -155,7 +219,7 @@ namespace simq::core::server {
         }
     }
 
-    void ServerController::_checkAuthGroupCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_authGroupCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = Protocol::getGroup( packet );
@@ -163,10 +227,10 @@ namespace simq::core::server {
 
         _access->authGroup( group, password, fd );
 
-        _sendOk( fd, sess );
+        _sendAuthGroupOk( fd, sess );
     }
 
-    void ServerController::_checkAuthConsumerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_authConsumerCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = Protocol::getGroup( packet );
@@ -177,10 +241,10 @@ namespace simq::core::server {
         _access->authConsumer( group, channel, login, password, fd );
         _q->joinConsumer( group, channel, fd );
 
-        _sendOk( fd, sess );
+        _sendAuthConsumerOk( fd, sess );
     }
 
-    void ServerController::_checkAuthProducerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_authProducerCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = Protocol::getGroup( packet );
@@ -191,24 +255,26 @@ namespace simq::core::server {
         _access->authProducer( group, channel, login, password, fd );
         _q->joinProducer( group, channel, fd );
 
-        _sendOk( fd, sess );
+        _sendAuthProducerOk( fd, sess );
     }
 
-    void ServerController::_checkAuthCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvAuth( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
+        if( !_recvToPacket( fd, packet ) ) return;
+
         if( Protocol::isAuthGroup( packet ) ) {
-            _checkAuthGroupCmd( fd, sess );
+            _authGroupCmd( fd, sess );
         } else if( Protocol::isAuthConsumer( packet ) ) {
-            _checkAuthConsumerCmd( fd, sess );
+            _authConsumerCmd( fd, sess );
         } else if( Protocol::isAuthProducer( packet ) ) {
-            _checkAuthProducerCmd( fd, sess );
+            _authProducerCmd( fd, sess );
         } else {
             throw util::Error::WRONG_CMD;
         }
     }
 
-    void ServerController::_checkUpdateMyGroupPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateMyGroupPasswordCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
         auto curPassword = Protocol::getPassword( packet );
@@ -226,10 +292,9 @@ namespace simq::core::server {
             group
         );
 
-        _sendOk( fd, sess );
     }
 
-    void ServerController::_checkUpdateMyConsumerPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateMyConsumerPasswordCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
         auto curPassword = Protocol::getPassword( packet );
@@ -254,10 +319,9 @@ namespace simq::core::server {
             group, channel, login
         );
 
-        _sendOk( fd, sess );
     }
 
-    void ServerController::_checkUpdateConsumerPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateConsumerPasswordCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
         auto newPassword = Protocol::getPassword( packet );
@@ -281,10 +345,9 @@ namespace simq::core::server {
             group
         );
 
-        _sendOk( fd, sess );
     }
 
-    void ServerController::_checkUpdateMyProducerPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateMyProducerPasswordCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
         auto curPassword = Protocol::getPassword( packet );
@@ -309,10 +372,9 @@ namespace simq::core::server {
             group, channel, login
         );
 
-        _sendOk( fd, sess );
     }
 
-    void ServerController::_checkUpdateProducerPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateProducerPasswordCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
         auto newPassword = Protocol::getPassword( packet );
@@ -336,14 +398,17 @@ namespace simq::core::server {
             group
         );
 
-        _sendOk( fd, sess );
     }
 
-    void ServerController::_checkGroupCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvGroupCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
+        if( !_recvToPacket( fd, packet ) ) return;
+
+        sess->fsm = FSM_GROUP_SEND_ERROR;
+
         if( Protocol::isUpdatePassword( packet ) ) {
-            _checkUpdateMyGroupPasswordCmd( fd, sess );
+            _updateMyGroupPasswordCmd( fd, sess );
         } else if( Protocol::isGetChannels( packet ) ) {
         } else if( Protocol::isGetChannelLimitMessages( packet ) ) {
         } else if( Protocol::isGetConsumers( packet ) ) {
@@ -353,119 +418,217 @@ namespace simq::core::server {
         } else if( Protocol::isRemoveChannel( packet ) ) {
         } else if( Protocol::isAddConsumer( packet ) ) {
         } else if( Protocol::isUpdateConsumerPassword( packet ) ) {
-            _checkUpdateConsumerPasswordCmd( fd, sess );
+            _updateConsumerPasswordCmd( fd, sess );
         } else if( Protocol::isRemoveConsumer( packet ) ) {
         } else if( Protocol::isAddProducer( packet ) ) {
         } else if( Protocol::isUpdateProducerPassword( packet ) ) {
-            _checkUpdateProducerPasswordCmd( fd, sess );
+            _updateProducerPasswordCmd( fd, sess );
         } else if( Protocol::isRemoveProducer( packet ) ) {
         } else {
+            sess->fsm = FSM_GROUP_RECV;
             throw util::Error::WRONG_CMD;
         }
     }
 
-    void ServerController::_checkConsumerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvConsumerCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
+        if( !_recvToPacket( fd, packet ) ) return;
+
+        sess->fsm = FSM_CONSUMER_SEND_ERROR;
+
         if( Protocol::isUpdatePassword( packet ) ) {
-            _checkUpdateMyConsumerPasswordCmd( fd, sess );
+            _updateMyConsumerPasswordCmd( fd, sess );
         } else if( Protocol::isPopMessage( packet ) ) {
         } else if( Protocol::isRemoveMessageByUUID( packet ) ) {
         } else if( Protocol::isOk( packet ) ) {
         } else {
+            sess->fsm = FSM_CONSUMER_RECV;
             throw util::Error::WRONG_CMD;
         }
     }
 
-    void ServerController::_checkProducerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvConsumerRemoveMessage( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
-        if( Protocol::isUpdatePassword( packet ) ) {
-            _checkUpdateMyProducerPasswordCmd( fd, sess );
-        } else if( Protocol::isPushMessage( packet ) ) {
-            sess->typeRecv = RECV_CMD_PRODUCER_BODY_PART;
-        } else if( Protocol::isPushPublicMessage( packet ) ) {
-            sess->typeRecv = RECV_CMD_PRODUCER_BODY_PART;
-        } else if( Protocol::isPushReplicaMessage( packet ) ) {
-            sess->typeRecv = RECV_CMD_PRODUCER_BODY_PART;
+        if( !_recvToPacket( fd, packet ) ) return;
+
+        sess->fsm = FSM_CONSUMER_SEND_ERROR;
+
+        if( Protocol::isRemoveMessage( packet ) ) {
+            _sendRemoveMessageOk( fd, sess );
         } else {
+            sess->fsm = FSM_CONSUMER_RECV;
             throw util::Error::WRONG_CMD;
         }
     }
 
-    void ServerController::_checkCmd( unsigned int fd, Session *sess ) {
-        switch( sess->typeRecv ) {
-            case RECV_CHECK_SECURE:
-                _checkSecureCmd( fd, sess );
-                break;
-            case RECV_GET_VERSION:
-                _checkGetVersionCmd( fd, sess );
-                break;
-            case RECV_AUTH:
-                _checkAuthCmd( fd, sess );
-                break;
-            case RECV_CMD_GROUP:
-                _checkGroupCmd( fd, sess );
-                break;
-            case RECV_CMD_CONSUMER:
-                _checkConsumerCmd( fd, sess );
-                break;
-            case RECV_CMD_PRODUCER:
-                _checkProducerCmd( fd, sess );
-                break;
-            case RECV_CMD_CONSUMER_BODY_PART:
-                break;
-            case RECV_CMD_CONSUMER_REMOVE_MESSAGE:
-                break;
-            case RECV_CMD_PRODUCER_BODY_PART:
-                break;
+    void ServerController::_recvProducerCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        if( !_recvToPacket( fd, packet ) ) return;
+
+        sess->fsm = FSM_PRODUCER_SEND_ERROR;
+
+        if( Protocol::isUpdatePassword( packet ) ) {
+            _updateMyProducerPasswordCmd( fd, sess );
+        } else if( Protocol::isPushMessage( packet ) ) {
+        } else if( Protocol::isPushPublicMessage( packet ) ) {
+        } else if( Protocol::isPushReplicaMessage( packet ) ) {
+        } else {
+            sess->fsm = FSM_PRODUCER_RECV;
+            throw util::Error::WRONG_CMD;
+        }
+    }
+
+    void ServerController::_recvProducerPartMessage( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        //
+    }
+
+    void ServerController::_recvProducerPartMessageNull( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+    }
+
+    void ServerController::_sendError(
+        unsigned int fd,
+        Session *sess,
+        const char *err,
+        bool isClose
+    ) {
+        if( err != nullptr ) {
+            if( isClose ) {
+                sess->fsm = _getFSMCloseFlag( sess->fsm );
+            }
+
+            try {
+                Protocol::sendError(
+                    fd,
+                    sess->packet.get(),
+                    err
+                );
+            } catch( ... ) {
+                _sessions.erase( fd );
+                ::close( fd );
+            }
+
+            return;
+        }
+
+        if( Protocol::continueSend( fd, sess->packet.get() ) ) {
+            if( isClose ) {
+                _sessions.erase( fd );
+                ::close( fd );
+            }
+        }
+    }
+
+    void ServerController::_sendAuthGroupOk( unsigned int fd, Session *sess ) {
+        if( Protocol::sendOk( fd, sess->packet.get() ) ) {
+            sess->fsm = FSM_GROUP_RECV;
+        }
+    }
+
+    void ServerController::_sendAuthConsumerOk( unsigned int fd, Session *sess ) {
+        if( Protocol::sendOk( fd, sess->packet.get() ) ) {
+            sess->fsm = FSM_CONSUMER_RECV;
+        }
+    }
+
+    void ServerController::_sendAuthProducerOk( unsigned int fd, Session *sess ) {
+        if( Protocol::sendOk( fd, sess->packet.get() ) ) {
+            sess->fsm = FSM_PRODUCER_RECV;
+        }
+    }
+
+    void ServerController::_sendRemoveMessageOk( unsigned int fd, Session *sess ) {
+        if( Protocol::sendOk( fd, sess->packet.get() ) ) {
+            sess->fsm = FSM_CONSUMER_RECV;
+        }
+    }
+
+    void ServerController::_sendGroup( unsigned int fd, Session *sess ) {
+        if( Protocol::continueSend( fd, sess->packet.get() ) ) {
+            sess->fsm = FSM_GROUP_RECV;
+        }
+    }
+
+    void ServerController::_sendConsumer( unsigned int fd, Session *sess ) {
+        if( Protocol::continueSend( fd, sess->packet.get() ) ) {
+            sess->fsm = FSM_CONSUMER_RECV;
+        }
+    }
+
+    void ServerController::_sendProducer( unsigned int fd, Session *sess ) {
+        if( Protocol::continueSend( fd, sess->packet.get() ) ) {
+            sess->fsm = FSM_PRODUCER_RECV;
         }
     }
 
     void ServerController::connect( unsigned int fd, unsigned int ip ) {
         auto sess = std::make_unique<Session>();
-        sess->typeRecv = RECV_CHECK_SECURE;
+        sess->fsm = FSM_COMMON_RECV_CMD_CHECK_SECURE;
         sess->packet = std::make_unique<Protocol::Packet>();
         _sessions[fd] = std::move( sess );
     }
 
     void ServerController::recv( unsigned int fd ) {
         auto sess = _sessions[fd].get();
-        auto packet = sess->packet.get();
 
         try {
-            if( FLAG_LOCK_RECV & sess->flag && !( FLAG_LOCK_RECV & sess->flag ) ) {
-                sess->flag |= FLAG_CLOSE;
-                throw util::Error::WRONG_CMD;
+            switch( sess->fsm ) {
+                case FSM_COMMON_RECV_CMD_CHECK_SECURE:
+                    _recvSecure( fd, sess );
+                    break;
+                case FSM_COMMON_RECV_CMD_GET_VERSION:
+                    _recvVersion( fd, sess );
+                    break;
+                case FSM_COMMON_RECV_CMD_AUTH:
+                    _recvAuth( fd, sess );
+                    break;
+                case FSM_GROUP_RECV:
+                    _recvGroupCmd( fd, sess );
+                    break;
+                case FSM_CONSUMER_RECV:
+                    _recvConsumerCmd( fd, sess );
+                    break;
+                case FSM_CONSUMER_RECV_REMOVE_MESSAGE:
+                    _recvConsumerRemoveMessage( fd, sess );
+                    break;
+                case FSM_PRODUCER_RECV:
+                    _recvProducerCmd( fd, sess );
+                    break;
+                case FSM_PRODUCER_RECV_PART_MESSAGE:
+                    _recvProducerPartMessage( fd, sess );
+                    break;
+                case FSM_PRODUCER_RECV_PART_MESSAGE_NULL:
+                    _recvProducerPartMessageNull( fd, sess );
+                    break;
+                case FSM_CLOSE_COMMON:
+                case FSM_CLOSE_GROUP:
+                case FSM_CLOSE_CONSUMER:
+                case FSM_CLOSE_PRODUCER:
+                    break;
+                default:
+                    sess->fsm = _getFSMCloseFlag( sess->fsm );
+                    throw util::Error::Err::WRONG_CMD;
             }
-
-            if( RECV_CMD_PRODUCER_BODY_PART == sess->typeRecv ) {
-                return;
-            }
-
-            Protocol::recv( fd, packet );
-
-            if( !Protocol::isReceived( packet ) ) {
-                return;
-            }
-
-            _checkCmd( fd, sess );
-
-            if( FLAG_SEND & sess->flag ) {
-                return;
-            }
-
-            if( RECV_CHECK_SECURE == sess->typeRecv ) {
-                sess->typeRecv = RECV_GET_VERSION;
-            } else if( RECV_GET_VERSION == sess->typeRecv ) {
-                sess->typeRecv = RECV_AUTH;
-            } else if( RECV_AUTH == sess->typeRecv ) {
-            }
-
         } catch( util::Error::Err err ) {
-            _sendError( fd, sess, util::Error::getDescription( err ) );
+            sess->fsm = _getFSMCloseFlag( sess->fsm );
+            _sendError(
+                fd,
+                sess,
+                util::Error::getDescription( err ),
+                _isCloseFSMFlag( sess->fsm )
+            );
         } catch( ... ) {
-            _sendError( fd, sess, util::Error::getDescription( util::Error::UNKNOWN ) );
+            _sendError(
+                fd,
+                sess,
+                util::Error::getDescription( util::Error::Err::UNKNOWN ),
+                true
+            );
         }
 
     }
@@ -473,22 +636,68 @@ namespace simq::core::server {
     void ServerController::send( unsigned int fd ) {
         auto sess = _sessions[fd].get();
 
-        if( FLAG_ERROR & sess->flag ) {
-            _sessions.erase( fd );
-            ::close( fd );
-            return;
-        }
-
-        if( FLAG_SEND_RAW & sess->flag ) {
-            return;
-        }
-
-        if( !( FLAG_SEND & sess->flag ) ) {
-            return;
-        }
-
         try {
-            _continueSend( fd, sess );
+            switch( sess->fsm ) {
+                case FSM_COMMON_SEND_CMD_SECURE_OK:
+                    _sendSecureOk( fd, sess );
+                    break;
+                case FSM_COMMON_SEND_CMD_VERSION:
+                    _sendVersion( fd, sess );
+                    break;
+                case FSM_COMMON_SEND_CMD_OK_GROUP:
+                    _sendAuthGroupOk( fd, sess );
+                    break;
+                case FSM_COMMON_SEND_CMD_OK_CONSUMER:
+                    _sendAuthConsumerOk( fd, sess );
+                    break;
+                case FSM_COMMON_SEND_CMD_OK_PRODUCER:
+                    _sendAuthProducerOk( fd, sess );
+                    break;
+                case FSM_GROUP_SEND:
+                    _sendGroup( fd, sess );
+                    break;
+                case FSM_GROUP_SEND_ERROR:
+                    _sendError( fd, sess, nullptr, false );
+                    break;
+                case FSM_CONSUMER_SEND:
+                    _sendConsumer( fd, sess );
+                    break;
+                case FSM_CONSUMER_SEND_ERROR:
+                    _sendError( fd, sess, nullptr, false );
+                    break;
+                case FSM_CONSUMER_SEND_PART_MESSAGE:
+                    // _sendConsumerPartMessage( fd, sess );
+                    break;
+                case FSM_CONSUMER_SEND_PART_MESSAGE_NULL:
+                    // _sendSendConsumerPartMessageNull( fd, sess );
+                    break;
+                case FSM_CONSUMER_SEND_PART_MESSAGE_CONFIRM_OK:
+                    // _sendSendConsumerPartMessageConfirmOk( fd, sess );
+                    break;
+                case FSM_CONSUMER_SEND_PART_MESSAGE_CONFIRM_ERROR:
+                    // _sendSendConsumerPartMessageConfirmError( fd, sess );
+                    break;
+                case FSM_PRODUCER_SEND:
+                    _sendProducer( fd, sess );
+                    break;
+                case FSM_PRODUCER_SEND_ERROR:
+                    _sendError( fd, sess, nullptr, false );
+                    break;
+                case FSM_PRODUCER_SEND_PART_MESSAGE_CONFIRM_OK:
+                    // _sendSendProducerPartMessageConfirmOk( fd, sess );
+                    break;
+                case FSM_PRODUCER_SEND_PART_MESSAGE_CONFIRM_ERROR:
+                    // _sendSendProducerPartMessageConfirmError( fd, sess );
+                    break;
+                case FSM_CLOSE_COMMON:
+                case FSM_CLOSE_GROUP:
+                case FSM_CLOSE_CONSUMER:
+                case FSM_CLOSE_PRODUCER:
+                    _sendError( fd, sess, nullptr, true );
+                    break;
+                default:
+                    return;
+            }
         } catch( ... ) {
             _sessions.erase( fd );
             ::close( fd );
