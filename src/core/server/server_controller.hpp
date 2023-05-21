@@ -183,15 +183,34 @@ namespace simq::core::server {
     }
 
     void ServerController::_sendVersion( unsigned int fd, Session *sess ) {
-
-        if( Protocol::sendVersion( fd, sess->packet.get() ) ) {
-            sess->fsm = FSM_COMMON_RECV_CMD_AUTH;
+        if( sess->fsm != FSM_COMMON_SEND_CMD_VERSION ) {
+            if( Protocol::sendVersion( fd, sess->packet.get() ) ) {
+                sess->fsm = FSM_COMMON_RECV_CMD_AUTH;
+                Protocol::reset( sess->packet.get() );
+            } else {
+                sess->fsm = FSM_COMMON_SEND_CMD_VERSION;
+            }
+        } else {
+            if( Protocol::continueSend( fd, sess->packet.get() ) ) {
+                sess->fsm = FSM_COMMON_RECV_CMD_AUTH;
+                Protocol::reset( sess->packet.get() );
+            }
         }
     }
 
     void ServerController::_sendSecureOk( unsigned int fd, Session *sess ) {
-        if( Protocol::sendOk( fd, sess->packet.get() ) ) {
-            sess->fsm = FSM_COMMON_RECV_CMD_GET_VERSION;
+        if( sess->fsm != FSM_COMMON_SEND_CMD_SECURE_OK ) {
+            if( Protocol::sendOk( fd, sess->packet.get() ) ) {
+                sess->fsm = FSM_COMMON_RECV_CMD_GET_VERSION;
+                Protocol::reset( sess->packet.get() );
+            } else {
+                sess->fsm = FSM_COMMON_SEND_CMD_SECURE_OK;
+            }
+        } else {
+            if( Protocol::continueSend( fd, sess->packet.get() ) ) {
+                sess->fsm = FSM_COMMON_RECV_CMD_GET_VERSION;
+                Protocol::reset( sess->packet.get() );
+            }
         }
     }
 
@@ -212,7 +231,7 @@ namespace simq::core::server {
 
         if( !_recvToPacket( fd, packet ) ) return;
 
-        if( Protocol::isCheckVersion( sess->packet.get() ) ) {
+        if( Protocol::isGetVersion( sess->packet.get() ) ) {
             _sendVersion( fd, sess );
         } else {
             throw util::Error::WRONG_CMD;
