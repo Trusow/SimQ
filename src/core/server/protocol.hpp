@@ -96,7 +96,7 @@ namespace simq::core::server {
 
             static void _marsh( Packet *packet, unsigned int value );
             static void _marsh( Packet *packet, Cmd value );
-            static void _marsh( Packet *packet, const char *value );
+            static void _marsh( Packet *packet, const char *value, unsigned int length );
 
             static void _demarsh( const char *data, unsigned int &value );
 
@@ -316,11 +316,15 @@ namespace simq::core::server {
 
     unsigned int Protocol::_calculateLengthBodyMessage( unsigned int value, ... ) {
         unsigned int total = SIZE_UINT;
+        total += SIZE_UINT;
+        total += value;
+
         va_list args;
         va_start( args, value );
  
-        while( value-- ) {
+        while( true ) {
             auto item = va_arg( args, unsigned int );
+
             if( item == 0 ) {
                 break;
             }
@@ -346,11 +350,9 @@ namespace simq::core::server {
         packet->length += SIZE_CMD;
     }
 
-    void Protocol::_marsh( Packet *packet, const char *value ) {
-        auto l = strlen( value );
-        packet->length += strlen( value );
-        memcpy( &packet->values[packet->length], value, l );
-        packet->length += l;
+    void Protocol::_marsh( Packet *packet, const char *value, unsigned int length ) {
+        memcpy( &packet->values[packet->length], value, length );
+        packet->length += length;
     }
 
     void Protocol::_demarsh( const char *data, unsigned int &value ) {
@@ -393,13 +395,14 @@ namespace simq::core::server {
         auto lengthBody = _calculateLengthBodyMessage( lengthDescr, 0 );
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
+        packet->length = 0;
 
-        _marsh( packet, CMD_CHECK_VERSION );
+        _marsh( packet, CMD_ERROR );
         _marsh( packet, lengthBody );
 
         _marsh( packet, 1 );
         _marsh( packet, lengthDescr );
-        _marsh( packet, description );
+        _marsh( packet, description, lengthDescr );
 
         return _send( fd, packet );
     }
@@ -424,7 +427,7 @@ namespace simq::core::server {
 
         for( auto it = list.begin(); it != list.end(); it++ ) {
             _marsh( packet, (*it).length() + 1 );
-            _marsh( packet, (*it).c_str() );
+            _marsh( packet, (*it).c_str(), (*it).size() );
         }
 
         return _send( fd, packet );
@@ -474,7 +477,7 @@ namespace simq::core::server {
         _marsh( packet, lengthBody );
         _marsh( packet, 1 );
         _marsh( packet, lengthUUID );
-        _marsh( packet, uuid );
+        _marsh( packet, uuid, lengthUUID );
 
         return _send( fd, packet );
     }
@@ -500,7 +503,7 @@ namespace simq::core::server {
         _marsh( packet, SIZE_UINT );
         _marsh( packet, length );
         _marsh( packet, lengthUUID );
-        _marsh( packet, uuid );
+        _marsh( packet, uuid, lengthUUID );
 
         return _send( fd, packet );
     }
