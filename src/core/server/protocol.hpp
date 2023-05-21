@@ -370,6 +370,7 @@ namespace simq::core::server {
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, 0 );
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
+        packet->length = 0;
 
         _marsh( packet, CMD_CHECK_VERSION );
         _marsh( packet, lengthBody );
@@ -383,6 +384,7 @@ namespace simq::core::server {
 
     bool Protocol::sendOk( unsigned int fd, Packet *packet ) {
         _reservePacketValues( packet, LENGTH_META );
+        packet->length = 0;
 
         _marsh( packet, CMD_OK );
         _marsh( packet, ( unsigned int )0 );
@@ -447,6 +449,7 @@ namespace simq::core::server {
         );
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
+        packet->length = 0;
 
         _marsh( packet, CMD_SEND_CHANNEL_LIMIT_MESSSAGES );
         _marsh( packet, lengthBody );
@@ -472,6 +475,7 @@ namespace simq::core::server {
         auto lengthBody = _calculateLengthBodyMessage( lengthUUID, 0 );
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
+        packet->length = 0;
 
         _marsh( packet, CMD_SEND_UUID_MESSAGE );
         _marsh( packet, lengthBody );
@@ -496,6 +500,7 @@ namespace simq::core::server {
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, lengthUUID, 0 );
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
+        packet->length = 0;
 
         _marsh( packet, CMD_SEND_MESSAGE_META );
         _marsh( packet, lengthBody );
@@ -516,6 +521,7 @@ namespace simq::core::server {
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, 0 );
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
+        packet->length = 0;
 
         _marsh( packet, CMD_SEND_MESSAGE_META );
         _marsh( packet, lengthBody );
