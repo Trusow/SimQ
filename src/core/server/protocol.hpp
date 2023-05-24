@@ -70,6 +70,7 @@ namespace simq::core::server {
                 CMD_REMOVE_MESSAGE_BY_UUID = 6'102,
 
                 CMD_POP_MESSAGE = 6'201,
+                CMD_GET_PART_MESSAGE = 6'202,
 
                 CMD_SEND_MESSAGE_META = 6'301,
                 CMD_SEND_PUBLIC_MESSAGE_META = 6'302,
@@ -90,7 +91,6 @@ namespace simq::core::server {
         private:
             static const unsigned int SIZE_CMD = sizeof( Cmd );
 
-            static bool _send( unsigned int fd, Packet *packet );
             static bool _recv( unsigned int fd, Packet *packet );
             static unsigned int _calculateLengthBodyMessage( unsigned int value, ... );
 
@@ -167,46 +167,36 @@ namespace simq::core::server {
             static void _checkCmdRemoveMessageByUUID( Packet *packet );
 
         public:
-            static bool sendVersion( unsigned int fd, Packet *packet );
-            static bool sendOk( unsigned int fd, Packet *packet );
-            static bool sendError(
-                unsigned int fd,
-                Packet *packet,
-                const char *description
-            );
-            static bool sendStringList(
-                unsigned int fd,
+            static void prepareVersion( Packet *packet );
+            static void prepareOk( Packet *packet );
+            static void prepareError( Packet *packet, const char *description );
+            static void prepareStringList(
                 Packet *packet,
                 std::list<std::string> &list
             );
-            static bool sendChannelLimitMessages(
-                unsigned int fd,
+            static void prepareChannelLimitMessages(
                 Packet *packet,
                 util::types::ChannelLimitMessages &limitMessages
             );
 
-            static bool sendMessageMetaPush(
-                unsigned int fd,
+            static void prepareMessageMetaPush(
                 Packet *packet,
                 const char *uuid
             );
-            static bool sendPublicMessageMetaPush(
-                unsigned int fd,
+            static void preparePublicMessageMetaPush(
                 Packet *packet
             );
-            static bool sendMessageMetaPop(
-                unsigned int fd,
+            static void prepareMessageMetaPop(
                 Packet *packet,
                 unsigned int length,
                 const char *uuid
             );
-            static bool sendPublicMessageMetaPop(
-                unsigned int fd,
+            static void preparePublicMessageMetaPop(
                 Packet *packet,
                 unsigned int length
             );
 
-            static bool continueSend( unsigned int fd, Packet *packet );
+            static bool send( unsigned int fd, Packet *packet );
 
             static void reset( Packet *packet );
             static void recv( unsigned int fd, Packet *packet );
@@ -241,6 +231,7 @@ namespace simq::core::server {
             static bool isRemoveProducer( Packet *packet );
 
             static bool isPopMessage( Packet *packet );
+            static bool isGetPartMessage( Packet *packet );
 
             static bool isPushMessage( Packet *packet );
             static bool isPushPublicMessage( Packet *packet );
@@ -267,27 +258,6 @@ namespace simq::core::server {
             static bool isReceived( Packet *packet );
     };
 
-    bool Protocol::_send( unsigned int fd, Packet *packet ) {
-        auto l = ::send(
-            fd,
-            &packet->values.get()[packet->wrLength],
-            packet->length - packet->wrLength,
-            MSG_NOSIGNAL
-        );
-
-        if( l == -1 ) {
-            if( errno != EAGAIN ) {
-                throw util::Error::SOCKET;
-            }
-
-            return false;
-        }
-
-        packet->wrLength += l;
-
-        return packet->wrLength == packet->length;
-    }
-
     bool Protocol::_recv( unsigned int fd, Packet *packet ) {
         auto l = ::recv(
             fd,
@@ -309,8 +279,25 @@ namespace simq::core::server {
         return packet->wrLength == packet->length;
     }
 
-    bool Protocol::continueSend( unsigned int fd, Packet *packet ) {
-        return _send( fd, packet );
+    bool Protocol::send( unsigned int fd, Packet *packet ) {
+        auto l = ::send(
+            fd,
+            &packet->values.get()[packet->wrLength],
+            packet->length - packet->wrLength,
+            MSG_NOSIGNAL
+        );
+
+        if( l == -1 ) {
+            if( errno != EAGAIN ) {
+                throw util::Error::SOCKET;
+            }
+
+            return false;
+        }
+
+        packet->wrLength += l;
+
+        return packet->wrLength == packet->length;
     };
 
     unsigned int Protocol::_calculateLengthBodyMessage( unsigned int value, ... ) {
@@ -365,7 +352,7 @@ namespace simq::core::server {
         packet->wrLength = 0;
     }
 
-    bool Protocol::sendVersion( unsigned int fd, Packet *packet ) {
+    void Protocol::prepareVersion( Packet *packet ) {
         auto lengthBody = _calculateLengthBodyMessage( SIZE_UINT, 0 );
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
@@ -377,21 +364,17 @@ namespace simq::core::server {
         _marsh( packet, 1 );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, VERSION );
-
-        return _send( fd, packet );
     }
 
-    bool Protocol::sendOk( unsigned int fd, Packet *packet ) {
+    void Protocol::prepareOk( Packet *packet ) {
         _reservePacketValues( packet, LENGTH_META );
         packet->length = 0;
 
         _marsh( packet, CMD_OK );
         _marsh( packet, ( unsigned int )0 );
-
-        return _send( fd, packet );
     }
 
-    bool Protocol::sendError( unsigned int fd, Packet *packet, const char *description ) {
+    void Protocol::prepareError( Packet *packet, const char *description ) {
         auto lengthDescr = strlen( description ) + 1;
         auto lengthBody = _calculateLengthBodyMessage( lengthDescr, 0 );
 
@@ -404,12 +387,9 @@ namespace simq::core::server {
         _marsh( packet, 1 );
         _marsh( packet, lengthDescr );
         _marsh( packet, description, lengthDescr );
-
-        return _send( fd, packet );
     }
 
-    bool Protocol::sendStringList(
-        unsigned int fd,
+    void Protocol::prepareStringList(
         Packet *packet,
         std::list<std::string> &list
     ) {
@@ -430,12 +410,9 @@ namespace simq::core::server {
             _marsh( packet, (*it).length() + 1 );
             _marsh( packet, (*it).c_str(), (*it).size() );
         }
-
-        return _send( fd, packet );
     }
 
-    bool Protocol::sendChannelLimitMessages(
-        unsigned int fd,
+    void Protocol::prepareChannelLimitMessages(
         Packet *packet,
         util::types::ChannelLimitMessages &limitMessages
     ) {
@@ -461,12 +438,9 @@ namespace simq::core::server {
         _marsh( packet, limitMessages.maxMessagesInMemory );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, limitMessages.maxMessagesOnDisk );
-
-        return _send( fd, packet );
     }
 
-    bool Protocol::sendMessageMetaPush(
-        unsigned int fd,
+    void Protocol::prepareMessageMetaPush(
         Packet *packet,
         const char *uuid
     ) {
@@ -481,16 +455,13 @@ namespace simq::core::server {
         _marsh( packet, 1 );
         _marsh( packet, lengthUUID );
         _marsh( packet, uuid, lengthUUID );
-
-        return _send( fd, packet );
     }
 
-    bool Protocol::sendPublicMessageMetaPush( unsigned int fd, Packet *packet ) {
-        return sendOk( fd, packet );
+    void Protocol::preparePublicMessageMetaPush( Packet *packet ) {
+        prepareOk( packet );
     }
 
-    bool Protocol::sendMessageMetaPop(
-        unsigned int fd,
+    void Protocol::prepareMessageMetaPop(
         Packet *packet,
         unsigned int length,
         const char *uuid
@@ -508,12 +479,9 @@ namespace simq::core::server {
         _marsh( packet, length );
         _marsh( packet, lengthUUID );
         _marsh( packet, uuid, lengthUUID );
-
-        return _send( fd, packet );
     }
 
-    bool Protocol::sendPublicMessageMetaPop(
-        unsigned int fd,
+    void Protocol::preparePublicMessageMetaPop(
         Packet *packet,
         unsigned int length
     ) {
@@ -527,8 +495,6 @@ namespace simq::core::server {
         _marsh( packet, 1 );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, length );
-
-        return _send( fd, packet );
     }
 
     void Protocol::_checkMeta( Packet *packet ) {
@@ -544,6 +510,8 @@ namespace simq::core::server {
             case CMD_REMOVE_MESSAGE:
             case CMD_GET_CHANNELS:
             case CMD_GET_VERSION:
+            case CMD_GET_PART_MESSAGE:
+            case CMD_POP_MESSAGE:
                 if( packet->length != 0 ) {
                     throw util::Error::WRONG_CMD;
                 }
@@ -1088,6 +1056,10 @@ namespace simq::core::server {
 
     bool Protocol::isPopMessage( Packet *packet ) {
         return packet->cmd == CMD_POP_MESSAGE;
+    }
+
+    bool Protocol::isGetPartMessage( Packet *packet ) {
+        return packet->cmd == CMD_GET_PART_MESSAGE;
     }
 
     bool Protocol::isPushMessage( Packet *packet ) {
