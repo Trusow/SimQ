@@ -82,6 +82,10 @@ namespace simq::core::server::q {
     unsigned int Messages::_allocateMessage( unsigned int length, bool &isMemory ) {
         unsigned int id;
 
+        if( length < _limits.minMessageSize || length > _limits.maxMessageSize ) {
+            throw util::Error::EXCEED_LIMIT;
+        }
+
         if( _totalInMemory < _limits.maxMessagesInMemory ) {
             id = _buffer->allocate( length );
             isMemory = true;
