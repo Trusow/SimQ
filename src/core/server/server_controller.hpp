@@ -303,6 +303,8 @@ namespace simq::core::server {
 
         if( !Protocol::send( fd, packet ) ) return;
 
+        Protocol::resetRecv( packet );
+
         switch( sess->fsm ) {
             case FSM_COMMON_SEND_CONFIRM_SECURE:
                 sess->fsm = FSM_COMMON_RECV_CMD_GET_VERSION;
