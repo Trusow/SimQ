@@ -131,6 +131,13 @@ namespace simq::core::server {
             void _sendToConsumerPartMessageNull( unsigned int fd, Session *sess );
             void _send( unsigned int fd, Session *sess );
 
+            void _copyAuthData(
+                Session *sess,
+                const char *group,
+                const char *channel = nullptr,
+                const char *login = nullptr
+            );
+
         public:
             void connect( unsigned int fd, unsigned int ip );
             void recv( unsigned int fd );
@@ -375,6 +382,33 @@ namespace simq::core::server {
         _send( fd, sess );
     }
 
+    void ServerController::_copyAuthData(
+        Session *sess,
+        const char *group,
+        const char *channel,
+        const char *login
+    ) {
+        auto lGroup = strlen( group );
+
+        if( channel == nullptr ) {
+            sess->authData = std::make_unique<char[]>( lGroup + 1 );
+            memcpy( sess->authData.get(), group, lGroup );
+            return;
+        }
+
+        auto lChannel = strlen( channel );
+        auto lLogin = strlen( login );
+
+        sess->authData = std::make_unique<char[]>( lGroup + lChannel + lLogin + 3 );
+
+        sess->offsetChannel = lGroup+1;
+        sess->offsetLogin = lGroup+lChannel+2;
+
+        memcpy( sess->authData.get(), group, lGroup );
+        memcpy( &sess->authData.get()[sess->offsetChannel], channel, lChannel );
+        memcpy( &sess->authData.get()[sess->offsetLogin], login, lLogin );
+    }
+
     void ServerController::_authGroupCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
@@ -382,6 +416,7 @@ namespace simq::core::server {
         auto password = Protocol::getPassword( packet );
 
         _access->authGroup( group, password, fd );
+        _copyAuthData( sess, group );
 
         Protocol::prepareOk( packet );
         sess->fsm = FSM_COMMON_SEND_CONFIRM_AUTH_GROUP;
@@ -399,6 +434,7 @@ namespace simq::core::server {
 
         _access->authConsumer( group, channel, login, password, fd );
         _q->joinConsumer( group, channel, fd );
+        _copyAuthData( sess, group, channel, login );
 
         Protocol::prepareOk( packet );
         sess->fsm = FSM_COMMON_SEND_CONFIRM_AUTH_CONSUMER;
@@ -416,6 +452,7 @@ namespace simq::core::server {
 
         _access->authProducer( group, channel, login, password, fd );
         _q->joinProducer( group, channel, fd );
+        _copyAuthData( sess, group, channel, login );
 
         Protocol::prepareOk( packet );
         sess->fsm = FSM_COMMON_SEND_CONFIRM_AUTH_PRODUCER;
