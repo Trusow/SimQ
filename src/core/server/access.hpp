@@ -213,6 +213,17 @@ namespace simq::core::server {
             unsigned int fd
         );
 
+        void checkToGroup(
+            const char *groupName,
+            unsigned int fd
+        );
+
+        void checkToChannel(
+            const char *groupName,
+            const char *channelName,
+            unsigned int fd
+        );
+
         void checkAddChannel(
             const char *groupName,
             unsigned int fd,
@@ -957,6 +968,46 @@ namespace simq::core::server {
         if( map.find( name ) != map.end() ) {
             throw util::Error::DUPLICATE_PRODUCER;
         }
+    }
+
+    void Access::checkToChannel(
+        const char *groupName,
+        const char *channelName,
+        unsigned int fd
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName].get();
+
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
+
+        _checkIssetSessions( group->sessions, fd );
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        _checkIssetChannel( group->channels, channelName );
+    }
+
+    void Access::checkToGroup(
+        const char *groupName,
+        unsigned int fd
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroups( _mGroups );
+
+        _checkIssetGroup( groupName );
+
+        auto group = _groups[groupName].get();
+
+        _wait( group->countSessionsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockGroupSessions( group->mSessions );
+
+        _checkIssetSessions( group->sessions, fd );
     }
 
     void Access::checkAddChannel(
