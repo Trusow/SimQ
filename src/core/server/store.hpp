@@ -5,6 +5,7 @@
 #include <string.h>
 #include <mutex>
 #include <vector>
+#include <list>
 #include <thread>
 #include <arpa/inet.h>
 #include <map>
@@ -75,7 +76,7 @@ namespace simq::core::server {
             void updateGroupPassword( const char *group, const unsigned char *password );
             void removeGroup( const char *group );
 
-            void getChannels( const char *group, std::vector<std::string> &channels );
+            void getChannels( const char *group, std::list<std::string> &channels );
             void getChannelLimitMessages(
                 const char *group,
                 const char *channel,
@@ -704,7 +705,7 @@ namespace simq::core::server {
         groups.erase( it );
     }
 
-    void Store::getChannels( const char *group, std::vector<std::string> &channels ) {
+    void Store::getChannels( const char *group, std::list<std::string> &channels ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -715,7 +716,6 @@ namespace simq::core::server {
 
         for( auto it = groups[group].begin(); it != groups[group].end(); it++ ) {
             channels.push_back( it->first );
-
         }
     }
 
