@@ -198,7 +198,7 @@ namespace simq::core::server {
 
             static bool send( unsigned int fd, Packet *packet );
 
-            static void reset( Packet *packet );
+            static void resetRecv( Packet *packet );
             static void recv( unsigned int fd, Packet *packet );
 
             static bool isOk( Packet *packet );
@@ -932,7 +932,7 @@ namespace simq::core::server {
         }
     }
 
-    void Protocol::reset( Packet *packet ) {
+    void Protocol::resetRecv( Packet *packet ) {
         packet->isRecvMeta = false;
         packet->isRecvBody = false;
     }
