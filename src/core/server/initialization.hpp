@@ -47,11 +47,11 @@ namespace simq::core::server {
     };
 
     void Initialization::_initConsumers( const char *group, const char *channel ) {
-        std::vector<std::string> items;
+        std::list<std::string> items;
         _store->getConsumers( group, channel, items );
 
-        for( auto i = 0; i < items.size(); i++ ) {
-            auto login = items[i].c_str();
+        for( auto it = items.begin(); it != items.end(); it++ ) {
+            auto login = (*it).c_str();
 
             std::list<Logger::Detail> details;
             Logger::addItemToDetails( details, "login", login );
@@ -89,11 +89,11 @@ namespace simq::core::server {
     }
 
     void Initialization::_initProducers( const char *group, const char *channel ) {
-        std::vector<std::string> items;
+        std::list<std::string> items;
         _store->getProducers( group, channel, items );
 
-        for( auto i = 0; i < items.size(); i++ ) {
-            auto login = items[i].c_str();
+        for( auto it = items.begin(); it != items.end(); it++ ) {
+            auto login = (*it).c_str();
 
             std::list<Logger::Detail> details;
             Logger::addItemToDetails( details, "login", login );
