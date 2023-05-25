@@ -94,7 +94,7 @@ namespace simq::core::server {
             );
             void removeChannel( const char *group, const char *channel );
 
-            void getConsumers( const char *group, const char *channel, std::vector<std::string> &consumers );
+            void getConsumers( const char *group, const char *channel, std::list<std::string> &consumers );
             void addConsumer(
                 const char *group,
                 const char *channel,
@@ -115,7 +115,7 @@ namespace simq::core::server {
             );
             void removeConsumer( const char *group, const char *channel, const char *login );
 
-            void getProducers( const char *group, const char *channel, std::vector<std::string> &producers );
+            void getProducers( const char *group, const char *channel, std::list<std::string> &producers );
             void addProducer(
                 const char *group,
                 const char *channel,
@@ -860,7 +860,7 @@ namespace simq::core::server {
         fileSettings.atomicWrite( &limitMessages, sizeof( util::types::ChannelLimitMessages ) );
     }
 
-    void Store::getConsumers( const char *group, const char *channel, std::vector<std::string> &consumers ) {
+    void Store::getConsumers( const char *group, const char *channel, std::list<std::string> &consumers ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
@@ -1011,7 +1011,7 @@ namespace simq::core::server {
         filePassword.atomicWrite( (void *)password, crypto::HASH_LENGTH );
     }
 
-    void Store::getProducers( const char *group, const char *channel, std::vector<std::string> &producers ) {
+    void Store::getProducers( const char *group, const char *channel, std::list<std::string> &producers ) {
         std::lock_guard<std::mutex> lock( m );
 
         auto itGroup = groups.find( group );
