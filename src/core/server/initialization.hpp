@@ -131,11 +131,11 @@ namespace simq::core::server {
     }
 
     void Initialization::_initChannels( const char *group ) {
-        std::vector<std::string> items;
+        std::list<std::string> items;
         _store->getChannels( group, items );
 
-        for( auto i = 0; i < items.size(); i++ ) {
-            auto channel = items[i].c_str();
+        for( auto it = items.begin(); it != items.end(); it++ ) {
+            auto channel = (*it).c_str();
 
             std::list<Logger::Detail> details;
             Logger::addItemToDetails( details, "channel", channel );
