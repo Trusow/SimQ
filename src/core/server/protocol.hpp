@@ -198,7 +198,6 @@ namespace simq::core::server {
 
             static bool send( unsigned int fd, Packet *packet );
 
-            static void resetRecv( Packet *packet );
             static void recv( unsigned int fd, Packet *packet );
 
             static bool isOk( Packet *packet );
@@ -932,11 +931,6 @@ namespace simq::core::server {
         }
     }
 
-    void Protocol::resetRecv( Packet *packet ) {
-        packet->isRecvMeta = false;
-        packet->isRecvBody = false;
-    }
-
     void Protocol::recv( unsigned int fd, Packet *packet ) {
         if( !packet->isRecvMeta && !packet->isRecvBody ) {
             _reservePacketValues( packet, LENGTH_META );
@@ -949,12 +943,14 @@ namespace simq::core::server {
             }
 
             packet->isRecvMeta = false;
-            packet->isRecvBody = true;
+            packet->isRecvBody = false;
             _checkMeta( packet );
-            _reservePacketValues( packet, packet->length );
 
-            if( !packet->length ) {
-                return;
+            if( packet->length ) {
+                packet->isRecvBody = true;
+                _reservePacketValues( packet, packet->length );
+            } else {
+                packet->length = LENGTH_META;
             }
         }
 
@@ -1249,10 +1245,7 @@ namespace simq::core::server {
     }
 
     bool Protocol::isReceived( Packet *packet ) {
-        bool isPassedMeta = !packet->isRecvMeta && packet->isRecvBody;
-        bool isPassedLength = packet->length == 0 || packet->length == packet->wrLength;
-
-        return isPassedMeta && isPassedLength;
+        return packet->length == packet->wrLength;
     }
 }
 
