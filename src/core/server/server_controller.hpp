@@ -3,13 +3,14 @@
 
 #include <unordered_map>
 #include <memory>
-#include <vector>
+#include <list>
 #include <unistd.h>
 #include <string.h>
 #include "server/callbacks.h"
 #include "../../util/error.h"
 #include "../../util/types.h"
 #include "access.hpp"
+#include "store.hpp"
 #include "changes.hpp"
 #include "q/manager.hpp"
 #include "protocol.hpp"
@@ -98,6 +99,7 @@ namespace simq::core::server {
             Access *_access = nullptr;
             q::Manager *_q = nullptr;
             Changes *_changes = nullptr;
+            Store *_store = nullptr;
 
             FSM _getFSMAfterSendPartMessage( Session *sess );
             FSM _getFSMAfterRecvPartMessage( Session *sess );
@@ -130,6 +132,26 @@ namespace simq::core::server {
             void _sendToConsumerPartMessage( unsigned int fd, Session *sess );
             void _sendToConsumerPartMessageNull( unsigned int fd, Session *sess );
             void _send( unsigned int fd, Session *sess );
+
+            void _getChannelsCmd( unsigned int fd, Session *sess );
+            void _getChannelLimitMessagesCmd( unsigned int fd, Session *sess );
+            void _getConsumersCmd( unsigned int fd, Session *sess );
+            void _getProducersCmd( unsigned int fd, Session *sess );
+            void _addChannelCmd( unsigned int fd, Session *sess );
+            void _updateChannelLimitMessagesCmd( unsigned int fd, Session *sess );
+            void _removeChannelCmd( unsigned int fd, Session *sess );
+            void _addConsumerCmd( unsigned int fd, Session *sess );
+            void _removeConsumerCmd( unsigned int fd, Session *sess );
+            void _addProducerCmd( unsigned int fd, Session *sess );
+            void _removeProducerCmd( unsigned int fd, Session *sess );
+
+            void _popMessageCmd( unsigned int fd, Session *sess );
+            void _removeMessageByUUIDCmd( unsigned int fd, Session *sess );
+
+            void _pushMessageCmd( unsigned int fd, Session *sess );
+            void _pushPublicMessageCmd( unsigned int fd, Session *sess );
+            void _pushReplicaMessageCmd( unsigned int fd, Session *sess );
+
 
             void _copyAuthData(
                 Session *sess,
@@ -630,20 +652,31 @@ namespace simq::core::server {
         if( Protocol::isUpdatePassword( packet ) ) {
             _updateMyGroupPasswordCmd( fd, sess );
         } else if( Protocol::isGetChannels( packet ) ) {
+            _getChannelsCmd( fd, sess );
         } else if( Protocol::isGetChannelLimitMessages( packet ) ) {
+            _getChannelLimitMessagesCmd( fd, sess );
         } else if( Protocol::isGetConsumers( packet ) ) {
+            _getConsumersCmd( fd, sess );
         } else if( Protocol::isGetProducers( packet ) ) {
+            _getProducersCmd( fd, sess );
         } else if( Protocol::isAddChannel( packet ) ) {
+            _addChannelCmd( fd, sess );
         } else if( Protocol::isUpdateChannelLimitMessages( packet ) ) {
+            _updateChannelLimitMessagesCmd( fd, sess );
         } else if( Protocol::isRemoveChannel( packet ) ) {
+            _removeChannelCmd( fd, sess );
         } else if( Protocol::isAddConsumer( packet ) ) {
+            _addConsumerCmd( fd, sess );
         } else if( Protocol::isUpdateConsumerPassword( packet ) ) {
             _updateConsumerPasswordCmd( fd, sess );
         } else if( Protocol::isRemoveConsumer( packet ) ) {
+            _removeConsumerCmd( fd, sess );
         } else if( Protocol::isAddProducer( packet ) ) {
+            _addProducerCmd( fd, sess );
         } else if( Protocol::isUpdateProducerPassword( packet ) ) {
             _updateProducerPasswordCmd( fd, sess );
         } else if( Protocol::isRemoveProducer( packet ) ) {
+            _removeProducerCmd( fd, sess );
         } else {
             throw util::Error::WRONG_CMD;
         }
@@ -657,8 +690,9 @@ namespace simq::core::server {
         if( Protocol::isUpdatePassword( packet ) ) {
             _updateMyConsumerPasswordCmd( fd, sess );
         } else if( Protocol::isPopMessage( packet ) ) {
+            _popMessageCmd( fd, sess );
         } else if( Protocol::isRemoveMessageByUUID( packet ) ) {
-        } else if( Protocol::isOk( packet ) ) {
+            _removeMessageByUUIDCmd( fd, sess );
         } else {
             throw util::Error::WRONG_CMD;
         }
@@ -688,8 +722,11 @@ namespace simq::core::server {
         if( Protocol::isUpdatePassword( packet ) ) {
             _updateMyProducerPasswordCmd( fd, sess );
         } else if( Protocol::isPushMessage( packet ) ) {
+            _pushMessageCmd( fd, sess );
         } else if( Protocol::isPushPublicMessage( packet ) ) {
+            _pushPublicMessageCmd( fd, sess );
         } else if( Protocol::isPushReplicaMessage( packet ) ) {
+            _pushReplicaMessageCmd( fd, sess );
         } else {
             throw util::Error::WRONG_CMD;
         }
@@ -708,6 +745,211 @@ namespace simq::core::server {
     }
 
     void ServerController::_sendToConsumerPartMessageNull( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+    }
+
+    void ServerController::_getChannelsCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+
+        _access->checkToGroup( group, fd );
+        
+        std::list<std::string> channels;
+        _store->getChannels( group, channels );
+
+        Protocol::prepareStringList( packet, channels );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_getChannelLimitMessagesCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+
+        _access->checkToChannel( sess->authData.get(), channel, fd );
+
+        util::types::ChannelLimitMessages limitMessages;
+        _store->getChannelLimitMessages( group, channel, limitMessages ); 
+
+        Protocol::prepareChannelLimitMessages( packet, limitMessages );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_getConsumersCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+
+        _access->checkToChannel( sess->authData.get(), channel, fd );
+
+        std::list<std::string> consumers;
+        _store->getConsumers( group, channel, consumers );
+
+        Protocol::prepareStringList( packet, consumers );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_getProducersCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+
+        _access->checkToChannel( sess->authData.get(), channel, fd );
+
+        std::list<std::string> producers;
+        _store->getProducers( group, channel, producers );
+
+        Protocol::prepareStringList( packet, producers );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_addChannelCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+        util::types::ChannelLimitMessages limitMessages;
+        Protocol::getChannelLimitMessages( packet, limitMessages );
+
+        _access->checkAddChannel( group, fd, channel );
+
+        auto change = _changes->addChannel( group, channel, &limitMessages );
+        _changes->push( std::move( change ) );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_updateChannelLimitMessagesCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+        util::types::ChannelLimitMessages limitMessages;
+        Protocol::getChannelLimitMessages( packet, limitMessages );
+
+        _access->checkToChannel( group, channel, fd );
+
+        auto change = _changes->updateChannelLimitMessages( group, channel, &limitMessages );
+        _changes->push( std::move( change ) );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_removeChannelCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+
+        _access->checkToChannel( group, channel, fd );
+
+        auto change = _changes->removeChannel( group, channel  );
+        _changes->push( std::move( change ) );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_addConsumerCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+        auto login = Protocol::getConsumer( packet );
+        auto password = Protocol::getPassword( packet );
+
+        _access->checkAddConsumer( group, fd, channel, login );
+
+        auto change = _changes->addConsumer( group, channel, login, password );
+        _changes->push( std::move( change ) );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_removeConsumerCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+        auto login = Protocol::getConsumer( packet );
+
+        _access->checkRemoveConsumer( group, fd, channel, login );
+
+        auto change = _changes->removeConsumer( group, channel, login );
+        _changes->push( std::move( change ) );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_addProducerCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+        auto login = Protocol::getProducer( packet );
+        auto password = Protocol::getPassword( packet );
+
+        _access->checkAddProducer( group, fd, channel, login );
+
+        auto change = _changes->addProducer( group, channel, login, password );
+        _changes->push( std::move( change ) );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_removeProducerCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+        auto login = Protocol::getProducer( packet );
+
+        _access->checkRemoveProducer( group, fd, channel, login );
+
+        auto change = _changes->removeProducer( group, channel, login );
+        _changes->push( std::move( change ) );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_popMessageCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+    }
+
+    void ServerController::_removeMessageByUUIDCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+    }
+
+    void ServerController::_pushMessageCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+    }
+
+    void ServerController::_pushPublicMessageCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+    }
+    
+    void ServerController::_pushReplicaMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
     }
 
