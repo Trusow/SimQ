@@ -255,6 +255,8 @@ namespace simq::core::server {
             );
 
             static bool isReceived( Packet *packet );
+            static void setLength( Packet *packet, unsigned int length );
+            static void addWRLength( Packet *packet, unsigned int length );
     };
 
     bool Protocol::_recv( unsigned int fd, Packet *packet ) {
@@ -1246,6 +1248,15 @@ namespace simq::core::server {
 
     bool Protocol::isReceived( Packet *packet ) {
         return packet->length == packet->wrLength;
+    }
+
+    void Protocol::setLength( Packet *packet, unsigned int length ) {
+        packet->length = length;
+        packet->wrLength = 0;
+    }
+
+    void Protocol::addWRLength( Packet *packet, unsigned int length ) {
+        packet->wrLength += length;
     }
 }
 
