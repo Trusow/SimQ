@@ -11,6 +11,7 @@
 #include <stdarg.h>
 #include <arpa/inet.h>
 #include "../../util/types.h"
+#include "../../util/constants.h"
 #include "../../util/error.h"
 #include "../../util/validation.hpp"
 #include "../../crypto/hash.hpp"
@@ -26,6 +27,7 @@ namespace simq::core::server {
 
         public:
             const static unsigned int LENGTH_META = SIZE_UINT * 2;
+            const static unsigned int PACKET_SIZE = util::constants::MESSAGE_PACKET_SIZE;
 
             enum Cmd {
                 CMD_OK = 10,
@@ -257,6 +259,8 @@ namespace simq::core::server {
             static bool isReceived( Packet *packet );
             static void setLength( Packet *packet, unsigned int length );
             static void addWRLength( Packet *packet, unsigned int length );
+            static bool isFullPart( Packet *packet );
+            static unsigned int getResiduePart( Packet *packet );
     };
 
     bool Protocol::_recv( unsigned int fd, Packet *packet ) {
@@ -537,7 +541,7 @@ namespace simq::core::server {
             case CMD_PUSH_PUBLIC_MESSAGE:
             case CMD_PUSH_REPLICA_MESSAGE:
             case CMD_REMOVE_MESSAGE_BY_UUID:
-                if( packet->length > 4096 ) {
+                if( packet->length > PACKET_SIZE ) {
                     throw util::Error::WRONG_CMD;
                 }
                 break;
@@ -1257,6 +1261,22 @@ namespace simq::core::server {
 
     void Protocol::addWRLength( Packet *packet, unsigned int length ) {
         packet->wrLength += length;
+    }
+
+    bool Protocol::isFullPart( Packet *packet ) {
+        return packet->length == packet->wrLength || packet->wrLength % PACKET_SIZE == 0;
+    }
+
+    unsigned int Protocol::getResiduePart( Packet *packet ) {
+        auto residue = packet->length - packet->wrLength;
+        if( residue < PACKET_SIZE ) {
+            return residue;
+        }
+
+        auto countWRPackets =  packet->wrLength / PACKET_SIZE;
+        residue = packet->wrLength - countWRPackets * PACKET_SIZE;
+ 
+        return PACKET_SIZE - residue;
     }
 }
 
