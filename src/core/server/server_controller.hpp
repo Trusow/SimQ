@@ -9,6 +9,7 @@
 #include "server/callbacks.h"
 #include "../../util/error.h"
 #include "../../util/types.h"
+#include "../../util/uuid.hpp"
 #include "access.hpp"
 #include "store.hpp"
 #include "changes.hpp"
@@ -60,12 +61,14 @@ namespace simq::core::server {
 
                 FSM_PRODUCER_RECV_CMD,
                 FSM_PRODUCER_SEND,
+                FSM_PRODUCER_SEND_MESSAGE_META,
                 FSM_PRODUCER_SEND_ERROR,
                 FSM_PRODUCER_SEND_ERROR_WITH_CLOSE,
                  
                 FSM_PRODUCER_RECV_PART_MESSAGE,
                 FSM_PRODUCER_RECV_PART_MESSAGE_NULL,
                 FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE,
+                FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE_END,
                  
                 FSM_PRODUCER_CLOSE,
             };
@@ -102,9 +105,7 @@ namespace simq::core::server {
             Store *_store = nullptr;
 
             FSM _getFSMAfterSendPartMessage( Session *sess );
-            FSM _getFSMAfterRecvPartMessage( Session *sess );
             FSM _getFSMAfterSendConfirmToConsumer( Session *sess );
-            FSM _getFSMAfterSendConfirmToProducer( Session *sess );
             FSM _getFSMByError( FSM fsm, util::Error::Err err );
 
             void _close( unsigned int fd, Session *sess );
@@ -296,16 +297,7 @@ namespace simq::core::server {
     bool ServerController::_recvToPacket( unsigned int fd, Protocol::Packet *packet ) {
         Protocol::recv( fd, packet );
 
-        return Protocol::isReceived( packet );
-    }
-
-    ServerController::FSM ServerController::_getFSMAfterRecvPartMessage( Session *sess ) {
-        switch( sess->fsm ) {
-            case FSM_PRODUCER_RECV_PART_MESSAGE:
-                return FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE;
-            default:
-                return FSM_PRODUCER_SEND_ERROR_WITH_CLOSE;
-        }
+        return Protocol::isFull( packet );
     }
 
     ServerController::FSM ServerController::_getFSMAfterSendPartMessage( Session *sess ) {
@@ -320,11 +312,6 @@ namespace simq::core::server {
     ServerController::FSM ServerController::_getFSMAfterSendConfirmToConsumer( Session *sess ) {
         //FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE | FSM_CONSUMER_RECV_CMD_PART_MESSAGE
         return FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE;
-    }
-
-    ServerController::FSM ServerController::_getFSMAfterSendConfirmToProducer( Session *sess ) {
-        //FSM_PRODUCER_RECV_CMD | FSM_PRODUCER_RECV_PART_MESSAGE;
-        return FSM_PRODUCER_RECV_CMD;
     }
 
     void ServerController::_send( unsigned int fd, Session *sess ) {
@@ -369,11 +356,17 @@ namespace simq::core::server {
             case FSM_PRODUCER_SEND_ERROR:
                 sess->fsm = FSM_PRODUCER_RECV_CMD;
                 break;
+            case FSM_PRODUCER_SEND_MESSAGE_META:
+                sess->fsm = FSM_PRODUCER_RECV_PART_MESSAGE;
+                break;
             case FSM_PRODUCER_SEND_ERROR_WITH_CLOSE:
                 sess->fsm = FSM_PRODUCER_CLOSE;
                 break;
             case FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE:
-                sess->fsm = _getFSMAfterSendConfirmToProducer( sess );
+                sess->fsm = FSM_PRODUCER_RECV_PART_MESSAGE;
+                break;
+            case FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE_END:
+                sess->fsm = FSM_PRODUCER_RECV_CMD;
                 break;
         }
     }
@@ -734,10 +727,55 @@ namespace simq::core::server {
 
     void ServerController::_recvFromProducerPartMessage( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = &sess->authData.get()[sess->offsetChannel];
+        auto login = &sess->authData.get()[sess->offsetLogin];
+
+        try {
+            _access->checkPushMessage( group, channel, login, fd );
+            auto l = _q->recv( group, channel, fd, sess->msgID );
+            Protocol::addWRLength( packet, l );
+
+            bool isSend = false;
+            if( Protocol::isFull( packet ) ) {
+                sess->fsm = FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE_END;
+                isSend = true;
+            } else if( Protocol::isFullPart( packet ) ) {
+                sess->fsm = FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE;
+                isSend = true;
+            }
+
+            if( !isSend ) return;
+
+            Protocol::prepareOk( packet );
+            _send( fd, sess );
+        } catch( util::Error::Err err ) {
+            if( err == util::Error::SOCKET ) {
+                _close( fd, sess );
+            } else {
+                sess->fsm = FSM_PRODUCER_RECV_PART_MESSAGE_NULL;
+            }
+        } catch( ... ) {
+            _close( fd, sess );
+        }
+
     }
 
     void ServerController::_recvFromProducerPartMessageNull( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+
+        auto residue = Protocol::getResiduePart( packet );
+        auto data = std::make_unique<char[]>( residue );
+        auto l = ::recv( fd, data.get(), residue, MSG_NOSIGNAL );
+        Protocol::addWRLength( packet, l );
+
+        if( Protocol::isFullPart( packet ) ) {
+            Protocol::prepareError( packet, util::Error::getDescription( util::Error::ACCESS_DENY ) );
+
+            sess->fsm = FSM_PRODUCER_SEND_ERROR_WITH_CLOSE;
+            _send( fd, sess );
+        }
     }
 
     void ServerController::_sendToConsumerPartMessage( unsigned int fd, Session *sess ) {
@@ -943,14 +981,61 @@ namespace simq::core::server {
 
     void ServerController::_pushMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+
+        auto length = Protocol::getLength( packet );
+        auto group = sess->authData.get();
+        auto channel = &sess->authData.get()[sess->offsetChannel];
+        auto login = &sess->authData.get()[sess->offsetLogin];
+
+        _access->checkPushMessage( group, channel, login, fd );
+        char uuid[util::UUID::LENGTH];
+
+        sess->msgID = _q->createMessageForQ( group, channel, fd, length, uuid );
+        Protocol::setLength( packet, length );
+
+        Protocol::prepareMessageMetaPush( packet, uuid );
+        sess->fsm = FSM_PRODUCER_SEND_MESSAGE_META;
+
+        _send( fd, sess );
     }
 
     void ServerController::_pushPublicMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+
+        auto length = Protocol::getLength( packet );
+        auto group = sess->authData.get();
+        auto channel = &sess->authData.get()[sess->offsetChannel];
+        auto login = &sess->authData.get()[sess->offsetLogin];
+
+        _access->checkPushMessage( group, channel, login, fd );
+
+        sess->msgID = _q->createMessageForBroadcast( group, channel, fd, length );
+        Protocol::setLength( packet, length );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_PRODUCER_SEND_MESSAGE_META;
+
+        _send( fd, sess );
     }
     
     void ServerController::_pushReplicaMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+
+        auto length = Protocol::getLength( packet );
+        auto uuid = Protocol::getUUID( packet );
+        auto group = sess->authData.get();
+        auto channel = &sess->authData.get()[sess->offsetChannel];
+        auto login = &sess->authData.get()[sess->offsetLogin];
+
+        _access->checkPushMessage( group, channel, login, fd );
+
+        sess->msgID = _q->createMessageForReplication( group, channel, fd, length, uuid );
+        Protocol::setLength( packet, length );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_PRODUCER_SEND_MESSAGE_META;
+
+        _send( fd, sess );
     }
 
     void ServerController::connect( unsigned int fd, unsigned int ip ) {
