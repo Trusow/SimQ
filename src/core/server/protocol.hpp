@@ -256,7 +256,7 @@ namespace simq::core::server {
                 util::types::ChannelLimitMessages &limitMessages
             );
 
-            static bool isReceived( Packet *packet );
+            static bool isFull( Packet *packet );
             static void setLength( Packet *packet, unsigned int length );
             static void addWRLength( Packet *packet, unsigned int length );
             static bool isFullPart( Packet *packet );
@@ -1250,7 +1250,7 @@ namespace simq::core::server {
         throw util::Error::WRONG_CMD;
     }
 
-    bool Protocol::isReceived( Packet *packet ) {
+    bool Protocol::isFull( Packet *packet ) {
         return packet->length == packet->wrLength;
     }
 
