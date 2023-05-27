@@ -218,35 +218,28 @@ namespace simq::core::server {
     }
 
     void ServerController::_close( unsigned int fd, Session *sess ) {
+        char *group, *channel, *login;
+
         switch( sess->type ) {
             case TYPE_GROUP:
                 _access->logoutGroup( sess->authData.get(), fd );
                 break;
             case TYPE_CONSUMER:
-                _access->logoutConsumer(
-                    sess->authData.get(),
-                    &sess->authData.get()[sess->offsetChannel],
-                    &sess->authData.get()[sess->offsetLogin],
-                    fd
-                );
-                _q->leaveConsumer(
-                    sess->authData.get(),
-                    &sess->authData.get()[sess->offsetChannel],
-                    fd
-                );
+                group = sess->authData.get();
+                channel = &sess->authData.get()[sess->offsetChannel];
+                login = &sess->authData.get()[sess->offsetLogin];
+
+                _access->logoutConsumer( group, channel, login, fd );
+                _q->removeMessage( group, channel, fd, sess->msgID );
+                _q->leaveConsumer( group, channel, fd );
                 break;
             case TYPE_PRODUCER:
-                _access->logoutProducer(
-                    sess->authData.get(),
-                    &sess->authData.get()[sess->offsetChannel],
-                    &sess->authData.get()[sess->offsetLogin],
-                    fd
-                );
-                _q->leaveProducer(
-                    sess->authData.get(),
-                    &sess->authData.get()[sess->offsetChannel],
-                    fd
-                );
+                group = sess->authData.get();
+                channel = &sess->authData.get()[sess->offsetChannel];
+                login = &sess->authData.get()[sess->offsetLogin];
+
+                _access->logoutProducer( group, channel, login, fd );
+                _q->leaveProducer( group, channel, fd );
                 break;
         }
 
