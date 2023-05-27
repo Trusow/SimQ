@@ -142,6 +142,7 @@ namespace simq::core::server::q {
                 const char *groupName,
                 const char *channelName,
                 unsigned int fd,
+                unsigned int &length,
                 char *uuid
             );
             void revertMessage(
@@ -732,6 +733,7 @@ namespace simq::core::server::q {
         const char *groupName,
         const char *channelName,
         unsigned int fd,
+        unsigned int &length,
         char *uuid
     ) {
         _wait( _countGroupsWrited );
@@ -777,6 +779,8 @@ namespace simq::core::server::q {
             channel->messages->getUUID( id, uuid );
             channel->QList.pop_front();
         }
+
+        length = channel->messages->getLength( id );
 
         return id;
     }
