@@ -76,6 +76,7 @@ namespace simq::core::server {
 
                 CMD_SEND_MESSAGE_META = 6'301,
                 CMD_SEND_PUBLIC_MESSAGE_META = 6'302,
+                CMD_SEND_MESSAGE_NONE = 6'303,
             };
 
             struct BasePacket {
@@ -199,6 +200,9 @@ namespace simq::core::server {
             static void preparePublicMessageMetaPop(
                 Packet *packet,
                 unsigned int length
+            );
+            static void prepareNoneMessageMetaPop(
+                Packet *packet
             );
 
             static bool send( unsigned int fd, Packet *packet );
@@ -498,11 +502,21 @@ namespace simq::core::server {
         _reservePacketValues( packet, LENGTH_META + lengthBody );
         packet->length = 0;
 
-        _marsh( packet, CMD_SEND_MESSAGE_META );
+        _marsh( packet, CMD_SEND_PUBLIC_MESSAGE_META );
         _marsh( packet, lengthBody );
         _marsh( packet, 1 );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, length );
+    }
+
+    void Protocol::prepareNoneMessageMetaPop(
+        Packet *packet
+    ) {
+        _reservePacketValues( packet, LENGTH_META );
+        packet->length = 0;
+
+        _marsh( packet, CMD_SEND_MESSAGE_NONE );
+        _marsh( packet, ( unsigned int )0 );
     }
 
     void Protocol::_checkMeta( Packet *packet ) {
