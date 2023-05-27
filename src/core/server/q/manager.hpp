@@ -515,7 +515,7 @@ namespace simq::core::server::q {
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
 
         if( _groups.find( groupName ) == _groups.end() ) {
-            throw util::Error::NOT_FOUND_GROUP;
+            return;
         }
 
         auto group = _groups[groupName].get();
@@ -524,7 +524,7 @@ namespace simq::core::server::q {
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         if( group->channels.find( channelName ) == group->channels.end() ) {
-            throw util::Error::NOT_FOUND_CHANNEL;
+            return;
         }
 
         auto channel = group->channels[channelName].get();
@@ -545,7 +545,7 @@ namespace simq::core::server::q {
 
             channel->messages->free( id );
         } else {
-            throw util::Error::NOT_FOUND_SESSION;
+            return;
         }
 
 
