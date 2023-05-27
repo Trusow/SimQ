@@ -722,6 +722,7 @@ namespace simq::core::server {
                 _close( fd, sess );
             } else {
                 sess->fsm = FSM_PRODUCER_RECV_PART_MESSAGE_NULL;
+                _recvFromProducerPartMessageNull( fd, sess );
             }
         } catch( ... ) {
             _close( fd, sess );
@@ -731,13 +732,14 @@ namespace simq::core::server {
 
     void ServerController::_recvFromProducerPartMessageNull( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+        auto packetMsg = sess->packetMsg.get();
 
-        auto residue = Protocol::getResiduePart( packet );
+        auto residue = Protocol::getResiduePart( packetMsg );
         auto data = std::make_unique<char[]>( residue );
         auto l = ::recv( fd, data.get(), residue, MSG_NOSIGNAL );
-        Protocol::addWRLength( packet, l );
+        Protocol::addWRLength( packetMsg, l );
 
-        if( Protocol::isFullPart( packet ) ) {
+        if( Protocol::isFullPart( packetMsg ) ) {
             Protocol::prepareError( packet, util::Error::getDescription( util::Error::ACCESS_DENY ) );
 
             sess->fsm = FSM_PRODUCER_SEND_ERROR_WITH_CLOSE;
