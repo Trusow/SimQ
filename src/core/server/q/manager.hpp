@@ -48,7 +48,11 @@ namespace simq::core::server::q {
             std::map<std::string, std::unique_ptr<Group>> _groups;
 
             void _wait( std::atomic_uint &atom );
-            unsigned int _calculateTotalConsumersByMessagedID(
+            bool _isMorePublicMessageID(
+                std::map<unsigned int, std::list<unsigned int>> &map,
+                unsigned int msgID
+            );
+            bool _isOnePublicMessageID(
                 std::map<unsigned int, std::list<unsigned int>> &map,
                 unsigned int msgID
             );
@@ -270,7 +274,22 @@ namespace simq::core::server::q {
         channel->consumers[fd] = std::list<unsigned int>();
     }
 
-    unsigned int Manager::_calculateTotalConsumersByMessagedID(
+    bool Manager::_isMorePublicMessageID(
+        std::map<unsigned int, std::list<unsigned int>> &map,
+        unsigned int msgID
+    ) {
+        for( auto itConsumer = map.begin(); itConsumer != map.end(); itConsumer++ ) {
+            for( auto itMsg = itConsumer->second.begin(); itMsg != itConsumer->second.end(); itMsg++ ) {
+                if( *itMsg == msgID ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    bool Manager::_isOnePublicMessageID(
         std::map<unsigned int, std::list<unsigned int>> &map,
         unsigned int msgID
     ) {
@@ -280,11 +299,14 @@ namespace simq::core::server::q {
             for( auto itMsg = itConsumer->second.begin(); itMsg != itConsumer->second.end(); itMsg++ ) {
                 if( *itMsg == msgID ) {
                     total++;
+                    if( total > 1 ) {
+                        return false;
+                    }
                 }
             }
         }
 
-        return total;
+        return total == 1;
     }
 
     void Manager::leaveConsumer( const char *groupName, const char *channelName, unsigned int fd ) {
@@ -315,9 +337,7 @@ namespace simq::core::server::q {
         }
 
         for( auto itMsg = itConsumer->second.begin(); itMsg != itConsumer->second.end(); itConsumer++ ) {
-            auto total = _calculateTotalConsumersByMessagedID( channel->consumers, *itMsg );
-
-            if( total == 1 ) {
+            if( _isOnePublicMessageID( channel->consumers, *itMsg ) ) {
                 channel->messages->free( *itMsg );
             }
         }
@@ -539,7 +559,7 @@ namespace simq::core::server::q {
         auto isProducer = _isProducer( channel->producers, fd );
 
         if( isConsumer || isProducer ) {
-            if( isConsumer && _calculateTotalConsumersByMessagedID( channel->consumers, id ) != 0 ) {
+            if( isConsumer && _isMorePublicMessageID( channel->consumers, id ) ) {
                 return;
             }
 
