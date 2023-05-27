@@ -80,10 +80,9 @@ namespace simq::core::server {
                 TYPE_PRODUCER,
             };
             
-            Type getTypeByFSM( FSM fsm );
-
             struct Session {
                 FSM fsm;
+                Type type;
              
                 std::unique_ptr<char[]> authData;
                 std::unique_ptr<Protocol::Packet> packet;
@@ -106,7 +105,7 @@ namespace simq::core::server {
 
             FSM _getFSMAfterSendPartMessage( Session *sess );
             FSM _getFSMAfterSendConfirmToConsumer( Session *sess );
-            FSM _getFSMByError( FSM fsm, util::Error::Err err );
+            FSM _getFSMByError( Session *sess, util::Error::Err err );
 
             void _close( unsigned int fd, Session *sess );
 
@@ -169,10 +168,8 @@ namespace simq::core::server {
             void iteration();
     };
 
-    ServerController::FSM ServerController::_getFSMByError( FSM fsm, util::Error::Err err ) {
-        auto type = getTypeByFSM( fsm );
-
-        switch( type ) {
+    ServerController::FSM ServerController::_getFSMByError( Session *sess, util::Error::Err err ) {
+        switch( sess->type ) {
             case TYPE_GROUP:
                 switch( err ) {
                     case util::Error::SOCKET:
@@ -221,9 +218,7 @@ namespace simq::core::server {
     }
 
     void ServerController::_close( unsigned int fd, Session *sess ) {
-        auto type = getTypeByFSM( sess->fsm );
-
-        switch( type ) {
+        switch( sess->type ) {
             case TYPE_GROUP:
                 _access->logoutGroup( sess->authData.get(), fd );
                 break;
@@ -256,42 +251,6 @@ namespace simq::core::server {
         }
 
         _sessions.erase( fd );
-    }
-
-    ServerController::Type ServerController::getTypeByFSM( FSM fsm ) {
-        switch( fsm ) {
-            case FSM_GROUP_RECV_CMD:
-            case FSM_GROUP_SEND:
-            case FSM_GROUP_SEND_ERROR:
-            case FSM_GROUP_SEND_ERROR_WITH_CLOSE:
-            case FSM_GROUP_CLOSE:
-                return TYPE_GROUP;
-
-            case FSM_CONSUMER_RECV_CMD:
-            case FSM_CONSUMER_SEND:
-            case FSM_CONSUMER_SEND_ERROR:
-            case FSM_CONSUMER_SEND_ERROR_WITH_CLOSE:
-            case FSM_CONSUMER_RECV_CMD_PART_MESSAGE:
-            case FSM_CONSUMER_SEND_PART_MESSAGE:
-            case FSM_CONSUMER_SEND_PART_MESSAGE_NULL:
-            case FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE:
-            case FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE:
-            case FSM_CONSUMER_CLOSE:
-                return TYPE_CONSUMER;
-
-            case FSM_PRODUCER_RECV_CMD:
-            case FSM_PRODUCER_SEND:
-            case FSM_PRODUCER_SEND_ERROR:
-            case FSM_PRODUCER_SEND_ERROR_WITH_CLOSE:
-            case FSM_PRODUCER_RECV_PART_MESSAGE:
-            case FSM_PRODUCER_RECV_PART_MESSAGE_NULL:
-            case FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE:
-            case FSM_PRODUCER_CLOSE:
-                return TYPE_PRODUCER;
-
-            default:
-                return TYPE_COMMON;
-        }
     }
 
     bool ServerController::_recvToPacket( unsigned int fd, Protocol::Packet *packet ) {
@@ -435,6 +394,7 @@ namespace simq::core::server {
 
         Protocol::prepareOk( packet );
         sess->fsm = FSM_COMMON_SEND_CONFIRM_AUTH_GROUP;
+        sess->type = TYPE_GROUP;
 
         _send( fd, sess );
     }
@@ -453,6 +413,7 @@ namespace simq::core::server {
 
         Protocol::prepareOk( packet );
         sess->fsm = FSM_COMMON_SEND_CONFIRM_AUTH_CONSUMER;
+        sess->type = TYPE_CONSUMER;
 
         _send( fd, sess );
     }
@@ -471,6 +432,7 @@ namespace simq::core::server {
 
         Protocol::prepareOk( packet );
         sess->fsm = FSM_COMMON_SEND_CONFIRM_AUTH_PRODUCER;
+        sess->type = TYPE_PRODUCER;
 
         _send( fd, sess );
     }
@@ -1041,6 +1003,7 @@ namespace simq::core::server {
     void ServerController::connect( unsigned int fd, unsigned int ip ) {
         auto sess = std::make_unique<Session>();
         sess->fsm = FSM_COMMON_RECV_CMD_CHECK_SECURE;
+        sess->type = TYPE_COMMON;
         sess->packet = std::make_unique<Protocol::Packet>();
         _sessions[fd] = std::move( sess );
     }
@@ -1084,7 +1047,7 @@ namespace simq::core::server {
                     throw util::Error::WRONG_CMD;
             }
         } catch( util::Error::Err err ) {
-            sess->fsm = _getFSMByError( sess->fsm, err );
+            sess->fsm = _getFSMByError( sess, err );
 
             switch( sess->fsm ) {
                 case FSM_COMMON_CLOSE:
