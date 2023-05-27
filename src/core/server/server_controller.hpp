@@ -738,6 +738,14 @@ namespace simq::core::server {
         auto residue = Protocol::getResiduePart( packetMsg );
         auto data = std::make_unique<char[]>( residue );
         auto l = ::recv( fd, data.get(), residue, MSG_NOSIGNAL );
+
+        if( l == -1 ) {
+            if( errno != EAGAIN ) {
+                _close( fd, sess );
+            }
+            return;
+        }
+
         Protocol::addWRLength( packetMsg, l );
 
         if( Protocol::isFullPart( packetMsg ) ) {
