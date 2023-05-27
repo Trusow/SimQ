@@ -55,6 +55,7 @@ namespace simq::core::server {
                 FSM_CONSUMER_SEND_PART_MESSAGE,
                 FSM_CONSUMER_SEND_PART_MESSAGE_NULL,
                 FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE,
+                FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE_END,
                 FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE,
 
                 FSM_CONSUMER_CLOSE,
@@ -106,8 +107,6 @@ namespace simq::core::server {
             Changes *_changes = nullptr;
             Store *_store = nullptr;
 
-            FSM _getFSMAfterSendPartMessage( Session *sess );
-            FSM _getFSMAfterSendConfirmToConsumer( Session *sess );
             FSM _getFSMByError( Session *sess, util::Error::Err err );
 
             void _close( unsigned int fd, Session *sess );
@@ -128,7 +127,7 @@ namespace simq::core::server {
             void _recvGroupCmd( unsigned int fd, Session *sess );
             void _recvConsumerCmd( unsigned int fd, Session *sess );
             void _recvConsumerCmdPartMessage( unsigned int fd, Session *sess );
-            void _recvConsumerRemoveMessage( unsigned int fd, Session *sess );
+            void _recvConsumerRemoveMessageCmd( unsigned int fd, Session *sess );
             void _recvProducerCmd( unsigned int fd, Session *sess );
             void _recvFromProducerPartMessage( unsigned int fd, Session *sess );
             void _recvFromProducerPartMessageNull( unsigned int fd, Session *sess );
@@ -233,8 +232,8 @@ namespace simq::core::server {
                 login = &sess->authData.get()[sess->offsetLogin];
 
                 _access->logoutConsumer( group, channel, login, fd );
-                if( sess->msgID != 0 ) {
-                    //_q->revertMessage( group, channel, fd, sess->msgID );
+                if( sess->msgID != 0 && !sess->isPublicMessage ) {
+                    _q->revertMessage( group, channel, fd, sess->msgID );
                 }
                 _q->leaveConsumer( group, channel, fd );
                 break;
@@ -258,20 +257,6 @@ namespace simq::core::server {
         Protocol::recv( fd, packet );
 
         return Protocol::isFull( packet );
-    }
-
-    ServerController::FSM ServerController::_getFSMAfterSendPartMessage( Session *sess ) {
-        switch( sess->fsm ) {
-            case FSM_CONSUMER_SEND_PART_MESSAGE:
-                return FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE;
-            default:
-                return FSM_CONSUMER_SEND_ERROR_WITH_CLOSE;
-        }
-    }
-
-    ServerController::FSM ServerController::_getFSMAfterSendConfirmToConsumer( Session *sess ) {
-        //FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE | FSM_CONSUMER_RECV_CMD_PART_MESSAGE
-        return FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE;
     }
 
     void ServerController::_send( unsigned int fd, Session *sess ) {
@@ -313,7 +298,10 @@ namespace simq::core::server {
                 sess->fsm = FSM_CONSUMER_CLOSE;
                 break;
             case FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE:
-                sess->fsm = _getFSMAfterSendConfirmToConsumer( sess );
+                sess->fsm = FSM_CONSUMER_RECV_CMD_PART_MESSAGE;
+                break;
+            case FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE_END:
+                sess->fsm = FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE;
                 break;
             case FSM_PRODUCER_SEND:
             case FSM_PRODUCER_SEND_ERROR:
@@ -330,6 +318,15 @@ namespace simq::core::server {
                 break;
             case FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE_END:
                 sess->fsm = FSM_PRODUCER_RECV_CMD;
+                break;
+        }
+
+        switch( sess->fsm ) {
+            case FSM_COMMON_CLOSE:
+            case FSM_GROUP_CLOSE:
+            case FSM_CONSUMER_CLOSE:
+            case FSM_PRODUCER_CLOSE:
+                _close( fd, sess );
                 break;
         }
     }
@@ -663,14 +660,28 @@ namespace simq::core::server {
         if( !_recvToPacket( fd, packet ) ) return;
 
         if( !Protocol::isGetPartMessage( packet ) ) throw util::Error::WRONG_CMD;
+
+        sess->fsm = FSM_CONSUMER_SEND_PART_MESSAGE;
+        _sendToConsumerPartMessage( fd, sess );
     }
 
-    void ServerController::_recvConsumerRemoveMessage( unsigned int fd, Session *sess ) {
+    void ServerController::_recvConsumerRemoveMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !_recvToPacket( fd, packet ) ) return;
 
         if( !Protocol::isRemoveMessage( packet ) ) throw util::Error::WRONG_CMD;
+
+        auto group = sess->authData.get();
+        auto channel = &sess->authData.get()[sess->offsetChannel];
+        auto login = &sess->authData.get()[sess->offsetLogin];
+
+        _access->checkPopMessage( group, channel, login, fd );
+        _q->removeMessage( group, channel, fd, sess->msgID );
+        sess->msgID = 0;
+
+        Protocol::prepareOk( packet );
+        _send( fd, sess );
     }
 
     void ServerController::_recvProducerCmd( unsigned int fd, Session *sess ) {
@@ -758,10 +769,61 @@ namespace simq::core::server {
 
     void ServerController::_sendToConsumerPartMessage( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+        auto packetMsg = sess->packetMsg.get();
+
+        auto group = sess->authData.get();
+        auto channel = &sess->authData.get()[sess->offsetChannel];
+        auto login = &sess->authData.get()[sess->offsetLogin];
+
+        try {
+            _access->checkPopMessage( group, channel, login, fd );
+            auto l = _q->send( group, channel, fd, sess->msgID );
+            Protocol::addWRLength( packetMsg, l );
+
+            if( Protocol::isFull( packetMsg ) ) {
+                Protocol::prepareOk( packet );
+                sess->fsm = FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE_END;
+                _send( fd, sess );
+            } else if( Protocol::isFullPart( packetMsg ) ) {
+                Protocol::prepareOk( packet );
+                sess->fsm = FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE;
+                _send( fd, sess );
+            }
+        } catch( util::Error::Err err ) {
+            if( err == util::Error::SOCKET ) {
+                _close( fd, sess );
+            } else {
+                sess->fsm = FSM_CONSUMER_SEND_PART_MESSAGE_NULL;
+                _sendToConsumerPartMessageNull( fd, sess );
+            }
+        } catch( ... ) {
+            _close( fd, sess );
+        }
     }
 
     void ServerController::_sendToConsumerPartMessageNull( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+        auto packetMsg = sess->packetMsg.get();
+
+        auto residue = Protocol::getResiduePart( packetMsg );
+        auto data = std::make_unique<char[]>( residue );
+        auto l = ::send( fd, data.get(), residue, MSG_NOSIGNAL );
+
+        if( l == -1 ) {
+            if( errno != EAGAIN ) {
+                _close( fd, sess );
+            }
+            return;
+        }
+
+        Protocol::addWRLength( packetMsg, l );
+
+        if( Protocol::isFullPart( packetMsg ) ) {
+            Protocol::prepareError( packet, util::Error::getDescription( util::Error::ACCESS_DENY ) );
+
+            sess->fsm = FSM_CONSUMER_SEND_ERROR_WITH_CLOSE;
+            _send( fd, sess );
+        }
     }
 
     void ServerController::_getChannelsCmd( unsigned int fd, Session *sess ) {
@@ -1096,7 +1158,7 @@ namespace simq::core::server {
                     _recvConsumerCmdPartMessage( fd, sess );
                     break;
                 case FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE:
-                    _recvConsumerRemoveMessage( fd, sess );
+                    _recvConsumerRemoveMessageCmd( fd, sess );
                     break;
                 case FSM_PRODUCER_RECV_CMD:
                     _recvProducerCmd( fd, sess );
