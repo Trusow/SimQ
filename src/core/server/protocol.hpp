@@ -78,10 +78,13 @@ namespace simq::core::server {
                 CMD_SEND_PUBLIC_MESSAGE_META = 6'302,
             };
 
-            struct Packet {
-                Cmd cmd;
+            struct BasePacket {
                 unsigned int length;
                 unsigned int wrLength;
+            };
+
+            struct Packet: BasePacket {
+                Cmd cmd;
 
                 bool isRecvMeta;
                 bool isRecvBody;
@@ -256,11 +259,11 @@ namespace simq::core::server {
                 util::types::ChannelLimitMessages &limitMessages
             );
 
-            static bool isFull( Packet *packet );
-            static void setLength( Packet *packet, unsigned int length );
-            static void addWRLength( Packet *packet, unsigned int length );
-            static bool isFullPart( Packet *packet );
-            static unsigned int getResiduePart( Packet *packet );
+            static bool isFull( BasePacket *packet );
+            static void setLength( BasePacket *packet, unsigned int length );
+            static void addWRLength( BasePacket *packet, unsigned int length );
+            static bool isFullPart( BasePacket *packet );
+            static unsigned int getResiduePart( BasePacket *packet );
     };
 
     bool Protocol::_recv( unsigned int fd, Packet *packet ) {
@@ -1250,24 +1253,24 @@ namespace simq::core::server {
         throw util::Error::WRONG_CMD;
     }
 
-    bool Protocol::isFull( Packet *packet ) {
+    bool Protocol::isFull( BasePacket *packet ) {
         return packet->length == packet->wrLength;
     }
 
-    void Protocol::setLength( Packet *packet, unsigned int length ) {
+    void Protocol::setLength( BasePacket *packet, unsigned int length ) {
         packet->length = length;
         packet->wrLength = 0;
     }
 
-    void Protocol::addWRLength( Packet *packet, unsigned int length ) {
+    void Protocol::addWRLength( BasePacket *packet, unsigned int length ) {
         packet->wrLength += length;
     }
 
-    bool Protocol::isFullPart( Packet *packet ) {
+    bool Protocol::isFullPart( BasePacket *packet ) {
         return packet->length == packet->wrLength || packet->wrLength % PACKET_SIZE == 0;
     }
 
-    unsigned int Protocol::getResiduePart( Packet *packet ) {
+    unsigned int Protocol::getResiduePart( BasePacket *packet ) {
         auto residue = packet->length - packet->wrLength;
         if( residue < PACKET_SIZE ) {
             return residue;
