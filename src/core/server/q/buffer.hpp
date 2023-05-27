@@ -204,7 +204,7 @@ namespace simq::core::server::q {
 
         auto item = _getItem( id );
 
-        if( !item ) {
+        if( item == nullptr ) {
             return 0;
         }
 
