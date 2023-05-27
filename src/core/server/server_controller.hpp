@@ -51,6 +51,7 @@ namespace simq::core::server {
                 FSM_CONSUMER_SEND_ERROR_WITH_CLOSE,
                  
                 FSM_CONSUMER_RECV_CMD_PART_MESSAGE,
+                FSM_CONSUMER_SEND_MESSAGE_META,
                 FSM_CONSUMER_SEND_PART_MESSAGE,
                 FSM_CONSUMER_SEND_PART_MESSAGE_NULL,
                 FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE,
@@ -303,6 +304,9 @@ namespace simq::core::server {
             case FSM_CONSUMER_SEND:
             case FSM_CONSUMER_SEND_ERROR:
                 sess->fsm = FSM_CONSUMER_RECV_CMD;
+                break;
+            case FSM_CONSUMER_SEND_MESSAGE_META:
+                sess->fsm = FSM_CONSUMER_RECV_CMD_PART_MESSAGE;
                 break;
             case FSM_CONSUMER_SEND_ERROR_WITH_CLOSE:
                 sess->fsm = FSM_CONSUMER_CLOSE;
@@ -936,6 +940,34 @@ namespace simq::core::server {
 
     void ServerController::_popMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+        auto packetMsg = sess->packetMsg.get();
+
+        auto group = sess->authData.get();
+        auto channel = &sess->authData.get()[sess->offsetChannel];
+        auto login = &sess->authData.get()[sess->offsetLogin];
+        char uuid[util::UUID::LENGTH]{};
+        unsigned int length;
+
+        _access->checkPopMessage( group, channel, login, fd );
+        auto id = _q->popMessage( group, channel, fd, length, uuid );
+
+        if( id == 0 ) {
+            Protocol::prepareNoneMessageMetaPop( packet );
+            sess->fsm = FSM_CONSUMER_SEND;
+            _send( fd, sess );
+            return;
+        }
+
+        Protocol::setLength( packetMsg, length );
+        sess->fsm = FSM_CONSUMER_SEND_MESSAGE_META;
+
+        if( uuid[0] ) {
+            Protocol::prepareMessageMetaPop( packet, length, uuid );
+        } else {
+            Protocol::preparePublicMessageMetaPop( packet, length );
+        }
+
+        _send( fd, sess );
     }
 
     void ServerController::_removeMessageByUUIDCmd( unsigned int fd, Session *sess ) {
