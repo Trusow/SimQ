@@ -940,6 +940,19 @@ namespace simq::core::server {
 
     void ServerController::_removeMessageByUUIDCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = &sess->authData.get()[sess->offsetChannel];
+        auto login = &sess->authData.get()[sess->offsetLogin];
+
+        auto uuid = Protocol::getUUID( packet );
+
+        _access->checkPopMessage( group, channel, login, fd );
+        _q->removeMessage( group, channel, fd, uuid );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM_CONSUMER_SEND;
+        _send( fd, sess );
     }
 
     void ServerController::_pushMessageCmd( unsigned int fd, Session *sess ) {
