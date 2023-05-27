@@ -86,6 +86,7 @@ namespace simq::core::server {
              
                 std::unique_ptr<char[]> authData;
                 std::unique_ptr<Protocol::Packet> packet;
+                std::unique_ptr<Protocol::BasePacket> packetMsg;
                 unsigned short int offsetChannel;
                 unsigned short int offsetLogin;
              
@@ -230,7 +231,9 @@ namespace simq::core::server {
                 login = &sess->authData.get()[sess->offsetLogin];
 
                 _access->logoutConsumer( group, channel, login, fd );
-                _q->removeMessage( group, channel, fd, sess->msgID );
+                if( sess->msgID != 0 ) {
+                    //_q->revertMessage( group, channel, fd, sess->msgID );
+                }
                 _q->leaveConsumer( group, channel, fd );
                 break;
             case TYPE_PRODUCER:
@@ -239,6 +242,9 @@ namespace simq::core::server {
                 login = &sess->authData.get()[sess->offsetLogin];
 
                 _access->logoutProducer( group, channel, login, fd );
+                if( sess->msgID != 0 ) {
+                    _q->removeMessage( group, channel, fd, sess->msgID );
+                }
                 _q->leaveProducer( group, channel, fd );
                 break;
         }
@@ -681,6 +687,7 @@ namespace simq::core::server {
     }
 
     void ServerController::_recvFromProducerPartMessage( unsigned int fd, Session *sess ) {
+        auto packetMsg = sess->packetMsg.get();
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -690,13 +697,14 @@ namespace simq::core::server {
         try {
             _access->checkPushMessage( group, channel, login, fd );
             auto l = _q->recv( group, channel, fd, sess->msgID );
-            Protocol::addWRLength( packet, l );
+            Protocol::addWRLength( packetMsg, l );
 
             bool isSend = false;
-            if( Protocol::isFull( packet ) ) {
+            if( Protocol::isFull( packetMsg ) ) {
+                sess->msgID = 0;
                 sess->fsm = FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE_END;
                 isSend = true;
-            } else if( Protocol::isFullPart( packet ) ) {
+            } else if( Protocol::isFullPart( packetMsg ) ) {
                 sess->fsm = FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE;
                 isSend = true;
             }
@@ -936,6 +944,7 @@ namespace simq::core::server {
 
     void ServerController::_pushMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+        auto packetMsg = sess->packetMsg.get();
 
         auto length = Protocol::getLength( packet );
         auto group = sess->authData.get();
@@ -946,7 +955,7 @@ namespace simq::core::server {
         char uuid[util::UUID::LENGTH];
 
         sess->msgID = _q->createMessageForQ( group, channel, fd, length, uuid );
-        Protocol::setLength( packet, length );
+        Protocol::setLength( packetMsg, length );
 
         Protocol::prepareMessageMetaPush( packet, uuid );
         sess->fsm = FSM_PRODUCER_SEND_MESSAGE_META;
@@ -956,6 +965,7 @@ namespace simq::core::server {
 
     void ServerController::_pushPublicMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+        auto packetMsg = sess->packetMsg.get();
 
         auto length = Protocol::getLength( packet );
         auto group = sess->authData.get();
@@ -965,7 +975,7 @@ namespace simq::core::server {
         _access->checkPushMessage( group, channel, login, fd );
 
         sess->msgID = _q->createMessageForBroadcast( group, channel, fd, length );
-        Protocol::setLength( packet, length );
+        Protocol::setLength( packetMsg, length );
 
         Protocol::prepareOk( packet );
         sess->fsm = FSM_PRODUCER_SEND_MESSAGE_META;
@@ -975,6 +985,7 @@ namespace simq::core::server {
     
     void ServerController::_pushReplicaMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
+        auto packetMsg = sess->packetMsg.get();
 
         auto length = Protocol::getLength( packet );
         auto uuid = Protocol::getUUID( packet );
@@ -985,7 +996,7 @@ namespace simq::core::server {
         _access->checkPushMessage( group, channel, login, fd );
 
         sess->msgID = _q->createMessageForReplication( group, channel, fd, length, uuid );
-        Protocol::setLength( packet, length );
+        Protocol::setLength( packetMsg, length );
 
         Protocol::prepareOk( packet );
         sess->fsm = FSM_PRODUCER_SEND_MESSAGE_META;
@@ -998,6 +1009,7 @@ namespace simq::core::server {
         sess->fsm = FSM_COMMON_RECV_CMD_CHECK_SECURE;
         sess->type = TYPE_COMMON;
         sess->packet = std::make_unique<Protocol::Packet>();
+        sess->packetMsg = std::make_unique<Protocol::BasePacket>();
         _sessions[fd] = std::move( sess );
     }
 
