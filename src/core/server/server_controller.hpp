@@ -97,6 +97,7 @@ namespace simq::core::server {
                 unsigned int msgID;
                 unsigned int lengthMessage;
                 unsigned int sendLengthMessage;
+                bool isPublicMessage;
             };
 
             std::map<unsigned int, std::unique_ptr<Session>> _sessions;
@@ -962,10 +963,13 @@ namespace simq::core::server {
 
         Protocol::setLength( packetMsg, length );
         sess->fsm = FSM_CONSUMER_SEND_MESSAGE_META;
+        sess->msgID = id;
 
         if( uuid[0] ) {
+            sess->isPublicMessage = false;
             Protocol::prepareMessageMetaPop( packet, length, uuid );
         } else {
+            sess->isPublicMessage = true;
             Protocol::preparePublicMessageMetaPop( packet, length );
         }
 
