@@ -17,6 +17,7 @@ namespace simq::core::server {
             std::unique_ptr<Changes> _changes;
             q::Manager *_q = nullptr;
             std::unique_ptr<char[]> _path;
+            bool _isInit = false;
 
             void _initGroups();
             void _initChannels( const char *group );
@@ -45,6 +46,7 @@ namespace simq::core::server {
             Changes *getChanges();
             Store *getStore();
             void pollChanges();
+            bool isInit();
     };
 
     void Initialization::_initConsumers( const char *group, const char *channel ) {
@@ -274,6 +276,7 @@ namespace simq::core::server {
             );
 
             _initGroups();
+            _isInit = true;
         } catch( util::Error::Err err ) {
             Logger::fail(
                 Logger::OP_INITIALIZATION_SETTINGS,
@@ -590,6 +593,10 @@ namespace simq::core::server {
                 );
             }
         }
+    }
+
+    bool Initialization::isInit() {
+        return _isInit;
     }
 
 }
