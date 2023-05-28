@@ -69,7 +69,7 @@ namespace simq::core::server::server {
         auto lastTS = time( NULL );
 
         while( true ) {
-            int count_events = epoll_wait( _ep, events, COUNT_EVENTS, 0 );
+            int count_events = epoll_wait( _ep, events, COUNT_EVENTS, TIMEOUT );
 
             for( unsigned int i = 0; i < count_events; i++ ) {
                 auto fd = events[i].data.fd;
