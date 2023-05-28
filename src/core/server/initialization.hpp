@@ -43,6 +43,7 @@ namespace simq::core::server {
             Initialization( const char *path, Access &access, q::Manager &q );
 
             Changes *getChanges();
+            Store *getStore();
             void pollChanges();
     };
 
@@ -295,6 +296,10 @@ namespace simq::core::server {
 
     Changes *Initialization::getChanges() {
         return _changes.get();
+    }
+
+    Store *Initialization::getStore() {
+        return _store.get();
     }
 
     void Initialization::_addGroup( std::unique_ptr<Changes::Change> &change ) {
