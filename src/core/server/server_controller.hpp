@@ -10,6 +10,7 @@
 #include "../../util/error.h"
 #include "../../util/types.h"
 #include "../../util/uuid.hpp"
+#include "../../util/messages.hpp"
 #include "access.hpp"
 #include "store.hpp"
 #include "changes.hpp"
@@ -753,7 +754,7 @@ namespace simq::core::server {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
-        auto residue = Protocol::getResiduePart( packetMsg );
+        auto residue = util::Messages::getResiduePart( packetMsg->length, packetMsg->wrLength );
         auto data = std::make_unique<char[]>( residue );
         auto l = ::recv( fd, data.get(), residue, MSG_NOSIGNAL );
 
@@ -812,7 +813,7 @@ namespace simq::core::server {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
-        auto residue = Protocol::getResiduePart( packetMsg );
+        auto residue = util::Messages::getResiduePart( packetMsg->length, packetMsg->wrLength );
         auto data = std::make_unique<char[]>( residue );
         auto l = ::send( fd, data.get(), residue, MSG_NOSIGNAL );
 
