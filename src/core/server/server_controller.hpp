@@ -163,6 +163,12 @@ namespace simq::core::server {
             );
 
         public:
+            ServerController(
+                simq::core::server::Store *store,
+                simq::core::server::Access *access,
+                simq::core::server::Changes *changes,
+                simq::core::server::q::Manager *q
+            ) : _store{store}, _access{access}, _changes{changes}, _q{q} {};
             void connect( unsigned int fd, unsigned int ip );
             void recv( unsigned int fd );
             void send( unsigned int fd );
