@@ -71,6 +71,10 @@ namespace simq::core::server::server {
         while( true ) {
             int count_events = epoll_wait( _ep, events, COUNT_EVENTS, TIMEOUT );
 
+            if( count_events == -1 ) {
+                continue;
+            }
+
             for( unsigned int i = 0; i < count_events; i++ ) {
                 auto fd = events[i].data.fd;
 
