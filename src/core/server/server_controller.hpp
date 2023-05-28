@@ -723,6 +723,7 @@ namespace simq::core::server {
 
             bool isSend = false;
             if( Protocol::isFull( packetMsg ) ) {
+                _q->pushMessage( group, channel, fd, sess->msgID );
                 sess->msgID = 0;
                 sess->fsm = FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE_END;
                 isSend = true;
