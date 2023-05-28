@@ -95,6 +95,8 @@ namespace simq::util {
                         return "Duplicate consumer";
                     case DUPLICATE_PRODUCER:
                         return "Duplicate producer";
+                    case SOCKET:
+                        return "Connection error";
                     default:
                         return "Unknown";
                 }
