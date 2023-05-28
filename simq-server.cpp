@@ -9,6 +9,7 @@
 #include <list>
 #include <string>
 #include <atomic>
+#include <mutex>
 
 void startManager( const char *path = "." ) {
     simq::core::server::Store store( path );
@@ -20,6 +21,7 @@ void startManager( const char *path = "." ) {
 }
 
 std::atomic_bool isPassedStartServer{ true };
+std::mutex mError;
 
 void startServer(
     simq::core::server::Store *store,
@@ -43,6 +45,12 @@ void startServer(
 
         server.run();
     } catch( ... ) {
+        std::lock_guard<std::mutex> lock( mError );
+
+        if( !isPassedStartServer ) {
+            return;
+        }
+
         std::list<simq::core::server::Logger::Detail> list;
         simq::core::server::Logger::fail(
             simq::core::server::Logger::OP_START_SERVER,
