@@ -12,11 +12,28 @@
 #include <mutex>
 
 void startManager( const char *path = "." ) {
-    simq::core::server::Store store( path );
-    simq::core::server::Changes changes( path );
-    simq::core::server::CLIController controller( &store, &changes );
-
-    simq::core::server::CLI::Manager manger( &controller );
+    try {
+        simq::core::server::Store store( path );
+        simq::core::server::Changes changes( path );
+        simq::core::server::CLIController controller( &store, &changes );
+        simq::core::server::CLI::Manager manger( &controller );
+    } catch( simq::util::Error::Err err ) {
+        std::list<simq::core::server::Logger::Detail> list;
+        simq::core::server::Logger::fail(
+            simq::core::server::Logger::OP_INITIALIZATION_SETTINGS,
+            err,
+            0,
+            list
+        );
+    } catch( ... ) {
+        std::list<simq::core::server::Logger::Detail> list;
+        simq::core::server::Logger::fail(
+            simq::core::server::Logger::OP_INITIALIZATION_SETTINGS,
+            simq::util::Error::FS_ERROR,
+            0,
+            list
+        );
+    }
 
 }
 
@@ -68,6 +85,9 @@ void startInit( const char *path = "." ) {
     simq::core::server::q::Manager q;
 
     simq::core::server::Initialization ini( path, access, q );
+    if( !ini.isInit() ) {
+        return;
+    }
 
     ini.pollChanges();
 
@@ -94,12 +114,16 @@ void startInit( const char *path = "." ) {
 int main( int argc, char *argv[] ) {
     bool isManager = false;
     std::string path = ".";
+    auto pathMask = "-path=";
+    auto lPathMask = strlen( pathMask );
 
     for( unsigned int i = 1; i < argc; i++ ) {
         std::string val = std::string( argv[i] );
 
         if( val == "manager" ) {
             isManager = true;
+        } else if( strncmp( val.c_str(), pathMask, lPathMask ) == 0 ) {
+            path = &val.c_str()[lPathMask];
         }
     }
 
