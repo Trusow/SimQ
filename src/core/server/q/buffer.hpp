@@ -16,6 +16,7 @@
 #include <sys/sendfile.h>
 #include <memory>
 #include "../../../util/file.hpp"
+#include "../../../util/messages.hpp"
 #include "../../../util/error.h"
 #include "../../../util/constants.h"
 #include "../../../util/lock_atomic.hpp"
@@ -69,7 +70,6 @@ namespace simq::core::server::q {
             );
 
             unsigned int _checkRSLength( int length );
-            unsigned int _calculateRSLength( unsigned int length, unsigned int rsLength );
             unsigned int _calculateCountPages( unsigned int length );
 
             unsigned int _recv( char *data, unsigned int recvLength, unsigned int fd );
@@ -126,17 +126,6 @@ namespace simq::core::server::q {
         }
 
         return length;
-    }
-
-    unsigned int Buffer::_calculateRSLength( unsigned int length, unsigned int rsLength ) {
-        if( length - rsLength < MESSAGE_PACKET_SIZE ) {
-            return length - rsLength;
-        }
-
-        auto countRSPackets =  rsLength / MESSAGE_PACKET_SIZE;
-        auto residue = rsLength - countRSPackets * MESSAGE_PACKET_SIZE;
- 
-        return MESSAGE_PACKET_SIZE - residue;
     }
 
     unsigned int Buffer::_calculateCountPages( unsigned int length ) {
@@ -242,7 +231,7 @@ namespace simq::core::server::q {
     }
 
     unsigned int Buffer::_recvToBuffer( Item *item, unsigned int fd ) {
-        auto recvLength = _calculateRSLength( item->length, item->recvLength );
+        auto recvLength = util::Messages::getResiduePart( item->length, item->recvLength );
 
         auto offsetPage = _getOffsetPage( item->recvLength );
         auto offsetInnerPage = _getOffsetInnerPage( item->recvLength, offsetPage );
@@ -260,7 +249,7 @@ namespace simq::core::server::q {
     }
 
     unsigned int Buffer::_recvToFile( Item *item, unsigned int fd ) {
-        auto recvLength = _calculateRSLength( item->length, item->recvLength );
+        auto recvLength = util::Messages::getResiduePart( item->length, item->recvLength );
 
         auto offsetPage = _getOffsetPage( item->recvLength );
         auto offsetInnerPage = _getOffsetInnerPage( item->recvLength, offsetPage );
@@ -298,7 +287,7 @@ namespace simq::core::server::q {
     }
 
     unsigned int Buffer::_sendFromBuffer( Item *item, unsigned int fd ) {
-        auto sendLength = _calculateRSLength( item->length, item->sendLength );
+        auto sendLength = util::Messages::getResiduePart( item->length, item->sendLength );
 
         auto offsetPage = _getOffsetPage( item->sendLength );
         auto offsetInnerPage = _getOffsetInnerPage( item->sendLength, offsetPage );
@@ -311,7 +300,7 @@ namespace simq::core::server::q {
     }
 
     unsigned int Buffer::_sendFromFile( Item *item, unsigned int fd ) {
-        auto sendLength = _calculateRSLength( item->length, item->sendLength );
+        auto sendLength = util::Messages::getResiduePart( item->length, item->sendLength );
 
         auto offsetPage = _getOffsetPage( item->sendLength );
         auto offsetInnerPage = _getOffsetInnerPage( item->sendLength, offsetPage );
