@@ -267,7 +267,6 @@ namespace simq::core::server {
             static void setLength( BasePacket *packet, unsigned int length );
             static void addWRLength( BasePacket *packet, unsigned int length );
             static bool isFullPart( BasePacket *packet );
-            static unsigned int getResiduePart( BasePacket *packet );
     };
 
     bool Protocol::_recv( unsigned int fd, Packet *packet ) {
@@ -1282,18 +1281,6 @@ namespace simq::core::server {
 
     bool Protocol::isFullPart( BasePacket *packet ) {
         return packet->length == packet->wrLength || packet->wrLength % PACKET_SIZE == 0;
-    }
-
-    unsigned int Protocol::getResiduePart( BasePacket *packet ) {
-        auto residue = packet->length - packet->wrLength;
-        if( residue < PACKET_SIZE ) {
-            return residue;
-        }
-
-        auto countWRPackets =  packet->wrLength / PACKET_SIZE;
-        residue = packet->wrLength - countWRPackets * PACKET_SIZE;
- 
-        return PACKET_SIZE - residue;
     }
 }
 
