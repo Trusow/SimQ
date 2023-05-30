@@ -405,18 +405,19 @@ namespace simq::core::server {
 
         for( auto it = list.begin(); it != list.end(); it++ ) {
             lengthBody += SIZE_UINT;
-            lengthBody += strlen( (*it).c_str() ) + 1;
+            lengthBody += (*it).size() + 1;
         }
 
         _reservePacketValues( packet, LENGTH_META + lengthBody );
+        packet->length = 0;
 
         _marsh( packet, CMD_STRING_LIST );
         _marsh( packet, lengthBody );
-        _marsh( packet, list.size() );
 
         for( auto it = list.begin(); it != list.end(); it++ ) {
-            _marsh( packet, (*it).length() + 1 );
+            _marsh( packet, (*it).size() + 1 );
             _marsh( packet, (*it).c_str(), (*it).size() );
+            _marsh( packet, "\0", 1 );
         }
     }
 
