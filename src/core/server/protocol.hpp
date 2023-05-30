@@ -151,7 +151,6 @@ namespace simq::core::server {
 
             static void _checkControlLength( unsigned int calculateLength, unsigned int length );
 
-            static void _checkCmdCheckVersion( Packet *packet );
             static void _checkCmdUpdatePassword( Packet *packet );
             static void _checkCmdAuthGroup( Packet *packet );
             static void _checkCmdAuthConsumer( Packet *packet );
@@ -312,7 +311,7 @@ namespace simq::core::server {
     };
 
     unsigned int Protocol::_calculateLengthBodyMessage( unsigned int value, ... ) {
-        unsigned int total = SIZE_UINT;
+        unsigned int total = 0;
         total += SIZE_UINT;
         total += value;
 
@@ -372,7 +371,6 @@ namespace simq::core::server {
         _marsh( packet, CMD_GET_VERSION );
         _marsh( packet, lengthBody );
 
-        _marsh( packet, 1 );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, VERSION );
     }
@@ -395,7 +393,6 @@ namespace simq::core::server {
         _marsh( packet, CMD_ERROR );
         _marsh( packet, lengthBody );
 
-        _marsh( packet, 1 );
         _marsh( packet, lengthDescr );
         _marsh( packet, description, lengthDescr );
     }
@@ -404,7 +401,7 @@ namespace simq::core::server {
         Packet *packet,
         std::list<std::string> &list
     ) {
-        auto lengthBody = SIZE_UINT;
+        auto lengthBody = 0;
 
         for( auto it = list.begin(); it != list.end(); it++ ) {
             lengthBody += SIZE_UINT;
@@ -440,7 +437,6 @@ namespace simq::core::server {
 
         _marsh( packet, CMD_SEND_CHANNEL_LIMIT_MESSSAGES );
         _marsh( packet, lengthBody );
-        _marsh( packet, 4 );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, limitMessages.minMessageSize );
         _marsh( packet, SIZE_UINT );
@@ -463,7 +459,6 @@ namespace simq::core::server {
 
         _marsh( packet, CMD_SEND_UUID_MESSAGE );
         _marsh( packet, lengthBody );
-        _marsh( packet, 1 );
         _marsh( packet, lengthUUID );
         _marsh( packet, uuid, lengthUUID );
     }
@@ -485,7 +480,6 @@ namespace simq::core::server {
 
         _marsh( packet, CMD_SEND_MESSAGE_META );
         _marsh( packet, lengthBody );
-        _marsh( packet, 2 );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, length );
         _marsh( packet, lengthUUID );
@@ -503,7 +497,6 @@ namespace simq::core::server {
 
         _marsh( packet, CMD_SEND_PUBLIC_MESSAGE_META );
         _marsh( packet, lengthBody );
-        _marsh( packet, 1 );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, length );
     }
@@ -708,15 +701,8 @@ namespace simq::core::server {
         }
     }
 
-    void Protocol::_checkCmdCheckVersion( Packet *packet ) {
-        auto offset = SIZE_UINT;
-        offset += _checkParamCmdUInt( packet, offset, 0 );
-
-        _checkControlLength( offset, packet->length );
-    }
-
     void Protocol::_checkCmdUpdatePassword( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
         offset += _checkParamCmdPassword( packet, offset, 0 );
         offset += _checkParamCmdPassword( packet, offset, 1 );
 
@@ -724,7 +710,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdAuthGroup( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
         offset += _checkParamCmdGroupName( packet, offset, 0 );
         offset += _checkParamCmdPassword( packet, offset, 1 );
 
@@ -732,7 +718,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdAuthConsumer( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
         offset += _checkParamCmdGroupName( packet, offset, 0 );
         offset += _checkParamCmdChannelName( packet, offset, 1 );
         offset += _checkParamCmdConsumerName( packet, offset, 2 );
@@ -742,7 +728,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdAuthProducer( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
         offset += _checkParamCmdGroupName( packet, offset, 0 );
         offset += _checkParamCmdChannelName( packet, offset, 1 );
         offset += _checkParamCmdProducerName( packet, offset, 2 );
@@ -752,21 +738,21 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdGetUsers( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
         offset += _checkParamCmdChannelName( packet, offset, 0 );
 
         _checkControlLength( offset, packet->length );
     }
 
     void Protocol::_checkCmdGetChannelLimitMessages( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
         offset += _checkParamCmdChannelName( packet, offset, 0 );
 
         _checkControlLength( offset, packet->length );
     }
 
     void Protocol::_checkCmdAddChannel( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
         offset += _checkParamCmdChannelName( packet, offset, 0 );
         offset += _checkParamCmdUInt( packet, offset, 1 );
         offset += _checkParamCmdUInt( packet, offset, 2 );
@@ -795,14 +781,14 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdRemoveChannel( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
         offset += _checkParamCmdChannelName( packet, offset, 0 );
 
         _checkControlLength( offset, packet->length );
     }
 
     void Protocol::_checkCmdAddConsumer( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
 
         offset += _checkParamCmdChannelName( packet, offset, 0 );
         offset += _checkParamCmdConsumerName( packet, offset, 1 );
@@ -816,7 +802,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdRemoveConsumer( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
 
         offset += _checkParamCmdChannelName( packet, offset, 0 );
         offset += _checkParamCmdConsumerName( packet, offset, 1 );
@@ -825,7 +811,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdAddProducer( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
 
         offset += _checkParamCmdChannelName( packet, offset, 0 );
         offset += _checkParamCmdProducerName( packet, offset, 1 );
@@ -839,7 +825,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdRemoveProducer( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
 
         offset += _checkParamCmdChannelName( packet, offset, 0 );
         offset += _checkParamCmdProducerName( packet, offset, 1 );
@@ -848,7 +834,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdPushMessage( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
 
         offset += _checkParamCmdUInt( packet, offset, 0 );
 
@@ -856,7 +842,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdPushReplicaMessage( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
 
         offset += _checkParamCmdUInt( packet, offset, 0 );
         offset += _checkParamCmdUUID( packet, offset, 1 );
@@ -869,7 +855,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_checkCmdRemoveMessageByUUID( Packet *packet ) {
-        auto offset = SIZE_UINT;
+        auto offset = 0;
 
         offset += _checkParamCmdUUID( packet, offset, 0 );
 
@@ -887,9 +873,6 @@ namespace simq::core::server {
         packet->valuesOffsets = std::make_unique<unsigned int[]>( packet->countValues );
 
         switch( packet->cmd ) {
-            case CMD_GET_VERSION:
-                _checkCmdCheckVersion( packet );
-                break;
             case CMD_UPDATE_PASSWORD:
                 _checkCmdUpdatePassword( packet );
                 break;
