@@ -308,6 +308,7 @@ namespace simq::core::server {
         _checkNoIssetGroup( groupName );
 
         _groups[groupName] = std::make_unique<Group>();
+        memcpy( _groups[groupName]->password, password, crypto::HASH_LENGTH );
     }
 
     void Access::updateGroupPassword(
