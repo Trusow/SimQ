@@ -584,7 +584,7 @@ namespace simq::core::server {
             throw util::Error::WRONG_PARAM;
         }
 
-        packet->valuesOffsets[iterator] = l;
+        packet->valuesOffsets[iterator] = offset ? offset + SIZE_UINT : SIZE_UINT;
 
         return SIZE_UINT + l;
     }
@@ -600,7 +600,7 @@ namespace simq::core::server {
             throw util::Error::WRONG_PASSWORD;
         }
 
-        packet->valuesOffsets[iterator] = l;
+        packet->valuesOffsets[iterator] = offset ? offset + SIZE_UINT : SIZE_UINT;
 
         return SIZE_UINT + l;
     }
@@ -618,7 +618,7 @@ namespace simq::core::server {
             throw util::Error::WRONG_GROUP;
         }
 
-        packet->valuesOffsets[iterator] = l;
+        packet->valuesOffsets[iterator] = offset ? offset + SIZE_UINT : SIZE_UINT;
 
         return SIZE_UINT + l;
     }
@@ -636,7 +636,7 @@ namespace simq::core::server {
             throw util::Error::WRONG_CHANNEL;
         }
 
-        packet->valuesOffsets[iterator] = l;
+        packet->valuesOffsets[iterator] = offset ? offset + SIZE_UINT : SIZE_UINT;
 
         return SIZE_UINT + l;
     }
@@ -654,7 +654,7 @@ namespace simq::core::server {
             throw util::Error::WRONG_CONSUMER;
         }
 
-        packet->valuesOffsets[iterator] = l;
+        packet->valuesOffsets[iterator] = offset ? offset + SIZE_UINT : SIZE_UINT;
 
         return SIZE_UINT + l;
     }
@@ -672,7 +672,7 @@ namespace simq::core::server {
             throw util::Error::WRONG_PRODUCER;
         }
 
-        packet->valuesOffsets[iterator] = l;
+        packet->valuesOffsets[iterator] = offset ? offset + SIZE_UINT : SIZE_UINT;
 
         return SIZE_UINT + l;
     }
@@ -690,7 +690,7 @@ namespace simq::core::server {
             throw util::Error::WRONG_UUID;
         }
 
-        packet->valuesOffsets[iterator] = l;
+        packet->valuesOffsets[iterator] = offset ? offset + SIZE_UINT : SIZE_UINT;
 
         return SIZE_UINT + l;
     }
