@@ -1226,6 +1226,8 @@ namespace simq::core::server {
     }
 
     void ServerController::disconnect( unsigned int fd ) {
+        auto sess = _sessions[fd].get();
+        _close( fd, sess );
         _sessions.erase( fd );
     }
 
