@@ -412,7 +412,7 @@ namespace simq::core::server {
         _reservePacketValues( packet, LENGTH_META + lengthBody );
         packet->length = 0;
 
-        _marsh( packet, CMD_STRING_LIST );
+        _marsh( packet, CMD_OK );
         _marsh( packet, lengthBody );
 
         for( auto it = list.begin(); it != list.end(); it++ ) {
@@ -437,7 +437,7 @@ namespace simq::core::server {
         _reservePacketValues( packet, LENGTH_META + lengthBody );
         packet->length = 0;
 
-        _marsh( packet, CMD_SEND_CHANNEL_LIMIT_MESSSAGES );
+        _marsh( packet, CMD_OK );
         _marsh( packet, lengthBody );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, limitMessages.minMessageSize );
