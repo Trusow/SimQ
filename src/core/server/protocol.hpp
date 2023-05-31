@@ -110,6 +110,7 @@ namespace simq::core::server {
 
             static void _checkMeta( Packet *packet );
             static void _checkBody( Packet *packet );
+            static unsigned int _calculateCountValues( Packet *packet );
 
             static unsigned int _getLengthByOffset( Packet *packet, unsigned int offset );
 
@@ -863,9 +864,32 @@ namespace simq::core::server {
         _checkControlLength( offset, packet->length );
     }
 
+    unsigned int Protocol::_calculateCountValues( Packet *packet ) {
+        unsigned int length = packet->length;
+        unsigned int offset = 0;
+        unsigned int count = 0;
+
+        while( true ) {
+            if( length - offset < SIZE_UINT + 1 ) throw util::Error::WRONG_CMD;
+
+            count++;
+
+            unsigned int l = 0;
+            memcpy( &l, &packet->values.get()[offset], SIZE_UINT );
+
+            l = ntohl( l );
+            offset += SIZE_UINT + l;
+
+            if( offset == length ) break;
+
+            if( offset > length ) throw util::Error::WRONG_CMD;
+        }
+
+        return count;
+    }
+
     void Protocol::_checkBody( Packet *packet ) {
-        memcpy( &packet->countValues, packet->values.get(), SIZE_UINT );
-        packet->countValues = ntohl( packet->countValues );
+        packet->countValues = _calculateCountValues( packet );
 
         if( packet->countValues == 0 || packet->countValues > 16 ) {
             throw util::Error::WRONG_CMD;
@@ -941,6 +965,7 @@ namespace simq::core::server {
         if( !packet->isRecvMeta && !packet->isRecvBody ) {
             _reservePacketValues( packet, LENGTH_META );
             packet->isRecvMeta = true;
+            packet->countValues = 0;
         }
 
         if( packet->isRecvMeta ) {
