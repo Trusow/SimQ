@@ -998,115 +998,115 @@ namespace simq::core::server {
     }
 
     bool Protocol::isOk( Packet *packet ) {
-        return packet->cmd == CMD_OK;
+        return packet->cmd == CMD_OK && packet->countValues == 0;
     }
 
     bool Protocol::isCheckSecure( Packet *packet ) {
-        return packet->cmd == CMD_CHECK_SECURE;
+        return packet->cmd == CMD_CHECK_SECURE && packet->countValues == 0;
     }
 
     bool Protocol::isCheckNoSecure( Packet *packet ) {
-        return packet->cmd == CMD_CHECK_NOSECURE;
+        return packet->cmd == CMD_CHECK_NOSECURE && packet->countValues == 0;
     }
 
     bool Protocol::isGetVersion( Packet *packet ) {
-        return packet->cmd == CMD_GET_VERSION;
+        return packet->cmd == CMD_GET_VERSION && packet->countValues == 0;
     }
 
     bool Protocol::isUpdatePassword( Packet *packet ) {
-        return packet->cmd == CMD_UPDATE_PASSWORD;
+        return packet->cmd == CMD_UPDATE_PASSWORD && packet->countValues == 2;
     }
 
     bool Protocol::isGetChannels( Packet *packet ) {
-        return packet->cmd == CMD_GET_CHANNELS;
+        return packet->cmd == CMD_GET_CHANNELS && packet->countValues == 0;
     }
 
     bool Protocol::isGetChannelLimitMessages( Packet *packet ) {
-        return packet->cmd == CMD_GET_CHANNEL_LIMIT_MESSSAGES;
+        return packet->cmd == CMD_GET_CHANNEL_LIMIT_MESSSAGES && packet->countValues == 1;
     }
 
     bool Protocol::isGetConsumers( Packet *packet ) {
-        return packet->cmd == CMD_GET_CONUMERS;
+        return packet->cmd == CMD_GET_CONUMERS && packet->countValues == 1;
     }
 
     bool Protocol::isGetProducers( Packet *packet ) {
-        return packet->cmd == CMD_GET_PRODUCERS;
+        return packet->cmd == CMD_GET_PRODUCERS && packet->countValues == 1;
     }
 
     bool Protocol::isAuthGroup( Packet *packet ) {
-        return packet->cmd == CMD_AUTH_GROUP;
+        return packet->cmd == CMD_AUTH_GROUP && packet->countValues == 2;
     }
 
     bool Protocol::isAuthConsumer( Packet *packet ) {
-        return packet->cmd == CMD_AUTH_CONSUMER;
+        return packet->cmd == CMD_AUTH_CONSUMER && packet->countValues == 4;
     }
 
     bool Protocol::isAuthProducer( Packet *packet ) {
-        return packet->cmd == CMD_AUTH_PRODUCER;
+        return packet->cmd == CMD_AUTH_PRODUCER && packet->countValues == 4;
     }
 
     bool Protocol::isAddChannel( Packet *packet ) {
-        return packet->cmd == CMD_ADD_CHANNEL;
+        return packet->cmd == CMD_ADD_CHANNEL && packet->countValues == 2;
     }
 
     bool Protocol::isUpdateChannelLimitMessages( Packet *packet ) {
-        return packet->cmd == CMD_UPDATE_CHANNEL_LIMIT_MESSAGES;
+        return packet->cmd == CMD_UPDATE_CHANNEL_LIMIT_MESSAGES && packet->countValues == 2;
     }
 
     bool Protocol::isRemoveChannel( Packet *packet ) {
-        return packet->cmd == CMD_REMOVE_CHANNEL;
+        return packet->cmd == CMD_REMOVE_CHANNEL && packet->countValues == 1;
     }
 
     bool Protocol::isAddConsumer( Packet *packet ) {
-        return packet->cmd == CMD_ADD_CONSUMER;
+        return packet->cmd == CMD_ADD_CONSUMER && packet->countValues == 3;
     }
 
     bool Protocol::isUpdateConsumerPassword( Packet *packet ) {
-        return packet->cmd == CMD_UPDATE_CONSUMER_PASSWORD;
+        return packet->cmd == CMD_UPDATE_CONSUMER_PASSWORD && packet->countValues == 3;
     }
 
     bool Protocol::isRemoveConsumer( Packet *packet ) {
-        return packet->cmd == CMD_REMOVE_CONSUMER;
+        return packet->cmd == CMD_REMOVE_CONSUMER && packet->countValues == 2;
     }
 
     bool Protocol::isAddProducer( Packet *packet ) {
-        return packet->cmd == CMD_ADD_PRODUCER;
+        return packet->cmd == CMD_ADD_PRODUCER && packet->countValues == 3;
     }
 
     bool Protocol::isUpdateProducerPassword( Packet *packet ) {
-        return packet->cmd == CMD_UPDATE_PRODUCER_PASSWORD;
+        return packet->cmd == CMD_UPDATE_PRODUCER_PASSWORD && packet->countValues == 3;
     }
 
     bool Protocol::isRemoveProducer( Packet *packet ) {
-        return packet->cmd == CMD_REMOVE_PRODUCER;
+        return packet->cmd == CMD_REMOVE_PRODUCER && packet->countValues == 2;
     }
 
     bool Protocol::isPopMessage( Packet *packet ) {
-        return packet->cmd == CMD_POP_MESSAGE;
+        return packet->cmd == CMD_POP_MESSAGE && packet->countValues == 0;;
     }
 
     bool Protocol::isGetPartMessage( Packet *packet ) {
-        return packet->cmd == CMD_GET_PART_MESSAGE;
+        return packet->cmd == CMD_GET_PART_MESSAGE && packet->countValues == 0;
     }
 
     bool Protocol::isPushMessage( Packet *packet ) {
-        return packet->cmd == CMD_PUSH_MESSAGE;
+        return packet->cmd == CMD_PUSH_MESSAGE && packet->countValues == 1;
     }
 
     bool Protocol::isPushPublicMessage( Packet *packet ) {
-        return packet->cmd == CMD_PUSH_PUBLIC_MESSAGE;
+        return packet->cmd == CMD_PUSH_PUBLIC_MESSAGE && packet->countValues == 1;
     }
 
     bool Protocol::isPushReplicaMessage( Packet *packet ) {
-        return packet->cmd == CMD_PUSH_REPLICA_MESSAGE;
+        return packet->cmd == CMD_PUSH_REPLICA_MESSAGE && packet->countValues == 2;
     }
 
     bool Protocol::isRemoveMessage( Packet *packet ) {
-        return packet->cmd == CMD_REMOVE_MESSAGE;
+        return packet->cmd == CMD_REMOVE_MESSAGE && packet->countValues == 0;
     }
 
     bool Protocol::isRemoveMessageByUUID( Packet *packet ) {
-        return packet->cmd == CMD_REMOVE_MESSAGE_BY_UUID;
+        return packet->cmd == CMD_REMOVE_MESSAGE_BY_UUID && packet->countValues == 1;
     }
 
     const char *Protocol::getGroup( Packet *packet ) {
