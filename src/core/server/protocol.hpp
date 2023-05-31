@@ -1047,11 +1047,11 @@ namespace simq::core::server {
     }
 
     bool Protocol::isAddChannel( Packet *packet ) {
-        return packet->cmd == CMD_ADD_CHANNEL && packet->countValues == 2;
+        return packet->cmd == CMD_ADD_CHANNEL && packet->countValues == 5;
     }
 
     bool Protocol::isUpdateChannelLimitMessages( Packet *packet ) {
-        return packet->cmd == CMD_UPDATE_CHANNEL_LIMIT_MESSAGES && packet->countValues == 2;
+        return packet->cmd == CMD_UPDATE_CHANNEL_LIMIT_MESSAGES && packet->countValues == 5;
     }
 
     bool Protocol::isRemoveChannel( Packet *packet ) {
