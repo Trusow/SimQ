@@ -258,6 +258,7 @@ namespace simq::core::server {
         }
 
         _sessions.erase( fd );
+        ::close( fd );
     }
 
     bool ServerController::_recvToPacket( unsigned int fd, Protocol::Packet *packet ) {
