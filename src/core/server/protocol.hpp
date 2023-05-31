@@ -878,6 +878,7 @@ namespace simq::core::server {
             memcpy( &l, &packet->values.get()[offset], SIZE_UINT );
 
             l = ntohl( l );
+            if( l == 0 ) throw util::Error::WRONG_CMD;
             offset += SIZE_UINT + l;
 
             if( offset == length ) break;
