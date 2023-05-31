@@ -52,8 +52,8 @@ namespace simq::core::server {
                 CMD_SEND_CHANNEL_LIMIT_MESSSAGES = 2'102,
 
                 CMD_ADD_CHANNEL = 3'001,
-                CMD_UPDATE_CHANNEL_LIMIT_MESSAGES = 3'002,
-                CMD_REMOVE_CHANNEL = 3'003,
+                CMD_REMOVE_CHANNEL = 3'002,
+                CMD_UPDATE_CHANNEL_LIMIT_MESSAGES = 3'101,
 
                 CMD_ADD_CONSUMER = 4'001,
                 CMD_UPDATE_CONSUMER_PASSWORD = 4'002,
