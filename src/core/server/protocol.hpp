@@ -357,7 +357,7 @@ namespace simq::core::server {
     }
 
     void Protocol::_reservePacketValues( Packet *packet, unsigned int length ){
-        packet->values = std::make_unique<char[]>( length );
+        packet->values = std::make_unique<char[]>( length + 1 );
         packet->length = length;
         packet->wrLength = 0;
     }
