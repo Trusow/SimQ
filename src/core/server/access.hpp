@@ -602,6 +602,14 @@ namespace simq::core::server {
         util::LockAtomic lockAtomicConsumerSessions( consumer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockConsumerSessions( consumer->mSessions );
 
+        if( strncmp(
+            ( const char * )consumer->password,
+            (const char *)password,
+            crypto::HASH_LENGTH
+        ) != 0 ) {
+            throw util::Error::WRONG_PASSWORD;
+        }
+
         _checkNoIssetSessions( consumer->sessions, fd );
 
         consumer->sessions[fd] = true;
@@ -637,6 +645,14 @@ namespace simq::core::server {
 
         util::LockAtomic lockAtomicProducerSessions( producer->countSessionsWrited );
         std::lock_guard<std::shared_timed_mutex> lockProducerSessions( producer->mSessions );
+
+        if( strncmp(
+            ( const char * )producer->password,
+            (const char *)password,
+            crypto::HASH_LENGTH
+        ) != 0 ) {
+            throw util::Error::WRONG_PASSWORD;
+        }
 
         _checkNoIssetSessions( producer->sessions, fd );
 
