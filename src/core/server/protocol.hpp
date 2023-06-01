@@ -56,12 +56,13 @@ namespace simq::core::server {
                 CMD_UPDATE_CHANNEL_LIMIT_MESSAGES = 3'101,
 
                 CMD_ADD_CONSUMER = 4'001,
-                CMD_UPDATE_CONSUMER_PASSWORD = 4'002,
-                CMD_REMOVE_CONSUMER = 4'003,
+                CMD_REMOVE_CONSUMER = 4'002,
+
+                CMD_UPDATE_CONSUMER_PASSWORD = 4'101,
 
                 CMD_ADD_PRODUCER = 5'001,
-                CMD_UPDATE_PRODUCER_PASSWORD = 5'002,
-                CMD_REMOVE_PRODUCER = 5'003,
+                CMD_REMOVE_PRODUCER = 5'002,
+                CMD_UPDATE_PRODUCER_PASSWORD = 5'101,
 
                 CMD_PUSH_MESSAGE = 6'001,
                 CMD_PUSH_REPLICA_MESSAGE = 6'002,
