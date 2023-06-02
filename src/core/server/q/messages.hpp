@@ -186,6 +186,8 @@ namespace simq::core::server::q {
             throw util::Error::DUPLICATE_UUID;
         }
 
+        _uuid[uuid] = true;
+
         if( id >= _messages.size() ) {
             _expandMessages();
         }
@@ -225,15 +227,24 @@ namespace simq::core::server::q {
             return;
         }
 
+        auto msg = _messages[id].get();
+
         _buffer->free( id );
 
-        if( _messages[id]->uuid[0] != 0 ) {
-            auto itUUID = _uuid.find( _messages[id]->uuid );
+        if( msg->uuid[0] != 0 ) {
+            auto itUUID = _uuid.find( msg->uuid );
             if( itUUID != _uuid.end() ) {
                 _uuid.erase( itUUID );
-                _messages[id].reset();
             }
         }
+
+        if( msg->isMemory ) {
+            _totalInMemory--;
+        } else {
+            _totalOnDisk++;
+        }
+
+        _messages[id].reset();
     }
 
     void Messages::free( const char *uuid ) {
@@ -252,6 +263,13 @@ namespace simq::core::server::q {
         _uuid.erase( it );
 
         _buffer->free( id );
+
+        if( _messages[id]->isMemory ) {
+            _totalInMemory--;
+        } else {
+            _totalOnDisk++;
+        }
+
         _messages[id].reset();
     }
 
