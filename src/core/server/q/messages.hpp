@@ -179,12 +179,13 @@ namespace simq::core::server::q {
         std::shared_lock<std::shared_timed_mutex> lockUUID( _mUUID );
 
         bool isMemory = false;
-        auto id = _allocateMessage( length, isMemory );
 
         auto itUUID = _uuid.find( uuid );
         if( itUUID != _uuid.end() ) {
             throw util::Error::DUPLICATE_UUID;
         }
+
+        auto id = _allocateMessage( length, isMemory );
 
         _uuid[uuid] = true;
 
