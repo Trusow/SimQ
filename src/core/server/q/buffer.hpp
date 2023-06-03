@@ -213,9 +213,10 @@ namespace simq::core::server::q {
 
         if( item->fileOffsets != nullptr ) {
             std::lock_guard<std::mutex> lockFile( _mFile );
+            auto countPages = _calculateCountPages( item->length );
 
-            for( int i = 0; i < item->length; i++ ) {
-                _freeFileOffsets.push( item->fileOffsets[i] );
+            for( int i = 0; i < countPages; i++ ) {
+                _freeFileOffsets.push_front( item->fileOffsets[i] );
             }
 
             item->fileOffsets.reset();
