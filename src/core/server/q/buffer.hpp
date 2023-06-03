@@ -2,7 +2,8 @@
 #define SIMQ_CORE_SERVER_Q_BUFFER
 
 #include <map>
-#include <queue>
+#include <list>
+#include <vector>
 #include <mutex>
 #include <shared_mutex>
 #include <atomic>
@@ -46,14 +47,14 @@ namespace simq::core::server::q {
             std::vector<std::unique_ptr<Item>> _items;
 
             unsigned int _countItemsPackets = 0;
-            std::queue<unsigned int> _freeIDs;
+            std::list<unsigned int> _freeIDs;
             unsigned int _uniqID = 0;
 
             unsigned int _getUniqID();
             void _freeUniqID( unsigned int id );
 
             std::mutex _mFile;
-            std::queue<unsigned long int> _freeFileOffsets;
+            std::list<unsigned long int> _freeFileOffsets;
             unsigned long int _fileOffset = 0;
 
             void _initFileSize();
@@ -262,7 +263,7 @@ namespace simq::core::server::q {
             }
 
             item->fileOffsets[offsetPage] = _freeFileOffsets.front();
-            _freeFileOffsets.pop();
+            _freeFileOffsets.pop_front();
         }
 
         char data[MESSAGE_PACKET_SIZE];
@@ -363,7 +364,7 @@ namespace simq::core::server::q {
     unsigned int Buffer::_getUniqID() {
         if( !_freeIDs.empty() ) {
             auto id = _freeIDs.front();
-            _freeIDs.pop();
+            _freeIDs.pop_front();
             return id;
         }
 
@@ -377,7 +378,7 @@ namespace simq::core::server::q {
     }
 
     void Buffer::_freeUniqID( unsigned int id ) {
-        _freeIDs.push( id );
+        _freeIDs.push_back( id );
     }
 
     void Buffer::_expandItems() {
@@ -389,7 +390,7 @@ namespace simq::core::server::q {
         _fileOffset += MIN_FILE_SIZE / MESSAGE_PACKET_SIZE;
         _file->expand( MIN_FILE_SIZE );
         for( unsigned int i = _fileOffset; i < _fileOffset + MIN_FILE_SIZE / MESSAGE_PACKET_SIZE; i++ ) {
-            _freeFileOffsets.push( i );
+            _freeFileOffsets.push_back( i );
         }
     }
 
@@ -401,7 +402,7 @@ namespace simq::core::server::q {
             _file->expand( MIN_FILE_SIZE );
 
             for( unsigned int i = 0; i < MIN_FILE_SIZE / MESSAGE_PACKET_SIZE; i++ ) {
-                _freeFileOffsets.push( i );
+                _freeFileOffsets.push_back( i );
             }
         } else if( size % MESSAGE_PACKET_SIZE != 0 ) {
             auto expandSize =  MESSAGE_PACKET_SIZE - ( size - ( size / MESSAGE_PACKET_SIZE ) * MESSAGE_PACKET_SIZE );
@@ -410,13 +411,13 @@ namespace simq::core::server::q {
                 _file->expand( expandSize );
 
                 for( unsigned int i = 0; i < MIN_FILE_SIZE / MESSAGE_PACKET_SIZE; i++ ) {
-                    _freeFileOffsets.push( i );
+                    _freeFileOffsets.push_back( i );
                 }
             } else {
                 _file->expand( expandSize );
 
                 for( unsigned int i = 0; i < ( size + expandSize ) / MESSAGE_PACKET_SIZE; i++ ) {
-                    _freeFileOffsets.push( i );
+                    _freeFileOffsets.push_back( i );
                 }
                 _fileOffset = ( size + expandSize ) / MESSAGE_PACKET_SIZE;
             }
@@ -425,11 +426,11 @@ namespace simq::core::server::q {
             _file->expand( expandSize );
 
             for( unsigned int i = 0; i < MIN_FILE_SIZE / MESSAGE_PACKET_SIZE; i++ ) {
-                _freeFileOffsets.push( i );
+                _freeFileOffsets.push_back( i );
             }
         } else {
             for( unsigned int i = 0; i < size / MESSAGE_PACKET_SIZE; i++ ) {
-                _freeFileOffsets.push( i );
+                _freeFileOffsets.push_back( i );
             }
             _fileOffset = size / MESSAGE_PACKET_SIZE;
         }
