@@ -110,11 +110,12 @@ namespace simq::core::server::server {
             }
 
             auto localLastTS = util::Timer::tick();
+            auto delay = localLastTS - lastTS;
 
-            if( localLastTS - lastTS > randTimeout ) {
+            if( delay > randTimeout ) {
+                _callbacks->polling( delay );
                 randTimeout = buildRand( randomRange );
-                lastTS = localLastTS;
-                _callbacks->iteration();
+                lastTS += delay;
             }
         }
     }
