@@ -110,7 +110,7 @@ namespace simq::core::server {
 
             FSM _getFSMByError( Session *sess, util::Error::Err err );
 
-            void _close( unsigned int fd, Session *sess );
+            void _close( unsigned int fd );
 
             bool _recvToPacket( unsigned int fd, Protocol::Packet *packet );
 
@@ -226,7 +226,11 @@ namespace simq::core::server {
         }
     }
 
-    void ServerController::_close( unsigned int fd, Session *sess ) {
+    void ServerController::_close( unsigned int fd ) {
+        auto itSess = _sessions.find( fd );
+
+        if( itSess == _sessions.end() ) return;
+        auto sess = itSess->second.get();
         char *group, *channel, *login;
 
         switch( sess->type ) {
@@ -257,7 +261,7 @@ namespace simq::core::server {
                 break;
         }
 
-        _sessions.erase( fd );
+        _sessions.erase( itSess );
         ::close( fd );
     }
 
@@ -334,7 +338,7 @@ namespace simq::core::server {
             case FSM_GROUP_CLOSE:
             case FSM_CONSUMER_CLOSE:
             case FSM_PRODUCER_CLOSE:
-                _close( fd, sess );
+                _close( fd );
                 break;
         }
     }
@@ -740,13 +744,13 @@ namespace simq::core::server {
             _send( fd, sess );
         } catch( util::Error::Err err ) {
             if( err == util::Error::SOCKET ) {
-                _close( fd, sess );
+                _close( fd );
             } else {
                 sess->fsm = FSM_PRODUCER_RECV_PART_MESSAGE_NULL;
                 _recvFromProducerPartMessageNull( fd, sess );
             }
         } catch( ... ) {
-            _close( fd, sess );
+            _close( fd );
         }
 
     }
@@ -761,7 +765,7 @@ namespace simq::core::server {
 
         if( l == -1 ) {
             if( errno != EAGAIN ) {
-                _close( fd, sess );
+                _close( fd );
             }
             return;
         }
@@ -800,13 +804,13 @@ namespace simq::core::server {
             }
         } catch( util::Error::Err err ) {
             if( err == util::Error::SOCKET ) {
-                _close( fd, sess );
+                _close( fd );
             } else {
                 sess->fsm = FSM_CONSUMER_SEND_PART_MESSAGE_NULL;
                 _sendToConsumerPartMessageNull( fd, sess );
             }
         } catch( ... ) {
-            _close( fd, sess );
+            _close( fd );
         }
     }
 
@@ -820,7 +824,7 @@ namespace simq::core::server {
 
         if( l == -1 ) {
             if( errno != EAGAIN ) {
-                _close( fd, sess );
+                _close( fd );
             }
             return;
         }
@@ -1189,19 +1193,19 @@ namespace simq::core::server {
                 case FSM_GROUP_CLOSE:
                 case FSM_CONSUMER_CLOSE:
                 case FSM_PRODUCER_CLOSE:
-                    _close( fd, sess );
+                    _close( fd );
                     break;
                 default:
                     try {
                         Protocol::prepareError( sess->packet.get(), util::Error::getDescription( err ) );
                         _send( fd, sess );
                     } catch( ... ) {
-                        _close( fd, sess );
+                        _close( fd );
                     }
                     break;
             }
         } catch( ... ) {
-            _close( fd, sess );
+            _close( fd );
         }
 
     }
@@ -1222,14 +1226,12 @@ namespace simq::core::server {
                     break;
             }
         } catch( ... ) {
-            _close( fd, sess );
+            _close( fd );
         }
     }
 
     void ServerController::disconnect( unsigned int fd ) {
-        auto sess = _sessions[fd].get();
-        _close( fd, sess );
-        _sessions.erase( fd );
+        _close( fd );
     }
 
     void ServerController::iteration() {
