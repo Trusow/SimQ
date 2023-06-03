@@ -699,6 +699,7 @@ namespace simq::core::server {
 
         _access->checkPopMessage( group, channel, login, fd );
         _q->removeMessage( group, channel, fd, sess->msgID );
+        sess->fsm = FSM_CONSUMER_SEND;
         sess->msgID = 0;
 
         Protocol::prepareOk( packet );
