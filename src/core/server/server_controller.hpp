@@ -95,12 +95,17 @@ namespace simq::core::server {
              
                 unsigned int ip;
                 unsigned int lastTS;
+
+                int delayConsumerWait;
              
                 unsigned int msgID;
                 unsigned int lengthMessage;
                 unsigned int sendLengthMessage;
                 bool isPublicMessage;
             };
+
+            const unsigned int MAX_DELAY_SECONDS = 120;
+            std::map<unsigned int, bool> _waitConsumers;
 
             std::map<unsigned int, std::unique_ptr<Session>> _sessions;
             Access *_access = nullptr;
@@ -148,6 +153,7 @@ namespace simq::core::server {
             void _addProducerCmd( unsigned int fd, Session *sess );
             void _removeProducerCmd( unsigned int fd, Session *sess );
 
+            unsigned int _popMessage( unsigned int fd, Session *sess );
             void _popMessageCmd( unsigned int fd, Session *sess );
             void _removeMessageByUUIDCmd( unsigned int fd, Session *sess );
 
@@ -174,7 +180,7 @@ namespace simq::core::server {
             void recv( unsigned int fd );
             void send( unsigned int fd );
             void disconnect( unsigned int fd );
-            void iteration();
+            void polling( unsigned int delay );
     };
 
     ServerController::FSM ServerController::_getFSMByError( Session *sess, util::Error::Err err ) {
@@ -336,8 +342,11 @@ namespace simq::core::server {
         switch( sess->fsm ) {
             case FSM_COMMON_CLOSE:
             case FSM_GROUP_CLOSE:
-            case FSM_CONSUMER_CLOSE:
             case FSM_PRODUCER_CLOSE:
+                _close( fd );
+                break;
+            case FSM_CONSUMER_CLOSE:
+                _waitConsumers.erase( fd );
                 _close( fd );
                 break;
         }
@@ -1024,7 +1033,7 @@ namespace simq::core::server {
         _send( fd, sess );
     }
 
-    void ServerController::_popMessageCmd( unsigned int fd, Session *sess ) {
+    unsigned int ServerController::_popMessage( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
@@ -1038,10 +1047,7 @@ namespace simq::core::server {
         auto id = _q->popMessage( group, channel, fd, length, uuid );
 
         if( id == 0 ) {
-            Protocol::prepareNoneMessageMetaPop( packet );
-            sess->fsm = FSM_CONSUMER_SEND;
-            _send( fd, sess );
-            return;
+            return id;
         }
 
         Protocol::setLength( packetMsg, length );
@@ -1057,6 +1063,28 @@ namespace simq::core::server {
         }
 
         _send( fd, sess );
+        return id;
+    }
+
+    void ServerController::_popMessageCmd( unsigned int fd, Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto delay = Protocol::getDelay( packet );
+        if( delay > MAX_DELAY_SECONDS ) throw util::Error::WRONG_CMD;
+        sess->delayConsumerWait = delay * 1000;
+
+        auto id = _popMessage( fd, sess );
+
+        if( id == 0 ) {
+            if( delay ) {
+                _waitConsumers[fd] = true;
+                return;
+            }
+
+            Protocol::prepareNoneMessageMetaPop( packet );
+            sess->fsm = FSM_CONSUMER_SEND;
+            _send( fd, sess );
+        }
     }
 
     void ServerController::_removeMessageByUUIDCmd( unsigned int fd, Session *sess ) {
@@ -1191,8 +1219,11 @@ namespace simq::core::server {
             switch( sess->fsm ) {
                 case FSM_COMMON_CLOSE:
                 case FSM_GROUP_CLOSE:
-                case FSM_CONSUMER_CLOSE:
                 case FSM_PRODUCER_CLOSE:
+                    _close( fd );
+                    break;
+                case FSM_CONSUMER_CLOSE:
+                    _waitConsumers.erase( fd );
                     _close( fd );
                     break;
                 default:
@@ -1200,11 +1231,13 @@ namespace simq::core::server {
                         Protocol::prepareError( sess->packet.get(), util::Error::getDescription( err ) );
                         _send( fd, sess );
                     } catch( ... ) {
+                        _waitConsumers.erase( fd );
                         _close( fd );
                     }
                     break;
             }
         } catch( ... ) {
+            _waitConsumers.erase( fd );
             _close( fd );
         }
 
@@ -1226,15 +1259,52 @@ namespace simq::core::server {
                     break;
             }
         } catch( ... ) {
+            _waitConsumers.erase( fd );
             _close( fd );
         }
     }
 
     void ServerController::disconnect( unsigned int fd ) {
+        _waitConsumers.erase( fd );
         _close( fd );
     }
 
-    void ServerController::iteration() {
+    void ServerController::polling( unsigned int delay ) {
+        for( auto it = _waitConsumers.begin(); it != _waitConsumers.end(); ) {
+            auto fd = it->first;
+
+            auto itSess = _sessions.find( fd );
+            if( itSess == _sessions.end() ) continue;
+            auto sess = itSess->second.get();
+
+            sess->delayConsumerWait -= delay;
+
+            try {
+                auto msgId = _popMessage( fd, sess );
+                if( msgId == 0 ) {
+                    if( sess->delayConsumerWait <= 0 ) {
+                        Protocol::prepareNoneMessageMetaPop( sess->packet.get() );
+                        sess->fsm = FSM_CONSUMER_SEND;
+                        _send( fd, sess );
+                        _waitConsumers.erase( it++ );
+                    } else {
+                        ++it;
+                    }
+                }
+            } catch( util::Error::Err err ) {
+                _waitConsumers.erase( it++ );
+                if( err == util::Error::SOCKET ) {
+                    _close( fd );
+                } else {
+                    sess->fsm = FSM_CONSUMER_SEND_ERROR;
+                    Protocol::prepareError( sess->packet.get(), util::Error::getDescription( err ) );
+                    _send( fd, sess );
+                }
+            } catch ( ... ) {
+                _waitConsumers.erase( it++ );
+                _close( fd );
+            }
+        }
     }
 }
 
