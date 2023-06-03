@@ -683,6 +683,11 @@ namespace simq::core::server {
                 lengthLimitMessages
             );
 
+            limitMessages.minMessageSize = ntohl( limitMessages.minMessageSize );
+            limitMessages.maxMessageSize = ntohl( limitMessages.maxMessageSize );
+            limitMessages.maxMessagesInMemory = ntohl( limitMessages.maxMessagesInMemory );
+            limitMessages.maxMessagesOnDisk = ntohl( limitMessages.maxMessagesOnDisk );
+
             if( !util::Validation::isChannelLimitMessages( limitMessages ) ) {
                 return false;
             }
