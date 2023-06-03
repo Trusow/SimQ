@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <stdarg.h>
 #include <arpa/inet.h>
+#include <iostream>
 #include "../../util/types.h"
 #include "../../util/constants.h"
 #include "../../util/error.h"
@@ -172,6 +173,7 @@ namespace simq::core::server {
             static void _checkCmdPushReplicaMessage( Packet *packet );
             static void _checkCmdPushPublicMessage( Packet *packet );
             static void _checkCmdRemoveMessageByUUID( Packet *packet );
+            static void _checkCmdPopMessage( Packet *packet );
 
         public:
             static void prepareVersion( Packet *packet );
@@ -258,6 +260,7 @@ namespace simq::core::server {
             static const unsigned char *getNewPassword( Packet *packet );
 
             static unsigned int getLength( Packet *packet );
+            static unsigned int getDelay( Packet *packet );
             static const char *getUUID( Packet *packet );
             static void getChannelLimitMessages(
                 Packet *packet,
@@ -518,6 +521,7 @@ namespace simq::core::server {
         memcpy( &packet->cmd, packet->values.get(), SIZE_CMD );
         memcpy( &packet->length, &packet->values.get()[SIZE_CMD], SIZE_UINT );
         packet->cmd = ( Cmd )ntohl( packet->cmd );
+        //std::cout << packet->cmd << std::endl;
         packet->length = ntohl( packet->length );
 
         switch( packet->cmd ) {
@@ -528,7 +532,6 @@ namespace simq::core::server {
             case CMD_GET_CHANNELS:
             case CMD_GET_VERSION:
             case CMD_GET_PART_MESSAGE:
-            case CMD_POP_MESSAGE:
                 if( packet->length != 0 ) {
                     throw util::Error::WRONG_CMD;
                 }
@@ -553,6 +556,7 @@ namespace simq::core::server {
             case CMD_PUSH_PUBLIC_MESSAGE:
             case CMD_PUSH_REPLICA_MESSAGE:
             case CMD_REMOVE_MESSAGE_BY_UUID:
+            case CMD_POP_MESSAGE:
                 if( packet->length > PACKET_SIZE ) {
                     throw util::Error::WRONG_CMD;
                 }
@@ -865,6 +869,14 @@ namespace simq::core::server {
         _checkControlLength( offset, packet->length );
     }
 
+    void Protocol::_checkCmdPopMessage( Packet *packet ) {
+        auto offset = 0;
+
+        offset += _checkParamCmdUInt( packet, offset, 0 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
     unsigned int Protocol::_calculateCountValues( Packet *packet ) {
         unsigned int length = packet->length;
         unsigned int offset = 0;
@@ -959,6 +971,9 @@ namespace simq::core::server {
                 break;
             case CMD_REMOVE_MESSAGE_BY_UUID:
                 _checkCmdRemoveMessageByUUID( packet );
+                break;
+            case CMD_POP_MESSAGE:
+                _checkCmdPopMessage( packet );
                 break;
         }
     }
@@ -1084,7 +1099,7 @@ namespace simq::core::server {
     }
 
     bool Protocol::isPopMessage( Packet *packet ) {
-        return packet->cmd == CMD_POP_MESSAGE && packet->countValues == 0;;
+        return packet->cmd == CMD_POP_MESSAGE && packet->countValues == 1;
     }
 
     bool Protocol::isGetPartMessage( Packet *packet ) {
@@ -1236,6 +1251,17 @@ namespace simq::core::server {
 
     unsigned int Protocol::getLength( Packet *packet ) {
         if( isPushMessage( packet ) || isPushPublicMessage( packet ) || isPushReplicaMessage ( packet ) ) {
+            unsigned int value = 0;
+            _demarsh( &packet->values[packet->valuesOffsets[0]], value );
+
+            return value;
+        }
+
+        throw util::Error::WRONG_CMD;
+    }
+
+    unsigned int Protocol::getDelay( Packet *packet ) {
+        if( isPopMessage( packet ) ) {
             unsigned int value = 0;
             _demarsh( &packet->values[packet->valuesOffsets[0]], value );
 
