@@ -170,15 +170,15 @@ namespace simq::core::server {
 
                 _access->addChannel( group, channel );
 
-                std::string pathToLimitMessages;
-                util::constants::buildPathToChannelLimitMessages(
-                    pathToLimitMessages,
+                std::string pathToData;
+                util::constants::buildPathToChannelData(
+                    pathToData,
                     _path.get(),
                     group,
                     channel
                 );
 
-                _q->addChannel( group, channel, pathToLimitMessages.c_str(), limitMessages );
+                _q->addChannel( group, channel, pathToData.c_str(), limitMessages );
 
                 Logger::success(
                     Logger::OP_INITIALIZATION_CHANNEL,
