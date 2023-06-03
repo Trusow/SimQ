@@ -9,8 +9,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
+#include <random>
 #include "callbacks.h"
 #include "../../../util/error.h"
+#include "../../../util/timer.hpp"
 
 namespace simq::core::server::server {
     class Manager {
@@ -25,7 +27,7 @@ namespace simq::core::server::server {
             const unsigned int SERVER_EVENTS = EPOLLIN | EPOLLET;
             const unsigned int COUNT_EVENTS = 100;
             const unsigned int COUNT_LISTEN = 500;
-            const unsigned int TIMEOUT = 2000;
+            const unsigned int TIMEOUT = 30;
 
             unsigned int _createSocket();
             void _bindSocket();
@@ -66,7 +68,13 @@ namespace simq::core::server::server {
             throw util::Error::SOCKET;
         }
 
-        auto lastTS = time( NULL );
+        auto lastTS = util::Timer::tick();
+
+        std::random_device randomDevice;
+        std::mt19937 randomRange( randomDevice() );
+        std::uniform_int_distribution<unsigned int> buildRand( 50, 200 );
+
+        auto randTimeout = buildRand( randomRange );
 
         while( true ) {
             int count_events = epoll_wait( _ep, events, COUNT_EVENTS, TIMEOUT );
@@ -101,9 +109,10 @@ namespace simq::core::server::server {
                 }
             }
 
-            auto localLastTS = time( NULL );
+            auto localLastTS = util::Timer::tick();
 
-            if( localLastTS - lastTS > TIMEOUT / 1000 ) {
+            if( localLastTS - lastTS > randTimeout ) {
+                randTimeout = buildRand( randomRange );
                 lastTS = localLastTS;
                 _callbacks->iteration();
             }
