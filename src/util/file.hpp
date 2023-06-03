@@ -117,6 +117,7 @@ namespace simq::util {
         if( fwrite( data, sizeof( char ), length, file ) != length ) {
             throw util::Error::FS_ERROR;
         }
+        fflush( file );
     }
 
     void File::write( void *data, unsigned int length, unsigned long int offset ) {
