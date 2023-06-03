@@ -609,9 +609,8 @@ namespace simq::core::server::q {
         auto itMsg = std::find( channel->QList.begin(), channel->QList.end(), id );
         if( itMsg != channel->QList.end() ) {
             channel->QList.erase( itMsg );
+            channel->messages->free( uuid );
         }
-
-        channel->messages->free( uuid );
     }
 
     unsigned int Manager::recv(
