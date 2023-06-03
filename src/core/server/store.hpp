@@ -91,7 +91,7 @@ namespace simq::core::server {
             void updateChannelLimitMessages(
                 const char *group,
                 const char *channel,
-                util::types::ChannelLimitMessages &limitMessages
+                util::types::ChannelLimitMessages limitMessages
             );
             void removeChannel( const char *group, const char *channel );
 
@@ -828,7 +828,7 @@ namespace simq::core::server {
     void Store::updateChannelLimitMessages(
         const char *group,
         const char *channel,
-        util::types::ChannelLimitMessages &limitMessages
+        util::types::ChannelLimitMessages limitMessages
     ) {
         std::lock_guard<std::mutex> lock( m );
 
