@@ -242,7 +242,7 @@ namespace simq::core::server::q {
         if( msg->isMemory ) {
             _totalInMemory--;
         } else {
-            _totalOnDisk++;
+            _totalOnDisk--;
         }
 
         _messages[id].reset();
