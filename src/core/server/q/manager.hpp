@@ -337,7 +337,7 @@ namespace simq::core::server::q {
             return;
         }
 
-        for( auto itMsg = itConsumer->second.begin(); itMsg != itConsumer->second.end(); itConsumer++ ) {
+        for( auto itMsg = channel->consumers[fd].begin(); itMsg != channel->consumers[fd].end(); itMsg++ ) {
             if( _isOnePublicMessageID( channel->consumers, *itMsg ) ) {
                 channel->messages->free( *itMsg );
             }
