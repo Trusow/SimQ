@@ -239,7 +239,12 @@ namespace simq::core::server::q {
         auto offsetInnerPage = _getOffsetInnerPage( item->recvLength, offsetPage );
 
         if( item->recvLength % MESSAGE_PACKET_SIZE == 0 ) {
-            item->buffer[offsetPage] = std::make_unique<char[]>( MESSAGE_PACKET_SIZE );
+            auto residue = util::Messages::getResiduePart( item->length, item->recvLength );
+            if( residue > MESSAGE_PACKET_SIZE ) {
+                item->buffer[offsetPage] = std::make_unique<char[]>( MESSAGE_PACKET_SIZE );
+            } else {
+                item->buffer[offsetPage] = std::make_unique<char[]>( residue );
+            }
         }
 
         auto data = &item->buffer[offsetPage][offsetInnerPage];
