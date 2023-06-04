@@ -1291,6 +1291,8 @@ namespace simq::core::server {
                     } else {
                         ++it;
                     }
+                } else {
+                    _waitConsumers.erase( it++ );
                 }
             } catch( util::Error::Err err ) {
                 _waitConsumers.erase( it++ );
