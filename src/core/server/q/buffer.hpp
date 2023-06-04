@@ -384,7 +384,7 @@ namespace simq::core::server::q {
 
     void Buffer::_expandItems() {
         _countItemsPackets++;
-        _items.reserve( _countItemsPackets + SIZE_ITEM_PACKET );
+        _items.resize( _items.size() + SIZE_ITEM_PACKET );
     }
 
     void Buffer::_expandFile() {
