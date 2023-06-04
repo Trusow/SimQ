@@ -718,7 +718,7 @@ namespace simq::core::server::q {
         } else {
             bool isAdd = false;
             for( auto itConsumer = channel->consumers.begin(); itConsumer != channel->consumers.end(); itConsumer++ ) {
-                itConsumer->second.push_back( id );
+                channel->consumers[itConsumer->first].push_back( id );
                 isAdd = true;
             }
 
