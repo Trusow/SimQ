@@ -769,6 +769,7 @@ namespace simq::core::server::q {
             if( itConsumer->first == fd && ! itConsumer->second.empty() ) {
                 id = itConsumer->second.front();
                 channel->consumers[fd].pop_front();
+                length = channel->messages->getLength( id );
                 return id;
             }
         }
@@ -777,9 +778,9 @@ namespace simq::core::server::q {
             id = channel->QList.front();
             channel->messages->getUUID( id, uuid );
             channel->QList.pop_front();
+            length = channel->messages->getLength( id );
         }
 
-        length = channel->messages->getLength( id );
 
         return id;
     }
