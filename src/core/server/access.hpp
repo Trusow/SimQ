@@ -911,7 +911,7 @@ namespace simq::core::server {
 
     void Access::_checkIssetSessions( std::map<unsigned int, bool> &map, unsigned int fd ) {
         if( map.find( fd ) == map.end() ) {
-            throw util::Error::NOT_FOUND_SESSION;
+            throw util::Error::ACCESS_DENY;
         }
     }
 
