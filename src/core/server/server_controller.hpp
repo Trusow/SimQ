@@ -249,8 +249,12 @@ namespace simq::core::server {
                 login = &sess->authData.get()[sess->offsetLogin];
 
                 _access->logoutConsumer( group, channel, login, fd );
-                if( sess->msgID != 0 && !sess->isPublicMessage ) {
-                    _q->revertMessage( group, channel, fd, sess->msgID );
+                if( sess->msgID != 0 ) {
+                    if( !sess->isPublicMessage ) {
+                        _q->revertMessage( group, channel, fd, sess->msgID );
+                    } else {
+                        _q->removeMessage( group, channel, fd, sess->msgID );
+                    }
                 }
                 _q->leaveConsumer( group, channel, fd );
                 break;
