@@ -76,8 +76,8 @@ namespace simq::core::server::q {
             unsigned int _recv( char *data, unsigned int recvLength, unsigned int fd );
             unsigned int _recvToBuffer( Item *item, unsigned int fd );
             unsigned int _recvToFile( Item *item, unsigned int fd );
-            unsigned int _sendFromBuffer( Item *item, unsigned int fd );
-            unsigned int _sendFromFile( Item *item, unsigned int fd );
+            unsigned int _sendFromBuffer( Item *item, unsigned int fd, unsigned int offset );
+            unsigned int _sendFromFile( Item *item, unsigned int fd, unsigned int offset );
 
             Item *_getItem( unsigned int id );
         public:
@@ -95,7 +95,7 @@ namespace simq::core::server::q {
             );
 
             unsigned int recv( unsigned int id, unsigned int fd );
-            unsigned int send( unsigned int id, unsigned int fd );
+            unsigned int send( unsigned int id, unsigned int fd, unsigned int offset );
 
             void resetSend( unsigned int id );
 
@@ -293,11 +293,11 @@ namespace simq::core::server::q {
         return length;
     }
 
-    unsigned int Buffer::_sendFromBuffer( Item *item, unsigned int fd ) {
-        auto sendLength = util::Messages::getResiduePart( item->length, item->sendLength );
+    unsigned int Buffer::_sendFromBuffer( Item *item, unsigned int fd, unsigned int offset ) {
+        auto sendLength = util::Messages::getResiduePart( item->length, offset );
 
-        auto offsetPage = _getOffsetPage( item->sendLength );
-        auto offsetInnerPage = _getOffsetInnerPage( item->sendLength, offsetPage );
+        auto offsetPage = _getOffsetPage( offset );
+        auto offsetInnerPage = _getOffsetInnerPage( offset, offsetPage );
 
         auto data = &item->buffer[offsetPage][offsetInnerPage];
         auto length = ::send( fd, data, sendLength, MSG_NOSIGNAL );
@@ -306,11 +306,11 @@ namespace simq::core::server::q {
         return length;
     }
 
-    unsigned int Buffer::_sendFromFile( Item *item, unsigned int fd ) {
-        auto sendLength = util::Messages::getResiduePart( item->length, item->sendLength );
+    unsigned int Buffer::_sendFromFile( Item *item, unsigned int fd, unsigned int offset ) {
+        auto sendLength = util::Messages::getResiduePart( item->length, offset );
 
-        auto offsetPage = _getOffsetPage( item->sendLength );
-        auto offsetInnerPage = _getOffsetInnerPage( item->sendLength, offsetPage );
+        auto offsetPage = _getOffsetPage( offset );
+        auto offsetInnerPage = _getOffsetInnerPage( offset, offsetPage );
         auto fileOffset = _getOffsetFile( item, offsetPage, offsetInnerPage );
 
         auto length = ::sendfile( fd, _fileFD, (long *)&fileOffset, sendLength );
@@ -337,7 +337,7 @@ namespace simq::core::server::q {
         return _recvToFile( item, fd );
     }
 
-    unsigned int Buffer::send( unsigned int id, unsigned int fd ) {
+    unsigned int Buffer::send( unsigned int id, unsigned int fd, unsigned int offset ) {
         _wait( _countItemsWrited );
         std::shared_lock<std::shared_timed_mutex> lockItems( _mItems );
 
@@ -348,10 +348,10 @@ namespace simq::core::server::q {
         }
 
         if( item->buffer.get() ) {
-            return _sendFromBuffer( item, fd );
+            return _sendFromBuffer( item, fd, offset );
         }
 
-        return _sendFromFile( item, fd );
+        return _sendFromFile( item, fd, offset );
     }
 
     void Buffer::resetSend( unsigned int id ) {

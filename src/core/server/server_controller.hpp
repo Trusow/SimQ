@@ -800,7 +800,7 @@ namespace simq::core::server {
 
         try {
             _access->checkPopMessage( group, channel, login, fd );
-            auto l = _q->send( group, channel, fd, sess->msgID );
+            auto l = _q->send( group, channel, fd, sess->msgID, packetMsg->wrLength );
             Protocol::addWRLength( packetMsg, l );
 
             if( Protocol::isFull( packetMsg ) ) {

@@ -61,7 +61,7 @@ namespace simq::core::server::q {
             unsigned int getID( const char *uuid );
 
             unsigned int recv( unsigned int id, unsigned int fd );
-            unsigned int send( unsigned int id, unsigned int fd );
+            unsigned int send( unsigned int id, unsigned int fd, unsigned int offset );
             void resetSend( unsigned int id );
             unsigned int getLength( unsigned int id );
     };
@@ -285,7 +285,7 @@ namespace simq::core::server::q {
         return _buffer->recv( id, fd );
     }
 
-    unsigned int Messages::send( unsigned int id, unsigned int fd ) {
+    unsigned int Messages::send( unsigned int id, unsigned int fd, unsigned int offset ) {
         _wait( _countWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _m );
 
@@ -293,7 +293,7 @@ namespace simq::core::server::q {
             throw util::Error::UNKNOWN;
         }
 
-        return _buffer->send( id, fd );
+        return _buffer->send( id, fd, offset );
     }
 
     void Messages::resetSend( unsigned int id ) {

@@ -34,6 +34,7 @@ namespace simq::core::server::q {
                 std::shared_timed_mutex mQList;
                 std::atomic_uint countQListWrited;
                 std::list<unsigned int> QList;
+                std::map<unsigned int, unsigned int> publicMessages;
             };
 
             struct Group {
@@ -48,14 +49,6 @@ namespace simq::core::server::q {
             std::map<std::string, std::unique_ptr<Group>> _groups;
 
             void _wait( std::atomic_uint &atom );
-            bool _isMorePublicMessageID(
-                std::map<unsigned int, std::list<unsigned int>> &map,
-                unsigned int msgID
-            );
-            bool _isOnePublicMessageID(
-                std::map<unsigned int, std::list<unsigned int>> &map,
-                unsigned int msgID
-            );
 
             bool _isConsumer( std::map<unsigned int, std::list<unsigned int>> &map, unsigned int fd );
             bool _isProducer( std::map<unsigned int, bool> &map, unsigned int fd );
@@ -129,7 +122,8 @@ namespace simq::core::server::q {
                 const char *groupName,
                 const char *channelName,
                 unsigned int fd,
-                unsigned int id
+                unsigned int id,
+                unsigned int offset
             );
 
             void pushMessage(
@@ -275,41 +269,6 @@ namespace simq::core::server::q {
         channel->consumers[fd] = std::list<unsigned int>();
     }
 
-    bool Manager::_isMorePublicMessageID(
-        std::map<unsigned int, std::list<unsigned int>> &map,
-        unsigned int msgID
-    ) {
-        for( auto itConsumer = map.begin(); itConsumer != map.end(); itConsumer++ ) {
-            for( auto itMsg = itConsumer->second.begin(); itMsg != itConsumer->second.end(); itMsg++ ) {
-                if( *itMsg == msgID ) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    bool Manager::_isOnePublicMessageID(
-        std::map<unsigned int, std::list<unsigned int>> &map,
-        unsigned int msgID
-    ) {
-        unsigned int total = 0;
-
-        for( auto itConsumer = map.begin(); itConsumer != map.end(); itConsumer++ ) {
-            for( auto itMsg = itConsumer->second.begin(); itMsg != itConsumer->second.end(); itMsg++ ) {
-                if( *itMsg == msgID ) {
-                    total++;
-                    if( total > 1 ) {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        return total == 1;
-    }
-
     void Manager::leaveConsumer( const char *groupName, const char *channelName, unsigned int fd ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
@@ -338,8 +297,15 @@ namespace simq::core::server::q {
         }
 
         for( auto itMsg = channel->consumers[fd].begin(); itMsg != channel->consumers[fd].end(); itMsg++ ) {
-            if( _isOnePublicMessageID( channel->consumers, *itMsg ) ) {
-                channel->messages->free( *itMsg );
+            auto idMsg = *itMsg;
+            if( channel->publicMessages.find( idMsg ) == channel->publicMessages.end() ) {
+                continue;
+            }
+
+            channel->publicMessages[idMsg]--;
+            if( channel->publicMessages[idMsg] == 0 ) {
+                channel->messages->free( idMsg );
+                channel->publicMessages.erase( idMsg );
             }
         }
 
@@ -563,8 +529,12 @@ namespace simq::core::server::q {
             return;
         }
 
-        if( isConsumer && _isMorePublicMessageID( channel->consumers, id ) ) {
-            return;
+        if( isConsumer && channel->publicMessages.find( id ) != channel->publicMessages.end() ) {
+            channel->publicMessages[id]--;
+
+            if( channel->publicMessages[id] != 0 ) {
+                return;
+            }
         }
 
 
@@ -648,7 +618,8 @@ namespace simq::core::server::q {
         const char *groupName,
         const char *channelName,
         unsigned int fd,
-        unsigned int id
+        unsigned int id,
+        unsigned int offset
     ) {
         _wait( _countGroupsWrited );
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
@@ -673,7 +644,7 @@ namespace simq::core::server::q {
 
         _checkConsumer( channel->consumers, fd );
 
-        return channel->messages->send( id, fd );
+        return channel->messages->send( id, fd, offset );
     }
 
     void Manager::pushMessage(
@@ -723,6 +694,8 @@ namespace simq::core::server::q {
 
             if( !isAdd ) {
                 channel->messages->free( id );
+            } else {
+                channel->publicMessages[id] = channel->consumers.size();
             }
         }
     }
@@ -764,13 +737,11 @@ namespace simq::core::server::q {
 
         unsigned int id = 0;
 
-        for( auto itConsumer = consumers.begin(); itConsumer != consumers.end(); itConsumer++ ) {
-            if( itConsumer->first == fd && ! itConsumer->second.empty() ) {
-                id = itConsumer->second.front();
-                channel->consumers[fd].pop_front();
-                length = channel->messages->getLength( id );
-                return id;
-            }
+        if( consumers.find( fd ) != consumers.end() && !consumers[fd].empty() ) {
+            id = consumers[fd].front();
+            channel->consumers[fd].pop_front();
+            length = channel->messages->getLength( id );
+            return id;
         }
 
         if( !channel->QList.empty() ) {
