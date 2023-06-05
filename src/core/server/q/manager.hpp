@@ -559,17 +559,16 @@ namespace simq::core::server::q {
         auto isConsumer = _isConsumer( channel->consumers, fd );
         auto isProducer = _isProducer( channel->producers, fd );
 
-        if( isConsumer || isProducer ) {
-            if( isConsumer && _isMorePublicMessageID( channel->consumers, id ) ) {
-                return;
-            }
+        if( !isConsumer && !isProducer ) {
+            return;
+        }
 
-            channel->messages->free( id );
-        } else {
+        if( isConsumer && _isMorePublicMessageID( channel->consumers, id ) ) {
             return;
         }
 
 
+        channel->messages->free( id );
     }
 
     void Manager::removeMessage(
