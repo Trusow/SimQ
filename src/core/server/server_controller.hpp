@@ -1092,16 +1092,18 @@ namespace simq::core::server {
 
         auto id = _popMessage( fd, sess );
 
-        if( id == 0 ) {
-            if( delay ) {
-                _waitConsumers[fd] = true;
-                return;
-            }
-
-            Protocol::prepareNoneMessageMetaPop( packet );
-            sess->fsm = FSM_CONSUMER_SEND;
-            _send( fd, sess );
+        if( id != 0 ) {
+            return;
         }
+
+        if( delay ) {
+            _waitConsumers[fd] = true;
+            return;
+        }
+
+        Protocol::prepareNoneMessageMetaPop( packet );
+        sess->fsm = FSM_CONSUMER_SEND;
+        _send( fd, sess );
     }
 
     void ServerController::_removeMessageByUUIDCmd( unsigned int fd, Session *sess ) {
