@@ -695,7 +695,19 @@ namespace simq::core::server {
 
         if( !_recvToPacket( fd, packet ) ) return;
 
-        if( !Protocol::isRemoveMessage( packet ) ) throw util::Error::WRONG_CMD;
+        if( !Protocol::isRemoveMessage( packet ) ) {
+            auto group = sess->authData.get();
+            auto channel = &sess->authData.get()[sess->offsetChannel];
+
+            if( !sess->isSignal ) {
+                _q->revertMessage( group, channel, fd, sess->msgID );
+            } else {
+                _q->removeMessage( group, channel, fd, sess->msgID );
+            }
+            sess->msgID = 0;
+
+            throw util::Error::WRONG_CMD;
+        };
 
         auto group = sess->authData.get();
         auto channel = &sess->authData.get()[sess->offsetChannel];
