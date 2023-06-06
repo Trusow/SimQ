@@ -34,7 +34,7 @@ namespace simq::core::server::q {
                 std::shared_timed_mutex mQList;
                 std::atomic_uint countQListWrited;
                 std::list<unsigned int> QList;
-                std::map<unsigned int, unsigned int> publicMessages;
+                std::map<unsigned int, unsigned int> signals;
             };
 
             struct Group {
@@ -298,14 +298,14 @@ namespace simq::core::server::q {
 
         for( auto itMsg = channel->consumers[fd].begin(); itMsg != channel->consumers[fd].end(); itMsg++ ) {
             auto idMsg = *itMsg;
-            if( channel->publicMessages.find( idMsg ) == channel->publicMessages.end() ) {
+            if( channel->signals.find( idMsg ) == channel->signals.end() ) {
                 continue;
             }
 
-            channel->publicMessages[idMsg]--;
-            if( channel->publicMessages[idMsg] == 0 ) {
+            channel->signals[idMsg]--;
+            if( channel->signals[idMsg] == 0 ) {
                 channel->messages->free( idMsg );
-                channel->publicMessages.erase( idMsg );
+                channel->signals.erase( idMsg );
             }
         }
 
@@ -529,10 +529,10 @@ namespace simq::core::server::q {
             return;
         }
 
-        if( isConsumer && channel->publicMessages.find( id ) != channel->publicMessages.end() ) {
-            channel->publicMessages[id]--;
+        if( isConsumer && channel->signals.find( id ) != channel->signals.end() ) {
+            channel->signals[id]--;
 
-            if( channel->publicMessages[id] != 0 ) {
+            if( channel->signals[id] != 0 ) {
                 return;
             }
         }
@@ -695,7 +695,7 @@ namespace simq::core::server::q {
             if( !isAdd ) {
                 channel->messages->free( id );
             } else {
-                channel->publicMessages[id] = channel->consumers.size();
+                channel->signals[id] = channel->consumers.size();
             }
         }
     }

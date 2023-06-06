@@ -67,7 +67,7 @@ namespace simq::core::server {
 
                 CMD_PUSH_MESSAGE = 6'001,
                 CMD_PUSH_REPLICA_MESSAGE = 6'002,
-                CMD_PUSH_PUBLIC_MESSAGE = 6'003,
+                CMD_PUSH_SIGNAL_MESSAGE = 6'003,
                 CMD_SEND_UUID_MESSAGE = 6'004,
 
                 CMD_REMOVE_MESSAGE = 6'101,
@@ -77,7 +77,7 @@ namespace simq::core::server {
                 CMD_GET_PART_MESSAGE = 6'202,
 
                 CMD_SEND_MESSAGE_META = 6'301,
-                CMD_SEND_PUBLIC_MESSAGE_META = 6'302,
+                CMD_SEND_SIGNAL_MESSAGE_META = 6'302,
                 CMD_SEND_MESSAGE_NONE = 6'303,
             };
 
@@ -171,7 +171,7 @@ namespace simq::core::server {
             static void _checkCmdRemoveProducer( Packet *packet );
             static void _checkCmdPushMessage( Packet *packet );
             static void _checkCmdPushReplicaMessage( Packet *packet );
-            static void _checkCmdPushPublicMessage( Packet *packet );
+            static void _checkCmdPushSignalMessage( Packet *packet );
             static void _checkCmdRemoveMessageByUUID( Packet *packet );
             static void _checkCmdPopMessage( Packet *packet );
 
@@ -192,7 +192,7 @@ namespace simq::core::server {
                 Packet *packet,
                 const char *uuid
             );
-            static void preparePublicMessageMetaPush(
+            static void prepareSignalMessageMetaPush(
                 Packet *packet
             );
             static void prepareMessageMetaPop(
@@ -200,7 +200,7 @@ namespace simq::core::server {
                 unsigned int length,
                 const char *uuid
             );
-            static void preparePublicMessageMetaPop(
+            static void prepareSignalMessageMetaPop(
                 Packet *packet,
                 unsigned int length
             );
@@ -245,7 +245,7 @@ namespace simq::core::server {
             static bool isGetPartMessage( Packet *packet );
 
             static bool isPushMessage( Packet *packet );
-            static bool isPushPublicMessage( Packet *packet );
+            static bool isPushSignalMessage( Packet *packet );
             static bool isPushReplicaMessage( Packet *packet );
 
             static bool isRemoveMessage( Packet *packet );
@@ -469,7 +469,7 @@ namespace simq::core::server {
         _marsh( packet, uuid, lengthUUID );
     }
 
-    void Protocol::preparePublicMessageMetaPush( Packet *packet ) {
+    void Protocol::prepareSignalMessageMetaPush( Packet *packet ) {
         prepareOk( packet );
     }
 
@@ -492,7 +492,7 @@ namespace simq::core::server {
         _marsh( packet, uuid, lengthUUID );
     }
 
-    void Protocol::preparePublicMessageMetaPop(
+    void Protocol::prepareSignalMessageMetaPop(
         Packet *packet,
         unsigned int length
     ) {
@@ -501,7 +501,7 @@ namespace simq::core::server {
         _reservePacketValues( packet, LENGTH_META + lengthBody );
         packet->length = 0;
 
-        _marsh( packet, CMD_SEND_PUBLIC_MESSAGE_META );
+        _marsh( packet, CMD_SEND_SIGNAL_MESSAGE_META );
         _marsh( packet, lengthBody );
         _marsh( packet, SIZE_UINT );
         _marsh( packet, length );
@@ -521,7 +521,6 @@ namespace simq::core::server {
         memcpy( &packet->cmd, packet->values.get(), SIZE_CMD );
         memcpy( &packet->length, &packet->values.get()[SIZE_CMD], SIZE_UINT );
         packet->cmd = ( Cmd )ntohl( packet->cmd );
-        //std::cout << packet->cmd << std::endl;
         packet->length = ntohl( packet->length );
 
         switch( packet->cmd ) {
@@ -553,7 +552,7 @@ namespace simq::core::server {
             case CMD_UPDATE_PRODUCER_PASSWORD:
             case CMD_REMOVE_PRODUCER:
             case CMD_PUSH_MESSAGE:
-            case CMD_PUSH_PUBLIC_MESSAGE:
+            case CMD_PUSH_SIGNAL_MESSAGE:
             case CMD_PUSH_REPLICA_MESSAGE:
             case CMD_REMOVE_MESSAGE_BY_UUID:
             case CMD_POP_MESSAGE:
@@ -857,7 +856,7 @@ namespace simq::core::server {
         _checkControlLength( offset, packet->length );
     }
 
-    void Protocol::_checkCmdPushPublicMessage( Packet *packet ) {
+    void Protocol::_checkCmdPushSignalMessage( Packet *packet ) {
         _checkCmdPushMessage( packet );
     }
 
@@ -966,8 +965,8 @@ namespace simq::core::server {
             case CMD_PUSH_REPLICA_MESSAGE:
                 _checkCmdPushReplicaMessage( packet );
                 break;
-            case CMD_PUSH_PUBLIC_MESSAGE:
-                _checkCmdPushPublicMessage( packet );
+            case CMD_PUSH_SIGNAL_MESSAGE:
+                _checkCmdPushSignalMessage( packet );
                 break;
             case CMD_REMOVE_MESSAGE_BY_UUID:
                 _checkCmdRemoveMessageByUUID( packet );
@@ -1110,8 +1109,8 @@ namespace simq::core::server {
         return packet->cmd == CMD_PUSH_MESSAGE && packet->countValues == 1;
     }
 
-    bool Protocol::isPushPublicMessage( Packet *packet ) {
-        return packet->cmd == CMD_PUSH_PUBLIC_MESSAGE && packet->countValues == 1;
+    bool Protocol::isPushSignalMessage( Packet *packet ) {
+        return packet->cmd == CMD_PUSH_SIGNAL_MESSAGE && packet->countValues == 1;
     }
 
     bool Protocol::isPushReplicaMessage( Packet *packet ) {
@@ -1250,7 +1249,7 @@ namespace simq::core::server {
     }
 
     unsigned int Protocol::getLength( Packet *packet ) {
-        if( isPushMessage( packet ) || isPushPublicMessage( packet ) || isPushReplicaMessage ( packet ) ) {
+        if( isPushMessage( packet ) || isPushSignalMessage( packet ) || isPushReplicaMessage ( packet ) ) {
             unsigned int value = 0;
             _demarsh( &packet->values[packet->valuesOffsets[0]], value );
 

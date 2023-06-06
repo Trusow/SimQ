@@ -101,7 +101,7 @@ namespace simq::core::server {
                 unsigned int msgID;
                 unsigned int lengthMessage;
                 unsigned int sendLengthMessage;
-                bool isPublicMessage;
+                bool isSignal;
             };
 
             const unsigned int MAX_DELAY_SECONDS = 120;
@@ -158,7 +158,7 @@ namespace simq::core::server {
             void _removeMessageByUUIDCmd( unsigned int fd, Session *sess );
 
             void _pushMessageCmd( unsigned int fd, Session *sess );
-            void _pushPublicMessageCmd( unsigned int fd, Session *sess );
+            void _pushSignalMessageCmd( unsigned int fd, Session *sess );
             void _pushReplicaMessageCmd( unsigned int fd, Session *sess );
 
 
@@ -250,7 +250,7 @@ namespace simq::core::server {
 
                 _access->logoutConsumer( group, channel, login, fd );
                 if( sess->msgID != 0 ) {
-                    if( !sess->isPublicMessage ) {
+                    if( !sess->isSignal ) {
                         _q->revertMessage( group, channel, fd, sess->msgID );
                     } else {
                         _q->removeMessage( group, channel, fd, sess->msgID );
@@ -719,8 +719,8 @@ namespace simq::core::server {
             _updateMyProducerPasswordCmd( fd, sess );
         } else if( Protocol::isPushMessage( packet ) ) {
             _pushMessageCmd( fd, sess );
-        } else if( Protocol::isPushPublicMessage( packet ) ) {
-            _pushPublicMessageCmd( fd, sess );
+        } else if( Protocol::isPushSignalMessage( packet ) ) {
+            _pushSignalMessageCmd( fd, sess );
         } else if( Protocol::isPushReplicaMessage( packet ) ) {
             _pushReplicaMessageCmd( fd, sess );
         } else {
@@ -1060,11 +1060,11 @@ namespace simq::core::server {
         sess->msgID = id;
 
         if( uuid[0] ) {
-            sess->isPublicMessage = false;
+            sess->isSignal = false;
             Protocol::prepareMessageMetaPop( packet, length, uuid );
         } else {
-            sess->isPublicMessage = true;
-            Protocol::preparePublicMessageMetaPop( packet, length );
+            sess->isSignal = true;
+            Protocol::prepareSignalMessageMetaPop( packet, length );
         }
 
         _send( fd, sess );
@@ -1130,7 +1130,7 @@ namespace simq::core::server {
         _send( fd, sess );
     }
 
-    void ServerController::_pushPublicMessageCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_pushSignalMessageCmd( unsigned int fd, Session *sess ) {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
