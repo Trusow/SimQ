@@ -435,9 +435,15 @@ namespace simq::core::server {
         util::types::Initiator initiator = util::types::Initiator::I_ROOT;
 
         while( true ) {
-            auto change = _changes->pop();
+            std::unique_ptr<Changes::Change> change;
 
-            if( change == nullptr ) {
+            try {
+                change = _changes->pop();
+
+                if( change == nullptr ) {
+                    return;
+                }
+            } catch( ... ) {
                 return;
             }
 
