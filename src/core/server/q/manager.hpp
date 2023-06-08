@@ -551,7 +551,7 @@ namespace simq::core::server::q {
         std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
 
         if( _groups.find( groupName ) == _groups.end() ) {
-            throw util::Error::NOT_FOUND_GROUP;
+            return;
         }
 
         auto group = _groups[groupName].get();
@@ -560,7 +560,7 @@ namespace simq::core::server::q {
         std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
 
         if( group->channels.find( channelName ) == group->channels.end() ) {
-            throw util::Error::NOT_FOUND_CHANNEL;
+            return;
         }
 
         auto channel = group->channels[channelName].get();
@@ -571,7 +571,11 @@ namespace simq::core::server::q {
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumer( channel->mProducers );
 
-        _checkConsumer( channel->consumers, fd );
+        try {
+            _checkConsumer( channel->consumers, fd );
+        } catch( ... ) {
+            return;
+        }
 
         auto id = channel->messages->getID( uuid );
 
