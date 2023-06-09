@@ -516,6 +516,9 @@ namespace simq::core::server::q {
 
         auto channel = group->channels[channelName].get();
 
+        util::LockAtomic lockAtomicQ( channel->countQListWrited );
+        std::lock_guard<std::shared_timed_mutex> lockQ( channel->mQList );
+
         _wait( channel->countProducersWrited );
         std::shared_lock<std::shared_timed_mutex> lockProducer( channel->mProducers );
 
@@ -571,9 +574,7 @@ namespace simq::core::server::q {
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumer( channel->mProducers );
 
-        try {
-            _checkConsumer( channel->consumers, fd );
-        } catch( ... ) {
+        if( !_isConsumer( channel->consumers, fd ) ) {
             return;
         }
 
@@ -789,9 +790,7 @@ namespace simq::core::server::q {
         _wait( channel->countConsumersWrited );
         std::shared_lock<std::shared_timed_mutex> lockConsumer( channel->mConsumers );
 
-        try {
-            _checkConsumer( channel->consumers, fd );
-        } catch( ... ) {
+        if( !_isConsumer( channel->consumers, fd ) ) {
             return;
         }
 
