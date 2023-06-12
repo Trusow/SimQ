@@ -16,66 +16,14 @@
 #include "changes.hpp"
 #include "q/manager.hpp"
 #include "protocol.hpp"
+#include "fsm.hpp"
+#include "sessions.hpp"
 
 // NO SAFE THREAD!!!
 
 namespace simq::core::server {
     class ServerController: public server::Callbacks {
         private:
-            enum FSM {
-                FSM_COMMON_RECV_CMD_CHECK_SECURE,
-                FSM_COMMON_SEND_CONFIRM_SECURE,
-                FSM_COMMON_RECV_CMD_GET_VERSION,
-                FSM_COMMON_SEND_VERSION,
-                FSM_COMMON_RECV_CMD_AUTH,
-                FSM_COMMON_SEND_CONFIRM_AUTH_GROUP,
-                FSM_COMMON_SEND_CONFIRM_AUTH_CONSUMER,
-                FSM_COMMON_SEND_CONFIRM_AUTH_PRODUCER,
-                FSM_COMMON_SEND_ERROR_WITH_CLOSE,
-
-                FSM_COMMON_CLOSE,
-                
-
-                 
-                FSM_GROUP_RECV_CMD,
-                FSM_GROUP_SEND,
-                FSM_GROUP_SEND_ERROR,
-                FSM_GROUP_SEND_ERROR_WITH_CLOSE,
-
-                FSM_GROUP_CLOSE,
-
-
-                 
-                FSM_CONSUMER_RECV_CMD,
-                FSM_CONSUMER_SEND,
-                FSM_CONSUMER_SEND_ERROR,
-                FSM_CONSUMER_SEND_ERROR_WITH_CLOSE,
-                 
-                FSM_CONSUMER_RECV_CMD_PART_MESSAGE,
-                FSM_CONSUMER_SEND_MESSAGE_META,
-                FSM_CONSUMER_SEND_PART_MESSAGE,
-                FSM_CONSUMER_SEND_PART_MESSAGE_NULL,
-                FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE,
-                FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE_END,
-                FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE,
-
-                FSM_CONSUMER_CLOSE,
-                 
-
-                FSM_PRODUCER_RECV_CMD,
-                FSM_PRODUCER_SEND,
-                FSM_PRODUCER_SEND_MESSAGE_META,
-                FSM_PRODUCER_SEND_ERROR,
-                FSM_PRODUCER_SEND_ERROR_WITH_CLOSE,
-                 
-                FSM_PRODUCER_RECV_PART_MESSAGE,
-                FSM_PRODUCER_RECV_PART_MESSAGE_NULL,
-                FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE,
-                FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE_END,
-                 
-                FSM_PRODUCER_CLOSE,
-            };
-
             enum Type {
                 TYPE_COMMON,
                 TYPE_GROUP,
@@ -83,87 +31,72 @@ namespace simq::core::server {
                 TYPE_PRODUCER,
             };
             
-            struct Session {
-                FSM fsm;
-                Type type;
-             
-                std::unique_ptr<char[]> authData;
-                std::unique_ptr<Protocol::Packet> packet;
-                std::unique_ptr<Protocol::BasePacket> packetMsg;
-                unsigned short int offsetChannel;
-                unsigned short int offsetLogin;
-             
-                unsigned int ip;
-                unsigned int lastTS;
-
-                int delayConsumerWait;
-             
-                unsigned int msgID;
-                unsigned int lengthMessage;
-                unsigned int sendLengthMessage;
-                bool isSignal;
-            };
-
             const unsigned int MAX_DELAY_SECONDS = 120;
             std::map<unsigned int, bool> _waitConsumers;
 
-            std::map<unsigned int, std::unique_ptr<Session>> _sessions;
+            struct WrapperSession {
+                Sessions::Session *sess;
+                unsigned int counter;
+            };
+
+            std::map<unsigned int, std::unique_ptr<WrapperSession>> _sessions;
             Access *_access = nullptr;
             q::Manager *_q = nullptr;
             Changes *_changes = nullptr;
             Store *_store = nullptr;
+            Sessions *_sess = nullptr;
 
-            FSM _getFSMByError( Session *sess, util::Error::Err err );
+            FSM::Code _getFSMByError( Sessions::Session *sess, util::Error::Err err );
 
             void _close( unsigned int fd );
 
             bool _recvToPacket( unsigned int fd, Protocol::Packet *packet );
 
-            void _recvSecure( unsigned int fd, Session *sess );
-            void _recvVersion( unsigned int fd, Session *sess );
-            void _recvAuth( unsigned int fd, Session *sess );
-            void _authGroupCmd( unsigned int fd, Session *sess );
-            void _authConsumerCmd( unsigned int fd, Session *sess );
-            void _authProducerCmd( unsigned int fd, Session *sess );
-            void _updateMyGroupPasswordCmd( unsigned int fd, Session *sess );
-            void _updateMyConsumerPasswordCmd( unsigned int fd, Session *sess );
-            void _updateConsumerPasswordCmd( unsigned int fd, Session *sess );
-            void _updateMyProducerPasswordCmd( unsigned int fd, Session *sess );
-            void _updateProducerPasswordCmd( unsigned int fd, Session *sess );
-            void _recvGroupCmd( unsigned int fd, Session *sess );
-            void _recvConsumerCmd( unsigned int fd, Session *sess );
-            void _recvConsumerCmdPartMessage( unsigned int fd, Session *sess );
-            void _recvConsumerRemoveMessageCmd( unsigned int fd, Session *sess );
-            void _recvProducerCmd( unsigned int fd, Session *sess );
-            void _recvFromProducerPartMessage( unsigned int fd, Session *sess );
-            void _recvFromProducerPartMessageNull( unsigned int fd, Session *sess );
-            void _sendToConsumerPartMessage( unsigned int fd, Session *sess );
-            void _sendToConsumerPartMessageNull( unsigned int fd, Session *sess );
-            void _send( unsigned int fd, Session *sess );
+            void _recvSecure( unsigned int fd, Sessions::Session *sess );
+            void _recvVersion( unsigned int fd, Sessions::Session *sess );
+            void _recvAuth( unsigned int fd, Sessions::Session *sess );
+            void _authGroupCmd( unsigned int fd, Sessions::Session *sess );
+            void _authConsumerCmd( unsigned int fd, Sessions::Session *sess );
+            void _authProducerCmd( unsigned int fd, Sessions::Session *sess );
+            void _updateMyGroupPasswordCmd( unsigned int fd, Sessions::Session *sess );
+            void _updateMyConsumerPasswordCmd( unsigned int fd, Sessions::Session *sess );
+            void _updateConsumerPasswordCmd( unsigned int fd, Sessions::Session *sess );
+            void _updateMyProducerPasswordCmd( unsigned int fd, Sessions::Session *sess );
+            void _updateProducerPasswordCmd( unsigned int fd, Sessions::Session *sess );
+            void _recvGroupCmd( unsigned int fd, Sessions::Session *sess );
+            void _recvConsumerCmd( unsigned int fd, Sessions::Session *sess );
+            void _recvConsumerCmdPartMessage( unsigned int fd, Sessions::Session *sess );
+            void _recvConsumerRemoveMessageCmd( unsigned int fd, Sessions::Session *sess );
+            void _recvProducerCmd( unsigned int fd, Sessions::Session *sess );
+            void _recvFromProducerPartMessage( unsigned int fd, Sessions::Session *sess );
+            void _recvFromProducerPartMessageNull( unsigned int fd, Sessions::Session *sess );
+            void _sendToConsumerPartMessage( unsigned int fd, Sessions::Session *sess );
+            void _sendToConsumerPartMessageNull( unsigned int fd, Sessions::Session *sess );
+            void _send( unsigned int fd, Sessions::Session *sess );
 
-            void _getChannelsCmd( unsigned int fd, Session *sess );
-            void _getChannelLimitMessagesCmd( unsigned int fd, Session *sess );
-            void _getConsumersCmd( unsigned int fd, Session *sess );
-            void _getProducersCmd( unsigned int fd, Session *sess );
-            void _addChannelCmd( unsigned int fd, Session *sess );
-            void _updateChannelLimitMessagesCmd( unsigned int fd, Session *sess );
-            void _removeChannelCmd( unsigned int fd, Session *sess );
-            void _addConsumerCmd( unsigned int fd, Session *sess );
-            void _removeConsumerCmd( unsigned int fd, Session *sess );
-            void _addProducerCmd( unsigned int fd, Session *sess );
-            void _removeProducerCmd( unsigned int fd, Session *sess );
+            void _getChannelsCmd( unsigned int fd, Sessions::Session *sess );
+            void _getChannelLimitMessagesCmd( unsigned int fd, Sessions::Session *sess );
+            void _getConsumersCmd( unsigned int fd, Sessions::Session *sess );
+            void _getProducersCmd( unsigned int fd, Sessions::Session *sess );
+            void _addChannelCmd( unsigned int fd, Sessions::Session *sess );
+            void _updateChannelLimitMessagesCmd( unsigned int fd, Sessions::Session *sess );
+            void _removeChannelCmd( unsigned int fd, Sessions::Session *sess );
+            void _addConsumerCmd( unsigned int fd, Sessions::Session *sess );
+            void _removeConsumerCmd( unsigned int fd, Sessions::Session *sess );
+            void _addProducerCmd( unsigned int fd, Sessions::Session *sess );
+            void _removeProducerCmd( unsigned int fd, Sessions::Session *sess );
 
-            unsigned int _popMessage( unsigned int fd, Session *sess );
-            void _popMessageCmd( unsigned int fd, Session *sess );
-            void _removeMessageByUUIDCmd( unsigned int fd, Session *sess );
+            unsigned int _popMessage( unsigned int fd, Sessions::Session *sess );
+            void _popMessageCmd( unsigned int fd, Sessions::Session *sess );
+            void _removeMessageByUUIDCmd( unsigned int fd, Sessions::Session *sess );
 
-            void _pushMessageCmd( unsigned int fd, Session *sess );
-            void _pushSignalMessageCmd( unsigned int fd, Session *sess );
-            void _pushReplicaMessageCmd( unsigned int fd, Session *sess );
+            void _pushMessageCmd( unsigned int fd, Sessions::Session *sess );
+            void _pushSignalMessageCmd( unsigned int fd, Sessions::Session *sess );
+            void _pushReplicaMessageCmd( unsigned int fd, Sessions::Session *sess );
 
 
             void _copyAuthData(
-                Session *sess,
+                Sessions::Session *sess,
                 const char *group,
                 const char *channel = nullptr,
                 const char *login = nullptr
@@ -174,8 +107,9 @@ namespace simq::core::server {
                 simq::core::server::Store *store,
                 simq::core::server::Access *access,
                 simq::core::server::Changes *changes,
-                simq::core::server::q::Manager *q
-            ) : _store{store}, _access{access}, _changes{changes}, _q{q} {};
+                simq::core::server::q::Manager *q,
+                simq::core::server::Sessions *sess
+            ) : _store{store}, _access{access}, _changes{changes}, _q{q}, _sess{sess} {};
             void connect( unsigned int fd, unsigned int ip );
             void recv( unsigned int fd );
             void send( unsigned int fd );
@@ -183,12 +117,12 @@ namespace simq::core::server {
             void polling( unsigned int delay );
     };
 
-    ServerController::FSM ServerController::_getFSMByError( Session *sess, util::Error::Err err ) {
+    FSM::Code ServerController::_getFSMByError( Sessions::Session *sess, util::Error::Err err ) {
         switch( sess->type ) {
             case TYPE_GROUP:
                 switch( err ) {
                     case util::Error::SOCKET:
-                        return FSM_GROUP_CLOSE;
+                        return FSM::Code::GROUP_CLOSE;
                     case util::Error::WRONG_PASSWORD:
                     case util::Error::WRONG_PARAM:
                     case util::Error::WRONG_GROUP:
@@ -199,79 +133,43 @@ namespace simq::core::server {
                     case util::Error::WRONG_CHANNEL_LIMIT_MESSAGES:
                     case util::Error::WRONG_CONSUMER:
                     case util::Error::WRONG_PRODUCER:
-                        return FSM_GROUP_SEND_ERROR;
+                        return FSM::Code::GROUP_SEND_ERROR;
                     default:
-                        return FSM_GROUP_SEND_ERROR_WITH_CLOSE;
+                        return FSM::Code::GROUP_SEND_ERROR_WITH_CLOSE;
                 }
             case TYPE_CONSUMER:
                 switch( err ) {
                     case util::Error::SOCKET:
-                        return FSM_CONSUMER_CLOSE;
+                        return FSM::Code::CONSUMER_CLOSE;
                     case util::Error::WRONG_PASSWORD:
-                        return FSM_CONSUMER_SEND_ERROR;
+                        return FSM::Code::CONSUMER_SEND_ERROR;
                     default:
-                        return FSM_CONSUMER_SEND_ERROR_WITH_CLOSE;
+                        return FSM::Code::CONSUMER_SEND_ERROR_WITH_CLOSE;
                 }
             case TYPE_PRODUCER:
                 switch( err ) {
                     case util::Error::SOCKET:
-                        return FSM_PRODUCER_CLOSE;
+                        return FSM::Code::PRODUCER_CLOSE;
                     case util::Error::WRONG_PASSWORD:
                     case util::Error::EXCEED_LIMIT:
-                        return FSM_PRODUCER_SEND_ERROR;
+                        return FSM::Code::PRODUCER_SEND_ERROR;
                     default:
-                        return FSM_PRODUCER_SEND_ERROR_WITH_CLOSE;
+                        return FSM::Code::PRODUCER_SEND_ERROR_WITH_CLOSE;
                 }
             default:
                 switch( err ) {
                     case util::Error::SOCKET:
-                        return FSM_COMMON_CLOSE;
+                        return FSM::Code::COMMON_CLOSE;
                     default:
-                        return FSM_COMMON_SEND_ERROR_WITH_CLOSE;
+                        return FSM::Code::COMMON_SEND_ERROR_WITH_CLOSE;
                 }
         }
     }
 
     void ServerController::_close( unsigned int fd ) {
-        auto itSess = _sessions.find( fd );
+        auto wrapper = _sessions[fd].get();
 
-        if( itSess == _sessions.end() ) return;
-        auto sess = itSess->second.get();
-        char *group, *channel, *login;
-
-        switch( sess->type ) {
-            case TYPE_GROUP:
-                _access->logoutGroup( sess->authData.get(), fd );
-                break;
-            case TYPE_CONSUMER:
-                group = sess->authData.get();
-                channel = &sess->authData.get()[sess->offsetChannel];
-                login = &sess->authData.get()[sess->offsetLogin];
-
-                _access->logoutConsumer( group, channel, login, fd );
-                if( sess->msgID != 0 ) {
-                    if( !sess->isSignal ) {
-                        _q->revertMessage( group, channel, fd, sess->msgID );
-                    } else {
-                        _q->removeMessage( group, channel, fd, sess->msgID );
-                    }
-                }
-                _q->leaveConsumer( group, channel, fd );
-                break;
-            case TYPE_PRODUCER:
-                group = sess->authData.get();
-                channel = &sess->authData.get()[sess->offsetChannel];
-                login = &sess->authData.get()[sess->offsetLogin];
-
-                _access->logoutProducer( group, channel, login, fd );
-                if( sess->msgID != 0 ) {
-                    _q->removeMessage( group, channel, fd, sess->msgID );
-                }
-                _q->leaveProducer( group, channel, fd );
-                break;
-        }
-
-        _sessions.erase( itSess );
+        _sess->disconnect( fd, wrapper->counter );
         ::close( fd );
     }
 
@@ -281,109 +179,56 @@ namespace simq::core::server {
         return Protocol::isFull( packet );
     }
 
-    void ServerController::_send( unsigned int fd, Session *sess ) {
+    void ServerController::_send( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !Protocol::send( fd, packet ) ) return;
 
-        switch( sess->fsm ) {
-            case FSM_COMMON_SEND_CONFIRM_SECURE:
-                sess->fsm = FSM_COMMON_RECV_CMD_GET_VERSION;
-                break;
-            case FSM_COMMON_SEND_VERSION:
-                sess->fsm = FSM_COMMON_RECV_CMD_AUTH;
-                break;
-            case FSM_COMMON_SEND_CONFIRM_AUTH_GROUP:
-                sess->fsm = FSM_GROUP_RECV_CMD;
-                break;
-            case FSM_COMMON_SEND_CONFIRM_AUTH_CONSUMER:
-                sess->fsm = FSM_CONSUMER_RECV_CMD;
-                break;
-            case FSM_COMMON_SEND_CONFIRM_AUTH_PRODUCER:
-                sess->fsm = FSM_PRODUCER_RECV_CMD;
-                break;
-            case FSM_GROUP_SEND:
-            case FSM_GROUP_SEND_ERROR:
-                sess->fsm = FSM_GROUP_RECV_CMD;
-                break;
-            case FSM_GROUP_SEND_ERROR_WITH_CLOSE:
-                sess->fsm = FSM_GROUP_CLOSE;
-                break;
-            case FSM_CONSUMER_SEND:
-            case FSM_CONSUMER_SEND_ERROR:
-                sess->fsm = FSM_CONSUMER_RECV_CMD;
-                break;
-            case FSM_CONSUMER_SEND_MESSAGE_META:
-                sess->fsm = FSM_CONSUMER_RECV_CMD_PART_MESSAGE;
-                break;
-            case FSM_CONSUMER_SEND_ERROR_WITH_CLOSE:
-                sess->fsm = FSM_CONSUMER_CLOSE;
-                break;
-            case FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE:
-                sess->fsm = FSM_CONSUMER_RECV_CMD_PART_MESSAGE;
-                break;
-            case FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE_END:
-                sess->fsm = FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE;
-                break;
-            case FSM_PRODUCER_SEND:
-            case FSM_PRODUCER_SEND_ERROR:
-                sess->fsm = FSM_PRODUCER_RECV_CMD;
-                break;
-            case FSM_PRODUCER_SEND_MESSAGE_META:
-                sess->fsm = FSM_PRODUCER_RECV_PART_MESSAGE;
-                break;
-            case FSM_PRODUCER_SEND_ERROR_WITH_CLOSE:
-                sess->fsm = FSM_PRODUCER_CLOSE;
-                break;
-            case FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE:
-                sess->fsm = FSM_PRODUCER_RECV_PART_MESSAGE;
-                break;
-            case FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE_END:
-                sess->fsm = FSM_PRODUCER_RECV_CMD;
-                break;
+        sess->fsm = FSM::getNextCodeAfterSend( sess->fsm );
+
+        if( !FSM::isClose( sess->fsm ) ) {
+            return;
         }
 
-        switch( sess->fsm ) {
-            case FSM_COMMON_CLOSE:
-            case FSM_GROUP_CLOSE:
-            case FSM_PRODUCER_CLOSE:
-                _close( fd );
-                break;
-            case FSM_CONSUMER_CLOSE:
-                _waitConsumers.erase( fd );
-                _close( fd );
-                break;
+        if( FSM::isConsumer( sess->fsm ) ) {
+            _waitConsumers.erase( fd );
         }
+
+        _close( fd );
     }
 
-    void ServerController::_recvSecure( unsigned int fd, Session *sess ) {
+    void ServerController::_recvSecure( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !_recvToPacket( fd, packet ) ) return;
 
-        if( !Protocol::isCheckNoSecure( sess->packet.get() ) ) throw util::Error::WRONG_CMD;
+        if( !Protocol::isCheckNoSecure( sess->packet.get() ) ) {
+            throw util::Error::WRONG_CMD;
+        }
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_COMMON_SEND_CONFIRM_SECURE;
+        sess->fsm = FSM::Code::COMMON_SEND_CONFIRM_SECURE;
 
         _send( fd, sess );
     }
 
-    void ServerController::_recvVersion( unsigned int fd, Session *sess ) {
+    void ServerController::_recvVersion( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !_recvToPacket( fd, packet ) ) return;
 
-        if( !Protocol::isGetVersion( sess->packet.get() ) ) throw util::Error::WRONG_CMD;
+        if( !Protocol::isGetVersion( sess->packet.get() ) ) {
+            throw util::Error::WRONG_CMD;
+        }
 
         Protocol::prepareVersion( packet );
-        sess->fsm = FSM_COMMON_SEND_VERSION;
+        sess->fsm = FSM::Code::COMMON_SEND_VERSION;
 
         _send( fd, sess );
     }
 
     void ServerController::_copyAuthData(
-        Session *sess,
+        Sessions::Session *sess,
         const char *group,
         const char *channel,
         const char *login
@@ -409,7 +254,7 @@ namespace simq::core::server {
         memcpy( &sess->authData.get()[sess->offsetLogin], login, lLogin );
     }
 
-    void ServerController::_authGroupCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_authGroupCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = Protocol::getGroup( packet );
@@ -419,13 +264,13 @@ namespace simq::core::server {
         _copyAuthData( sess, group );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_COMMON_SEND_CONFIRM_AUTH_GROUP;
-        sess->type = TYPE_GROUP;
+        sess->fsm = FSM::Code::COMMON_SEND_CONFIRM_AUTH_GROUP;
+        sess->type = Sessions::TYPE_GROUP;
 
         _send( fd, sess );
     }
 
-    void ServerController::_authConsumerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_authConsumerCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = Protocol::getGroup( packet );
@@ -438,13 +283,13 @@ namespace simq::core::server {
         _copyAuthData( sess, group, channel, login );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_COMMON_SEND_CONFIRM_AUTH_CONSUMER;
-        sess->type = TYPE_CONSUMER;
+        sess->fsm = FSM::Code::COMMON_SEND_CONFIRM_AUTH_CONSUMER;
+        sess->type = Sessions::TYPE_CONSUMER;
 
         _send( fd, sess );
     }
 
-    void ServerController::_authProducerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_authProducerCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = Protocol::getGroup( packet );
@@ -457,13 +302,13 @@ namespace simq::core::server {
         _copyAuthData( sess, group, channel, login );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_COMMON_SEND_CONFIRM_AUTH_PRODUCER;
-        sess->type = TYPE_PRODUCER;
+        sess->fsm = FSM::Code::COMMON_SEND_CONFIRM_AUTH_PRODUCER;
+        sess->type = Sessions::TYPE_PRODUCER;
 
         _send( fd, sess );
     }
 
-    void ServerController::_recvAuth( unsigned int fd, Session *sess ) {
+    void ServerController::_recvAuth( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !_recvToPacket( fd, packet ) ) return;
@@ -479,7 +324,7 @@ namespace simq::core::server {
         }
     }
 
-    void ServerController::_updateMyGroupPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateMyGroupPasswordCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto curPassword = Protocol::getPassword( packet );
@@ -498,12 +343,12 @@ namespace simq::core::server {
         );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
 
         _send( fd, sess );
     }
 
-    void ServerController::_updateMyConsumerPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateMyConsumerPasswordCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto curPassword = Protocol::getPassword( packet );
@@ -529,12 +374,12 @@ namespace simq::core::server {
         );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_CONSUMER_SEND;
+        sess->fsm = FSM::Code::CONSUMER_SEND;
 
         _send( fd, sess );
     }
 
-    void ServerController::_updateConsumerPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateConsumerPasswordCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto newPassword = Protocol::getPassword( packet );
@@ -559,12 +404,12 @@ namespace simq::core::server {
         );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
 
         _send( fd, sess );
     }
 
-    void ServerController::_updateMyProducerPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateMyProducerPasswordCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto curPassword = Protocol::getPassword( packet );
@@ -590,12 +435,12 @@ namespace simq::core::server {
         );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_PRODUCER_SEND;
+        sess->fsm = FSM::Code::PRODUCER_SEND;
 
         _send( fd, sess );
     }
 
-    void ServerController::_updateProducerPasswordCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateProducerPasswordCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto newPassword = Protocol::getPassword( packet );
@@ -620,12 +465,12 @@ namespace simq::core::server {
         );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
 
         _send( fd, sess );
     }
 
-    void ServerController::_recvGroupCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvGroupCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !_recvToPacket( fd, packet ) ) return;
@@ -663,7 +508,7 @@ namespace simq::core::server {
         }
     }
 
-    void ServerController::_recvConsumerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvConsumerCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !_recvToPacket( fd, packet ) ) return;
@@ -679,18 +524,20 @@ namespace simq::core::server {
         }
     }
 
-    void ServerController::_recvConsumerCmdPartMessage( unsigned int fd, Session *sess ) {
+    void ServerController::_recvConsumerCmdPartMessage( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !_recvToPacket( fd, packet ) ) return;
 
-        if( !Protocol::isGetPartMessage( packet ) ) throw util::Error::WRONG_CMD;
+        if( !Protocol::isGetPartMessage( packet ) ) {
+            throw util::Error::WRONG_CMD;
+        }
 
-        sess->fsm = FSM_CONSUMER_SEND_PART_MESSAGE;
+        sess->fsm = FSM::Code::CONSUMER_SEND_PART_MESSAGE;
         _sendToConsumerPartMessage( fd, sess );
     }
 
-    void ServerController::_recvConsumerRemoveMessageCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvConsumerRemoveMessageCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !_recvToPacket( fd, packet ) ) return;
@@ -715,14 +562,14 @@ namespace simq::core::server {
 
         _access->checkPopMessage( group, channel, login, fd );
         _q->removeMessage( group, channel, fd, sess->msgID );
-        sess->fsm = FSM_CONSUMER_SEND;
+        sess->fsm = FSM::Code::CONSUMER_SEND;
         sess->msgID = 0;
 
         Protocol::prepareOk( packet );
         _send( fd, sess );
     }
 
-    void ServerController::_recvProducerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_recvProducerCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         if( !_recvToPacket( fd, packet ) ) return;
@@ -740,7 +587,7 @@ namespace simq::core::server {
         }
     }
 
-    void ServerController::_recvFromProducerPartMessage( unsigned int fd, Session *sess ) {
+    void ServerController::_recvFromProducerPartMessage( unsigned int fd, Sessions::Session *sess ) {
         auto packetMsg = sess->packetMsg.get();
         auto packet = sess->packet.get();
 
@@ -757,10 +604,10 @@ namespace simq::core::server {
             if( Protocol::isFull( packetMsg ) ) {
                 _q->pushMessage( group, channel, fd, sess->msgID );
                 sess->msgID = 0;
-                sess->fsm = FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE_END;
+                sess->fsm = FSM::Code::PRODUCER_SEND_CONFIRM_PART_MESSAGE_END;
                 isSend = true;
             } else if( Protocol::isFullPart( packetMsg ) ) {
-                sess->fsm = FSM_PRODUCER_SEND_CONFIRM_PART_MESSAGE;
+                sess->fsm = FSM::Code::PRODUCER_SEND_CONFIRM_PART_MESSAGE;
                 isSend = true;
             }
 
@@ -772,7 +619,7 @@ namespace simq::core::server {
             if( err == util::Error::SOCKET ) {
                 _close( fd );
             } else {
-                sess->fsm = FSM_PRODUCER_RECV_PART_MESSAGE_NULL;
+                sess->fsm = FSM::Code::PRODUCER_RECV_PART_MESSAGE_NULL;
                 _recvFromProducerPartMessageNull( fd, sess );
             }
         } catch( ... ) {
@@ -781,7 +628,7 @@ namespace simq::core::server {
 
     }
 
-    void ServerController::_recvFromProducerPartMessageNull( unsigned int fd, Session *sess ) {
+    void ServerController::_recvFromProducerPartMessageNull( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
@@ -801,12 +648,12 @@ namespace simq::core::server {
         if( Protocol::isFullPart( packetMsg ) ) {
             Protocol::prepareError( packet, util::Error::getDescription( util::Error::ACCESS_DENY ) );
 
-            sess->fsm = FSM_PRODUCER_SEND_ERROR_WITH_CLOSE;
+            sess->fsm = FSM::Code::PRODUCER_SEND_ERROR_WITH_CLOSE;
             _send( fd, sess );
         }
     }
 
-    void ServerController::_sendToConsumerPartMessage( unsigned int fd, Session *sess ) {
+    void ServerController::_sendToConsumerPartMessage( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
@@ -821,18 +668,18 @@ namespace simq::core::server {
 
             if( Protocol::isFull( packetMsg ) ) {
                 Protocol::prepareOk( packet );
-                sess->fsm = FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE_END;
+                sess->fsm = FSM::Code::CONSUMER_SEND_CONFIRM_PART_MESSAGE_END;
                 _send( fd, sess );
             } else if( Protocol::isFullPart( packetMsg ) ) {
                 Protocol::prepareOk( packet );
-                sess->fsm = FSM_CONSUMER_SEND_CONFIRM_PART_MESSAGE;
+                sess->fsm = FSM::Code::CONSUMER_SEND_CONFIRM_PART_MESSAGE;
                 _send( fd, sess );
             }
         } catch( util::Error::Err err ) {
             if( err == util::Error::SOCKET ) {
                 _close( fd );
             } else {
-                sess->fsm = FSM_CONSUMER_SEND_PART_MESSAGE_NULL;
+                sess->fsm = FSM::Code::CONSUMER_SEND_PART_MESSAGE_NULL;
                 _sendToConsumerPartMessageNull( fd, sess );
             }
         } catch( ... ) {
@@ -840,7 +687,7 @@ namespace simq::core::server {
         }
     }
 
-    void ServerController::_sendToConsumerPartMessageNull( unsigned int fd, Session *sess ) {
+    void ServerController::_sendToConsumerPartMessageNull( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
@@ -860,12 +707,12 @@ namespace simq::core::server {
         if( Protocol::isFullPart( packetMsg ) ) {
             Protocol::prepareError( packet, util::Error::getDescription( util::Error::ACCESS_DENY ) );
 
-            sess->fsm = FSM_CONSUMER_SEND_ERROR_WITH_CLOSE;
+            sess->fsm = FSM::Code::CONSUMER_SEND_ERROR_WITH_CLOSE;
             _send( fd, sess );
         }
     }
 
-    void ServerController::_getChannelsCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_getChannelsCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -876,11 +723,11 @@ namespace simq::core::server {
         _store->getChannels( group, channels );
 
         Protocol::prepareStringList( packet, channels );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_getChannelLimitMessagesCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_getChannelLimitMessagesCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -892,11 +739,11 @@ namespace simq::core::server {
         _store->getChannelLimitMessages( group, channel, limitMessages ); 
 
         Protocol::prepareChannelLimitMessages( packet, limitMessages );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_getConsumersCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_getConsumersCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -908,11 +755,11 @@ namespace simq::core::server {
         _store->getConsumers( group, channel, consumers );
 
         Protocol::prepareStringList( packet, consumers );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_getProducersCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_getProducersCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -924,11 +771,11 @@ namespace simq::core::server {
         _store->getProducers( group, channel, producers );
 
         Protocol::prepareStringList( packet, producers );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_addChannelCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_addChannelCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -942,11 +789,11 @@ namespace simq::core::server {
         _changes->push( std::move( change ) );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_updateChannelLimitMessagesCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_updateChannelLimitMessagesCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -960,11 +807,11 @@ namespace simq::core::server {
         _changes->push( std::move( change ) );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_removeChannelCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_removeChannelCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -976,11 +823,11 @@ namespace simq::core::server {
         _changes->push( std::move( change ) );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_addConsumerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_addConsumerCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -994,11 +841,11 @@ namespace simq::core::server {
         _changes->push( std::move( change ) );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_removeConsumerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_removeConsumerCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -1011,11 +858,11 @@ namespace simq::core::server {
         _changes->push( std::move( change ) );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_addProducerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_addProducerCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -1029,11 +876,11 @@ namespace simq::core::server {
         _changes->push( std::move( change ) );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_removeProducerCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_removeProducerCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -1046,11 +893,11 @@ namespace simq::core::server {
         _changes->push( std::move( change ) );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_GROUP_SEND;
+        sess->fsm = FSM::Code::GROUP_SEND;
         _send( fd, sess );
     }
 
-    unsigned int ServerController::_popMessage( unsigned int fd, Session *sess ) {
+    unsigned int ServerController::_popMessage( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
@@ -1068,7 +915,7 @@ namespace simq::core::server {
         }
 
         Protocol::setLength( packetMsg, length );
-        sess->fsm = FSM_CONSUMER_SEND_MESSAGE_META;
+        sess->fsm = FSM::Code::CONSUMER_SEND_MESSAGE_META;
         sess->msgID = id;
 
         if( uuid[0] ) {
@@ -1083,11 +930,13 @@ namespace simq::core::server {
         return id;
     }
 
-    void ServerController::_popMessageCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_popMessageCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto delay = Protocol::getDelay( packet );
-        if( delay > MAX_DELAY_SECONDS ) throw util::Error::WRONG_CMD;
+        if( delay > MAX_DELAY_SECONDS ) {
+            throw util::Error::WRONG_CMD;
+        }
         sess->delayConsumerWait = delay * 1000;
 
         auto id = _popMessage( fd, sess );
@@ -1102,11 +951,11 @@ namespace simq::core::server {
         }
 
         Protocol::prepareNoneMessageMetaPop( packet );
-        sess->fsm = FSM_CONSUMER_SEND;
+        sess->fsm = FSM::Code::CONSUMER_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_removeMessageByUUIDCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_removeMessageByUUIDCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
 
         auto group = sess->authData.get();
@@ -1119,11 +968,11 @@ namespace simq::core::server {
         _q->removeMessage( group, channel, fd, uuid );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_CONSUMER_SEND;
+        sess->fsm = FSM::Code::CONSUMER_SEND;
         _send( fd, sess );
     }
 
-    void ServerController::_pushMessageCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_pushMessageCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
@@ -1139,12 +988,12 @@ namespace simq::core::server {
         Protocol::setLength( packetMsg, length );
 
         Protocol::prepareMessageMetaPush( packet, uuid );
-        sess->fsm = FSM_PRODUCER_SEND_MESSAGE_META;
+        sess->fsm = FSM::Code::PRODUCER_SEND_MESSAGE_META;
 
         _send( fd, sess );
     }
 
-    void ServerController::_pushSignalMessageCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_pushSignalMessageCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
@@ -1159,12 +1008,12 @@ namespace simq::core::server {
         Protocol::setLength( packetMsg, length );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_PRODUCER_SEND_MESSAGE_META;
+        sess->fsm = FSM::Code::PRODUCER_SEND_MESSAGE_META;
 
         _send( fd, sess );
     }
     
-    void ServerController::_pushReplicaMessageCmd( unsigned int fd, Session *sess ) {
+    void ServerController::_pushReplicaMessageCmd( unsigned int fd, Sessions::Session *sess ) {
         auto packet = sess->packet.get();
         auto packetMsg = sess->packetMsg.get();
 
@@ -1180,53 +1029,51 @@ namespace simq::core::server {
         Protocol::setLength( packetMsg, length );
 
         Protocol::prepareOk( packet );
-        sess->fsm = FSM_PRODUCER_SEND_MESSAGE_META;
+        sess->fsm = FSM::Code::PRODUCER_SEND_MESSAGE_META;
 
         _send( fd, sess );
     }
 
     void ServerController::connect( unsigned int fd, unsigned int ip ) {
-        auto sess = std::make_unique<Session>();
-        sess->fsm = FSM_COMMON_RECV_CMD_CHECK_SECURE;
-        sess->type = TYPE_COMMON;
-        sess->packet = std::make_unique<Protocol::Packet>();
-        sess->packetMsg = std::make_unique<Protocol::BasePacket>();
-        _sessions[fd] = std::move( sess );
+        auto wrapper = std::make_unique<WrapperSession>();
+
+        wrapper->sess = _sess->connect( fd, wrapper->counter );
+        _sessions[fd] = std::move( wrapper );
     }
 
     void ServerController::recv( unsigned int fd ) {
-        auto sess = _sessions[fd].get();
+        auto sess = _sessions[fd]->sess;
 
         try {
             switch( sess->fsm ) {
-                case FSM_COMMON_RECV_CMD_CHECK_SECURE:
+                case FSM::Code::COMMON_RECV_CMD_CHECK_SECURE:
                     _recvSecure( fd, sess );
                     break;
-                case FSM_COMMON_RECV_CMD_GET_VERSION:
+                case FSM::Code::COMMON_RECV_CMD_GET_VERSION:
                     _recvVersion( fd, sess );
                     break;
-                case FSM_COMMON_RECV_CMD_AUTH:
+                case FSM::Code::COMMON_RECV_CMD_AUTH:
                     _recvAuth( fd, sess );
                     break;
-                case FSM_GROUP_RECV_CMD:
+                case FSM::Code::GROUP_RECV_CMD:
                     _recvGroupCmd( fd, sess );
                     break;
-                case FSM_CONSUMER_RECV_CMD:
+                case FSM::Code::CONSUMER_RECV_CMD:
                     _recvConsumerCmd( fd, sess );
                     break;
-                case FSM_CONSUMER_RECV_CMD_PART_MESSAGE:
+                case FSM::Code::CONSUMER_RECV_CMD_PART_MESSAGE:
                     _recvConsumerCmdPartMessage( fd, sess );
                     break;
-                case FSM_CONSUMER_RECV_CMD_REMOVE_MESSAGE:
+                case FSM::Code::CONSUMER_RECV_CMD_REMOVE_MESSAGE:
                     _recvConsumerRemoveMessageCmd( fd, sess );
                     break;
-                case FSM_PRODUCER_RECV_CMD:
+                case FSM::Code::PRODUCER_RECV_CMD:
                     _recvProducerCmd( fd, sess );
                     break;
-                case FSM_PRODUCER_RECV_PART_MESSAGE:
+                case FSM::Code::PRODUCER_RECV_PART_MESSAGE:
                     _recvFromProducerPartMessage( fd, sess );
                     break;
-                case FSM_PRODUCER_RECV_PART_MESSAGE_NULL:
+                case FSM::Code::PRODUCER_RECV_PART_MESSAGE_NULL:
                     _recvFromProducerPartMessageNull( fd, sess );
                     break;
                 default:
@@ -1235,42 +1082,41 @@ namespace simq::core::server {
         } catch( util::Error::Err err ) {
             sess->fsm = _getFSMByError( sess, err );
 
-            switch( sess->fsm ) {
-                case FSM_COMMON_CLOSE:
-                case FSM_GROUP_CLOSE:
-                case FSM_PRODUCER_CLOSE:
-                    _close( fd );
-                    break;
-                case FSM_CONSUMER_CLOSE:
+            if( FSM::isClose( sess->fsm ) ) {
+                if( FSM::isConsumer( sess->fsm ) ) {
                     _waitConsumers.erase( fd );
-                    _close( fd );
-                    break;
-                default:
-                    try {
-                        Protocol::prepareError( sess->packet.get(), util::Error::getDescription( err ) );
-                        _send( fd, sess );
-                    } catch( ... ) {
+                }
+
+                _close( fd );
+            } else {
+                try {
+                    Protocol::prepareError( sess->packet.get(), util::Error::getDescription( err ) );
+                    _send( fd, sess );
+                } catch( ... ) {
+                    if( FSM::isConsumer( sess->fsm ) ) {
                         _waitConsumers.erase( fd );
-                        _close( fd );
                     }
-                    break;
+                    _close( fd );
+                }
             }
         } catch( ... ) {
-            _waitConsumers.erase( fd );
+            if( FSM::isConsumer( sess->fsm ) ) {
+                _waitConsumers.erase( fd );
+            }
             _close( fd );
         }
 
     }
 
     void ServerController::send( unsigned int fd ) {
-        auto sess = _sessions[fd].get();
+        auto sess = _sessions[fd]->sess;
 
         try {
             switch( sess->fsm ) {
-                case FSM_CONSUMER_SEND_PART_MESSAGE:
+                case FSM::Code::CONSUMER_SEND_PART_MESSAGE:
                     _sendToConsumerPartMessage( fd, sess );
                     break;
-                case FSM_CONSUMER_SEND_PART_MESSAGE_NULL:
+                case FSM::Code::CONSUMER_SEND_PART_MESSAGE_NULL:
                     _sendToConsumerPartMessageNull( fd, sess );
                     break;
                 default:
@@ -1278,14 +1124,21 @@ namespace simq::core::server {
                     break;
             }
         } catch( ... ) {
-            _waitConsumers.erase( fd );
+            if( FSM::isConsumer( sess->fsm ) ) {
+                _waitConsumers.erase( fd );
+            }
             _close( fd );
         }
     }
 
     void ServerController::disconnect( unsigned int fd ) {
-        _waitConsumers.erase( fd );
-        _close( fd );
+        auto wrapper = _sessions[fd].get();
+
+        if( FSM::isConsumer( wrapper->sess->fsm ) ) {
+            _waitConsumers.erase( fd );
+        }
+
+        _sess->disconnect( fd, wrapper->counter );
     }
 
     void ServerController::polling( unsigned int delay ) {
@@ -1294,7 +1147,7 @@ namespace simq::core::server {
 
             auto itSess = _sessions.find( fd );
             if( itSess == _sessions.end() ) continue;
-            auto sess = itSess->second.get();
+            auto sess = itSess->second->sess;
 
             sess->delayConsumerWait -= delay;
 
@@ -1303,7 +1156,7 @@ namespace simq::core::server {
                 if( msgId == 0 ) {
                     if( sess->delayConsumerWait <= 0 ) {
                         Protocol::prepareNoneMessageMetaPop( sess->packet.get() );
-                        sess->fsm = FSM_CONSUMER_SEND;
+                        sess->fsm = FSM::Code::CONSUMER_SEND;
                         _send( fd, sess );
                         _waitConsumers.erase( it++ );
                     } else {
@@ -1317,7 +1170,7 @@ namespace simq::core::server {
                 if( err == util::Error::SOCKET ) {
                     _close( fd );
                 } else {
-                    sess->fsm = FSM_CONSUMER_SEND_ERROR;
+                    sess->fsm = FSM::Code::CONSUMER_SEND_ERROR;
                     Protocol::prepareError( sess->packet.get(), util::Error::getDescription( err ) );
                     _send( fd, sess );
                 }
