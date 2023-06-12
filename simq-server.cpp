@@ -123,7 +123,7 @@ int main( int argc, char *argv[] ) {
     for( unsigned int i = 1; i < argc; i++ ) {
         std::string val = std::string( argv[i] );
 
-        if( val == "manager" ) {
+        if( val == "admin" ) {
             isManager = true;
         } else if( strncmp( val.c_str(), pathMask, lPathMask ) == 0 ) {
             path = &val.c_str()[lPathMask];
