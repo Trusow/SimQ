@@ -742,7 +742,7 @@ namespace simq::core::server::q {
 
         unsigned int id = 0;
 
-        if( consumers.find( fd ) != consumers.end() && !consumers[fd].empty() ) {
+        if( !consumers[fd].empty() ) {
             id = consumers[fd].front();
             channel->consumers[fd].pop_front();
             length = channel->messages->getLength( id );
