@@ -5,6 +5,7 @@
 #include "src/core/server/initialization.hpp"
 #include "src/core/server/server/manager.hpp"
 #include "src/core/server/server_controller.hpp"
+#include "src/core/server/sessions.hpp"
 #include <thread>
 #include <list>
 #include <string>
@@ -44,7 +45,8 @@ void startServer(
     simq::core::server::Store *store,
     simq::core::server::Access *access,
     simq::core::server::Changes *changes,
-    simq::core::server::q::Manager *q
+    simq::core::server::q::Manager *q,
+    simq::core::server::Sessions *sess
 ) {
     if( !isPassedStartServer ) {
         return;
@@ -53,7 +55,7 @@ void startServer(
 
     try {
         simq::core::server::server::Manager server( store->getPort() );
-        simq::core::server::ServerController controller( store, access, changes, q );
+        simq::core::server::ServerController controller( store, access, changes, q, sess );
 
         server.bindController( &controller );
 
@@ -83,6 +85,7 @@ void startServer(
 void startInit( const char *path = "." ) {
     simq::core::server::Access access;
     simq::core::server::q::Manager q;
+    simq::core::server::Sessions sess( &access, &q );
 
     simq::core::server::Initialization ini( path, access, q );
     if( !ini.isInit() ) {
@@ -95,7 +98,7 @@ void startInit( const char *path = "." ) {
     auto store = ini.getStore();
 
     for( unsigned int i = 0; i < store->getCountThreads(); i++ ) {
-        std::thread t( startServer, store, &access, changes, &q );
+        std::thread t( startServer, store, &access, changes, &q, &sess );
         t.detach();
     }
 
