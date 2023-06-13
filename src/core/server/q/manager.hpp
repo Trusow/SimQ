@@ -802,7 +802,6 @@ namespace simq::core::server::q {
             return;
         }
 
-        channel->messages->resetSend( id );
         channel->QList.push_front( id );
     }
 }

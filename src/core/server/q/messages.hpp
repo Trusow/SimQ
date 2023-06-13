@@ -62,7 +62,6 @@ namespace simq::core::server::q {
 
             unsigned int recv( unsigned int id, unsigned int fd );
             unsigned int send( unsigned int id, unsigned int fd, unsigned int offset );
-            void resetSend( unsigned int id );
             unsigned int getLength( unsigned int id );
     };
 
@@ -294,13 +293,6 @@ namespace simq::core::server::q {
         }
 
         return _buffer->send( id, fd, offset );
-    }
-
-    void Messages::resetSend( unsigned int id ) {
-        _wait( _countWrited );
-        std::shared_lock<std::shared_timed_mutex> lock( _m );
-
-        _buffer->resetSend( id );
     }
 
     unsigned int Messages::getLength( unsigned int id ) {

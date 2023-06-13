@@ -33,7 +33,6 @@ namespace simq::core::server::q {
             struct Item {
                 unsigned int length;
                 unsigned int recvLength;
-                unsigned int sendLength;
 
                 std::unique_ptr<std::unique_ptr<char[]>[]> buffer;
                 std::unique_ptr<unsigned long int[]> fileOffsets;
@@ -96,8 +95,6 @@ namespace simq::core::server::q {
 
             unsigned int recv( unsigned int id, unsigned int fd );
             unsigned int send( unsigned int id, unsigned int fd, unsigned int offset );
-
-            void resetSend( unsigned int id );
 
             unsigned int getLength( unsigned int id );
     };
@@ -301,9 +298,8 @@ namespace simq::core::server::q {
 
         auto data = &item->buffer[offsetPage][offsetInnerPage];
         auto length = ::send( fd, data, sendLength, MSG_NOSIGNAL );
-        item->sendLength += _checkRSLength( length );
 
-        return length;
+        return _checkRSLength( length );
     }
 
     unsigned int Buffer::_sendFromFile( Item *item, unsigned int fd, unsigned int offset ) {
@@ -314,9 +310,8 @@ namespace simq::core::server::q {
         auto fileOffset = _getOffsetFile( item, offsetPage, offsetInnerPage );
 
         auto length = ::sendfile( fd, _fileFD, (long *)&fileOffset, sendLength );
-        item->sendLength += _checkRSLength( length );
 
-        return length;
+        return _checkRSLength( length );
     }
 
 
@@ -352,19 +347,6 @@ namespace simq::core::server::q {
         }
 
         return _sendFromFile( item, fd, offset );
-    }
-
-    void Buffer::resetSend( unsigned int id ) {
-        _wait( _countItemsWrited );
-        std::shared_lock<std::shared_timed_mutex> lockItems( _mItems );
-
-        auto item = _getItem( id );
-
-        if( item == nullptr ) {
-            return;
-        }
-
-        item->sendLength = 0;
     }
 
     unsigned int Buffer::_getUniqID() {
