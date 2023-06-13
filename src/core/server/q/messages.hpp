@@ -109,7 +109,7 @@ namespace simq::core::server::q {
         auto it = _uuid.find( uuid );
 
         if( it == _uuid.end() ) {
-            throw util::Error::UNKNOWN;
+            throw util::Error::NOT_FOUND_UUID;
         }
 
         return it->second;
