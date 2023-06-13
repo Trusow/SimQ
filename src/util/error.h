@@ -5,7 +5,6 @@ namespace simq::util {
     class Error {
         public:
             enum Err {
-                NOT_FOUND,
                 WRONG_PASSWORD,
                 WRONG_PARAM,
                 WRONG_GROUP,
@@ -18,22 +17,25 @@ namespace simq::util {
                 WRONG_PRODUCER,
                 WRONG_UUID,
                 WRONG_CMD,
-                EXCEED_LIMIT,
-                IS_EXISTS,
-                ACCESS_DENY,
-                UNKNOWN,
-                FS_ERROR,
-                DUPLICATE_GROUP,
+
+                NOT_FOUND,
                 NOT_FOUND_GROUP,
                 NOT_FOUND_CHANNEL,
                 NOT_FOUND_CONSUMER,
                 NOT_FOUND_PRODUCER,
                 NOT_FOUND_UUID,
+
+                DUPLICATE_GROUP,
                 DUPLICATE_SESSION,
                 DUPLICATE_CHANNEL,
                 DUPLICATE_CONSUMER,
                 DUPLICATE_PRODUCER,
                 DUPLICATE_UUID,
+
+                EXCEED_LIMIT,
+                ACCESS_DENY,
+                UNKNOWN,
+                FS_ERROR,
                 SOCKET,
             };
 
@@ -69,8 +71,6 @@ namespace simq::util {
                         return "Wrong command";
                     case EXCEED_LIMIT:
                         return "Exceed limit";
-                    case IS_EXISTS:
-                        return "Is exists";
                     case ACCESS_DENY:
                         return "Access deny";
                     case util::Error::FS_ERROR:
