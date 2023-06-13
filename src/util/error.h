@@ -28,6 +28,7 @@ namespace simq::util {
                 NOT_FOUND_CHANNEL,
                 NOT_FOUND_CONSUMER,
                 NOT_FOUND_PRODUCER,
+                NOT_FOUND_UUID,
                 DUPLICATE_SESSION,
                 DUPLICATE_CHANNEL,
                 DUPLICATE_CONSUMER,
@@ -94,6 +95,8 @@ namespace simq::util {
                         return "Duplicate producer";
                     case SOCKET:
                         return "Connection error";
+                    case NOT_FOUND_UUID:
+                        return "Not found UUID";
                     default:
                         return "Unknown";
                 }
