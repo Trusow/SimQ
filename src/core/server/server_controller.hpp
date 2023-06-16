@@ -85,6 +85,7 @@ namespace simq::core::server {
             void _removeConsumerCmd( unsigned int fd, Sessions::Session *sess );
             void _addProducerCmd( unsigned int fd, Sessions::Session *sess );
             void _removeProducerCmd( unsigned int fd, Sessions::Session *sess );
+            void _clearQCmd( unsigned int fd, Sessions::Session *sess );
 
             unsigned int _popMessage( unsigned int fd, Sessions::Session *sess );
             void _popMessageCmd( unsigned int fd, Sessions::Session *sess );
@@ -503,6 +504,8 @@ namespace simq::core::server {
             _updateProducerPasswordCmd( fd, sess );
         } else if( Protocol::isRemoveProducer( packet ) ) {
             _removeProducerCmd( fd, sess );
+        } else if( Protocol::isClearQ( packet ) ) {
+            _clearQCmd( fd, sess );
         } else {
             throw util::Error::WRONG_CMD;
         }
@@ -891,6 +894,20 @@ namespace simq::core::server {
 
         auto change = _changes->removeProducer( group, channel, login );
         _changes->push( std::move( change ) );
+
+        Protocol::prepareOk( packet );
+        sess->fsm = FSM::Code::GROUP_SEND;
+        _send( fd, sess );
+    }
+
+    void ServerController::_clearQCmd( unsigned int fd, Sessions::Session *sess ) {
+        auto packet = sess->packet.get();
+
+        auto group = sess->authData.get();
+        auto channel = Protocol::getChannel( packet );
+
+        _access->checkToChannel( group, channel, fd );
+        _q->clearQ( group, channel );
 
         Protocol::prepareOk( packet );
         sess->fsm = FSM::Code::GROUP_SEND;
