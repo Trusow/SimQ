@@ -45,7 +45,6 @@ namespace simq::core::server::q {
             std::atomic_uint _countItemsWrited {0};
             std::vector<std::unique_ptr<Item>> _items;
 
-            unsigned int _countItemsPackets = 0;
             std::list<unsigned int> _freeIDs;
             unsigned int _uniqID = 0;
 
@@ -97,6 +96,8 @@ namespace simq::core::server::q {
             unsigned int send( unsigned int id, unsigned int fd, unsigned int offset );
 
             unsigned int getLength( unsigned int id );
+
+            void clear();
     };
 
     Buffer::Buffer( const char *path ) {
@@ -370,7 +371,6 @@ namespace simq::core::server::q {
     }
 
     void Buffer::_expandItems() {
-        _countItemsPackets++;
         _items.resize( _items.size() + SIZE_ITEM_PACKET );
     }
 
@@ -422,6 +422,21 @@ namespace simq::core::server::q {
             }
             _fileOffset = size / MESSAGE_PACKET_SIZE;
         }
+    }
+
+    void Buffer::clear() {
+        util::LockAtomic lockAtomicGroup( _countItemsWrited );
+        std::lock_guard<std::shared_timed_mutex> lockItems( _mItems );
+
+        std::lock_guard<std::mutex> lockFile( _mFile );
+
+        _uniqID = 0;
+        _freeIDs.clear();
+        _items.clear();
+        _freeFileOffsets.clear();
+
+        _initFileSize();
+        _expandItems();
     }
 }
 

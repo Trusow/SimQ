@@ -145,6 +145,11 @@ namespace simq::core::server::q {
                 unsigned int fd,
                 unsigned int id
             );
+
+            void clearQ (
+                const char *groupName,
+                const char *channelName
+            );
     };
 
     void Manager::_wait( std::atomic_uint &atom ) {
@@ -803,6 +808,40 @@ namespace simq::core::server::q {
         }
 
         channel->QList.push_front( id );
+    }
+
+    void Manager::clearQ(
+        const char *groupName,
+        const char *channelName
+    ) {
+        _wait( _countGroupsWrited );
+        std::shared_lock<std::shared_timed_mutex> lock( _mGroups );
+
+        if( _groups.find( groupName ) == _groups.end() ) {
+            return;
+        }
+
+        auto group = _groups[groupName].get();
+
+        _wait( group->countChannelsWrited );
+        std::shared_lock<std::shared_timed_mutex> lockChannels( group->mChannels );
+
+        if( group->channels.find( channelName ) == group->channels.end() ) {
+            return;
+        }
+
+        auto channel = group->channels[channelName].get();
+
+        util::LockAtomic lockAtomicQ( channel->countQListWrited );
+        std::lock_guard<std::shared_timed_mutex> lockQ( channel->mQList );
+
+        for( auto it = channel->consumers.begin(); it != channel->consumers.end(); it++ ) {
+            channel->consumers[it->first].clear();
+        }
+
+        channel->messages->clearQ();
+        channel->QList.clear();
+        channel->signals.clear();
     }
 }
 
