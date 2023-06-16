@@ -55,6 +55,7 @@ namespace simq::core::server {
                 CMD_ADD_CHANNEL = 3'001,
                 CMD_REMOVE_CHANNEL = 3'002,
                 CMD_UPDATE_CHANNEL_LIMIT_MESSAGES = 3'101,
+                CMD_CLEAR_Q = 3'201,
 
                 CMD_ADD_CONSUMER = 4'001,
                 CMD_REMOVE_CONSUMER = 4'002,
@@ -174,6 +175,7 @@ namespace simq::core::server {
             static void _checkCmdPushSignalMessage( Packet *packet );
             static void _checkCmdRemoveMessageByUUID( Packet *packet );
             static void _checkCmdPopMessage( Packet *packet );
+            static void _checkCmdClearQ( Packet *packet );
 
         public:
             static void prepareVersion( Packet *packet );
@@ -251,6 +253,8 @@ namespace simq::core::server {
             static bool isRemoveMessage( Packet *packet );
             static bool isRemoveMessageByUUID( Packet *packet );
 
+            static bool isClearQ( Packet *packet );
+
             static const char *getGroup( Packet *packet );
             static const char *getChannel( Packet *packet );
             static const char *getConsumer( Packet *packet );
@@ -283,6 +287,7 @@ namespace simq::core::server {
 
         if( l == -1 ) {
             if( errno != EAGAIN ) {
+                std::cout << "this protocol" << std::endl;
                 throw util::Error::SOCKET;
             }
 
@@ -304,6 +309,7 @@ namespace simq::core::server {
 
         if( l == -1 ) {
             if( errno != EAGAIN ) {
+                std::cout << "this protocol" << std::endl;
                 throw util::Error::SOCKET;
             }
 
@@ -556,6 +562,7 @@ namespace simq::core::server {
             case CMD_PUSH_REPLICA_MESSAGE:
             case CMD_REMOVE_MESSAGE_BY_UUID:
             case CMD_POP_MESSAGE:
+            case CMD_CLEAR_Q:
                 if( packet->length > PACKET_SIZE ) {
                     throw util::Error::WRONG_CMD;
                 }
@@ -876,6 +883,14 @@ namespace simq::core::server {
         _checkControlLength( offset, packet->length );
     }
 
+    void Protocol::_checkCmdClearQ( Packet *packet ) {
+        auto offset = 0;
+
+        offset += _checkParamCmdChannelName( packet, offset, 0 );
+
+        _checkControlLength( offset, packet->length );
+    }
+
     unsigned int Protocol::_calculateCountValues( Packet *packet ) {
         unsigned int length = packet->length;
         unsigned int offset = 0;
@@ -973,6 +988,9 @@ namespace simq::core::server {
                 break;
             case CMD_POP_MESSAGE:
                 _checkCmdPopMessage( packet );
+                break;
+            case CMD_CLEAR_Q:
+                _checkCmdClearQ( packet );
                 break;
         }
     }
@@ -1125,6 +1143,10 @@ namespace simq::core::server {
         return packet->cmd == CMD_REMOVE_MESSAGE_BY_UUID && packet->countValues == 1;
     }
 
+    bool Protocol::isClearQ( Packet *packet ) {
+        return packet->cmd == CMD_CLEAR_Q && packet->countValues == 1;
+    }
+
     const char *Protocol::getGroup( Packet *packet ) {
         auto values = packet->values.get();
         auto offsets = packet->valuesOffsets.get();
@@ -1173,6 +1195,8 @@ namespace simq::core::server {
         } else if( isRemoveProducer( packet ) ) {
             return &values[offsets[0]];
         } else if( isGetChannelLimitMessages( packet ) ) {
+            return &values[offsets[0]];
+        } else if( isClearQ( packet ) ) {
             return &values[offsets[0]];
         }
 
