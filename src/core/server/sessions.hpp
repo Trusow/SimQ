@@ -134,13 +134,15 @@ namespace simq::core::server {
                 login = &sess->authData.get()[sess->offsetLogin];
 
                 _access->logoutConsumer( group, channel, login, fd );
-                if( sess->msgID != 0 ) {
-                    if( !sess->isSignal ) {
-                        _q->revertMessage( group, channel, fd, sess->msgID );
-                    } else {
-                        _q->removeMessage( group, channel, fd, sess->msgID );
+                try {
+                    if( sess->msgID != 0 ) {
+                        if( !sess->isSignal ) {
+                            _q->revertMessage( group, channel, fd, sess->msgID );
+                        } else {
+                            _q->removeMessage( group, channel, fd, sess->msgID );
+                        }
                     }
-                }
+                } catch( ... ) {}
                 _q->leaveConsumer( group, channel, fd );
                 break;
             case TYPE_PRODUCER:
@@ -149,9 +151,11 @@ namespace simq::core::server {
                 login = &sess->authData.get()[sess->offsetLogin];
 
                 _access->logoutProducer( group, channel, login, fd );
-                if( sess->msgID != 0 ) {
-                    _q->removeMessage( group, channel, fd, sess->msgID );
-                }
+                try {
+                    if( sess->msgID != 0 ) {
+                        _q->removeMessage( group, channel, fd, sess->msgID );
+                    }
+                } catch( ... ) {}
                 _q->leaveProducer( group, channel, fd );
                 break;
         }
