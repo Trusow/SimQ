@@ -286,7 +286,6 @@ namespace simq::core::server {
 
         if( l == -1 ) {
             if( errno != EAGAIN ) {
-                std::cout << "this protocol" << std::endl;
                 throw util::Error::SOCKET;
             }
 
@@ -308,7 +307,6 @@ namespace simq::core::server {
 
         if( l == -1 ) {
             if( errno != EAGAIN ) {
-                std::cout << "this protocol" << std::endl;
                 throw util::Error::SOCKET;
             }
 
