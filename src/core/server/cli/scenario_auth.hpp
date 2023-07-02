@@ -35,7 +35,7 @@ namespace simq::core::server::CLI {
 
     void ScenarioAuth::start() {
         _isEnd = false;
-        _console->printSuccess( "Welcome to SimQ - a simple message queue.\nAuthor - Sergej Trusow, version - 1.0\nPress 'h' to help." );
+        _console->printSuccess( "Welcome to SimQ - a simple message queue.\nAuthor - Sergei Trusow, version - 1.0.1\nhttps://simq.org i@trusow.ru\nPress 'h' to help." );
         _console->getPassword( "Input password to continue: " );
     }
 
