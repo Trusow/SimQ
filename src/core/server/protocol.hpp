@@ -47,7 +47,7 @@ namespace simq::core::server {
                 CMD_AUTH_PRODUCER = 1'003,
 
                 CMD_GET_CHANNELS = 2'001,
-                CMD_GET_CONUMERS = 2'002,
+                CMD_GET_CONSUMERS = 2'002,
                 CMD_GET_PRODUCERS = 2'003,
                 CMD_GET_CHANNEL_LIMIT_MESSSAGES = 2'101,
                 CMD_SEND_CHANNEL_LIMIT_MESSSAGES = 2'102,
@@ -69,7 +69,6 @@ namespace simq::core::server {
                 CMD_PUSH_MESSAGE = 6'001,
                 CMD_PUSH_REPLICA_MESSAGE = 6'002,
                 CMD_PUSH_SIGNAL_MESSAGE = 6'003,
-                CMD_SEND_UUID_MESSAGE = 6'004,
 
                 CMD_REMOVE_MESSAGE = 6'101,
                 CMD_REMOVE_MESSAGE_BY_UUID = 6'102,
@@ -379,7 +378,7 @@ namespace simq::core::server {
         _reservePacketValues( packet, LENGTH_META + lengthBody );
         packet->length = 0;
 
-        _marsh( packet, CMD_GET_VERSION );
+        _marsh( packet, CMD_OK );
         _marsh( packet, lengthBody );
 
         _marsh( packet, SIZE_UINT );
@@ -469,7 +468,7 @@ namespace simq::core::server {
         _reservePacketValues( packet, LENGTH_META + lengthBody );
         packet->length = 0;
 
-        _marsh( packet, CMD_SEND_UUID_MESSAGE );
+        _marsh( packet, CMD_OK );
         _marsh( packet, lengthBody );
         _marsh( packet, lengthUUID );
         _marsh( packet, uuid, lengthUUID );
@@ -545,7 +544,7 @@ namespace simq::core::server {
             case CMD_AUTH_GROUP:
             case CMD_AUTH_CONSUMER:
             case CMD_AUTH_PRODUCER:
-            case CMD_GET_CONUMERS:
+            case CMD_GET_CONSUMERS:
             case CMD_GET_PRODUCERS:
             case CMD_GET_CHANNEL_LIMIT_MESSSAGES:
             case CMD_ADD_CHANNEL:
@@ -939,7 +938,7 @@ namespace simq::core::server {
                 _checkCmdAuthProducer( packet );
                 break;
                 break;
-            case CMD_GET_CONUMERS:
+            case CMD_GET_CONSUMERS:
             case CMD_GET_PRODUCERS:
                 _checkCmdGetUsers( packet );
                 break;
@@ -1060,7 +1059,7 @@ namespace simq::core::server {
     }
 
     bool Protocol::isGetConsumers( Packet *packet ) {
-        return packet->cmd == CMD_GET_CONUMERS && packet->countValues == 1;
+        return packet->cmd == CMD_GET_CONSUMERS && packet->countValues == 1;
     }
 
     bool Protocol::isGetProducers( Packet *packet ) {
